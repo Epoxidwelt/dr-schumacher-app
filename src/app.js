@@ -1,3 +1,36 @@
+// Placeholder pricing seeded from the Gesamtkatalog 2026 Google Sheet the user
+// maintains (UVP/PL1-PL5 - PL6 has no data there yet). Every size currently carries
+// the same flat 10/9/8/7/6/5 EUR test values, confirmed with the user as intentional
+// placeholder data for exercising the import pipeline - NOT real prices. Replace by
+// re-running scripts (see docs/referenz-katalog-artikel-roh.csv) once real per-product
+// prices exist, or by importing a real price CSV via Einstellungen, which overrides
+// this at the per-SKU level.
+const DEFAULT_PRICES = {
+  '00-457OP-0005-01': {sizes:{
+'50 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'100 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'150 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'500 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'700 ml (ESH Vacu-Bag kurze Pumpe)':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'700 ml (ESH Vacu-Bag lange Pumpe)':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'1 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'5 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-409-0015-02': {sizes:{
+'150 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'500 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'1 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-410OP-0015': {sizes:{
+'150 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'500 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'1 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-401-0015-02': {sizes:{
+'150 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'500 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'1 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'5 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'250 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-323DS-005': {sizes:{
+'500 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'750 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'1 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'2,5 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'5 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'10 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-323DS-T060': {sizes:{
+'60 Tücher':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'100 Tücher':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-208-005': {sizes:{
+'500 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'750 ml':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'1 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'5 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-270-T072': {sizes:{
+'72 Tücher':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-255-0004': {sizes:{
+'40 g':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'1 kg':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-155-0004': {sizes:{
+'40 g':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'1 kg':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-150-010': {sizes:{
+'1 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'2 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'5 L':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+  '00-915-SKD001': {sizes:{
+'1 Stück':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''},'6 Stück':{'UVP':10.0,'PL 1':9.0,'PL 2':8.0,'PL 3':7.0,'PL 4':6.0,'PL 5':5.0,'PL 6':''}}},
+};
 const OFFICIAL = {
   home: 'https://www.schumacher-online.com/de',
   catalog: 'https://schumacher-katalog.com/de/',
@@ -37,7 +70,7 @@ const state = {
   priceList: sessionStorage.getItem('priceList') || '',
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
-  prices: JSON.parse(localStorage.getItem('prices') || '{}'),
+  prices: {...DEFAULT_PRICES, ...JSON.parse(localStorage.getItem('prices') || '{}')},
   favorites: JSON.parse(localStorage.getItem('favorites') || '[]'),
   size: '',
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
@@ -117,6 +150,14 @@ function bottomNav(active='home') {
 
 function render() {
   const app = $('#app');
+  const active = document.activeElement;
+  const isTypingField = active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) && active.id;
+  const focusState = isTypingField ? {
+    id: active.id,
+    selStart: 'selectionStart' in active ? active.selectionStart : null,
+    selEnd: 'selectionEnd' in active ? active.selectionEnd : null,
+    scrollY: window.scrollY
+  } : null;
   let html = '';
   if (state.screen === 'profile') html = profileScreen();
   if (state.screen === 'prices') html = priceScreen();
@@ -136,6 +177,16 @@ function render() {
   if (state.screen === 'dashboard') html = header(true) + dashboardScreen() + bottomNav('home');
   app.innerHTML = html;
   bind();
+  if (focusState) {
+    const el = document.getElementById(focusState.id);
+    if (el) {
+      el.focus();
+      if (focusState.selStart != null && 'setSelectionRange' in el) {
+        try { el.setSelectionRange(focusState.selStart, focusState.selEnd); } catch (e) {}
+      }
+      window.scrollTo(0, focusState.scrollY);
+    }
+  }
 }
 
 
@@ -228,7 +279,7 @@ function productsScreen() {
   return `<main class="page products-page">
     <div class="section-heading"><div><span class="eyebrow">Produktbereich</span><h1>${names[state.category]}</h1></div><span class="result-count">${list.length} Produkte</span></div>
     <label class="search-box">${icon('search')}<input id="search" value="${escapeHtml(state.query)}" placeholder="Produktname oder Artikelnummer suchen"></label>
-    <div class="filter-row">${spectra.map(s => `<button class="filter-chip ${state.spectrum===s?'active':''}" data-spectrum="${s}">${s==='all'?'Alle':s}</button>`).join('')}</div>
+    <div class="filter-row">${spectra.map(s => `<button class="filter-chip ${s==='all'?'':spectrumClass(s)} ${state.spectrum===s?'active':''}" data-spectrum="${s}">${s==='all'?'Alle':s}</button>`).join('')}</div>
     <div class="product-list">${list.map(productCard).join('') || '<div class="empty-state"><h2>Keine Produkte gefunden</h2><p>Bitte ändern Sie Ihre Suche oder den Filter.</p></div>'}</div>
   </main>`;
 }
@@ -260,7 +311,7 @@ function detailScreen() {
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2><ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
-      <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div><div class="price-display"><div>${state.customerMode?'<small>Kundenmodus aktiv</small><strong class="hidden-price">Preis verborgen</strong><span>Interne Konditionen werden nicht angezeigt.</span>':`<small>Ihr Preis (${state.priceList})</small><strong>${money(price)}</strong><span>${perUnitLabel(p,state.size) || 'zzgl. MwSt.'}</span>`}</div><button data-action="${state.customerMode?'customer-mode':'prices'}">${state.customerMode?'Internen Modus aktivieren':'Preisliste wechseln'}</button></div>
+      <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div><div class="price-display"><div>${state.customerMode?'<small>Kundenmodus aktiv</small><strong class="hidden-price">Preis verborgen</strong><span>Interne Konditionen werden nicht angezeigt.</span>':`<small>Ihr Preis (${state.priceList})</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div><button data-action="${state.customerMode?'customer-mode':'prices'}">${state.customerMode?'Internen Modus aktivieren':'Preisliste wechseln'}</button></div>
         ${state.customerMode ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
@@ -649,9 +700,11 @@ function downloadsScreen() {
   return `<main class="page downloads-page"><div class="section-heading"><div><span class="eyebrow">Immer aktuell</span><h1>Downloads</h1><p>Alle Unterlagen werden direkt von den offiziellen Online-Quellen geöffnet.</p></div></div><div class="download-list">${links.map(([title,sub,url,emoji]) => `<a href="${url}" target="_blank" rel="noopener"><span class="download-icon">${emoji}</span><span><strong>${title}</strong><small>${sub}</small></span><b>↗</b></a>`).join('')}</div></main>`;
 }
 
+function spectrumClass(s) {
+  return s.includes('PLUS') ? 'plus' : s === 'viruzid' ? 'viruzid' : s === 'sporizid' ? 'sporizid' : 'limited';
+}
 function spectrumBadge(s) {
-  const cls = s.includes('PLUS') ? 'plus' : s === 'viruzid' ? 'viruzid' : s === 'sporizid' ? 'sporizid' : 'limited';
-  return `<span class="badge ${cls}">${s}</span>`;
+  return `<span class="badge ${spectrumClass(s)}">${s}</span>`;
 }
 function documentLink(title, sub, url, emoji) {
   return `<a class="document-link" href="${url}" target="_blank" rel="noopener"><span>${emoji}</span><div><strong>${title}</strong><small>${sub}</small></div><b>↗</b></a>`;
@@ -674,6 +727,13 @@ function pricePerUnit(product, size) {
 function perUnitLabel(product, size) {
   const per = pricePerUnit(product, size);
   return per == null ? '' : `${moneyPerUnit(per)} / Tuch`;
+}
+function perUnitCalc(product, size) {
+  const units = unitsInSize(size);
+  const price = resolvePrice(product, size);
+  const per = pricePerUnit(product, size);
+  if (per == null) return '';
+  return `${money(Number(price))} ÷ ${units} Tücher = ${moneyPerUnit(per)} / Tuch`;
 }
 function escapeHtml(text) { return String(text).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
@@ -698,7 +758,7 @@ function bind() {
   document.querySelectorAll('[data-email-toggle]').forEach(button => button.onclick = () => { const key=button.dataset.emailToggle; state.emailInclude[key]=!state.emailInclude[key]; render(); });
   document.querySelectorAll('[data-action="send-email"]').forEach(button => button.onclick = () => sendProductEmail(button.dataset.product));
   $('#search')?.addEventListener('input', event => { state.query=event.target.value; render(); });
-  $('#globalSearch')?.addEventListener('input', event => { state.globalQuery=event.target.value; render(); setTimeout(()=>{const el=$('#globalSearch'); if(el){el.focus(); el.setSelectionRange(el.value.length,el.value.length);}},0); });
+  $('#globalSearch')?.addEventListener('input', event => { state.globalQuery=event.target.value; render(); });
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
   $('#excel')?.addEventListener('change', importExcel);
   document.querySelectorAll('[data-advisor]').forEach(button => button.onclick = () => { state.advisor[button.dataset.advisor]=button.dataset.value; render(); });
