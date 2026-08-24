@@ -529,7 +529,7 @@ function offerScreen() {
   const total = subtotal + vat;
   const validUntil = state.quoteValidUntil || new Date(Date.now()+14*86400000).toISOString().slice(0,10);
   return `<main class="page offer-page"><div class="section-heading no-print"><div><span class="eyebrow">Angebotsentwurf</span><h1>Kundenübersicht & Kalkulation</h1><p>Erstellt aus der aktiven Merkliste „${escapeHtml(state.activeList)}“.</p></div></div>
-    <section class="offer-config no-print"><label>Kunde / Einrichtung<input id="quoteCustomer" value="${escapeHtml(state.quoteCustomer)}" placeholder="z. B. Klinikum Dortmund"></label><label>Ansprechpartner<input id="quoteContact" value="${escapeHtml(state.quoteContact)}" placeholder="Name oder Funktion"></label><label>Gültig bis<input id="quoteValidUntil" type="date" value="${escapeHtml(validUntil)}"></label><label class="wide">Notiz<textarea id="quoteNote" placeholder="Ziel, nächste Schritte oder besondere Anforderungen">${escapeHtml(state.quoteNote)}</textarea></label><div class="offer-actions wide"><button class="secondary-button" data-action="customer-mode">${state.customerMode?'Preise wieder anzeigen':'Preise für Kunden ausblenden'}</button><button class="secondary-button" data-action="export-offer">CSV für Innendienst</button><button class="primary-button compact" data-action="print-offer">Drucken / als PDF speichern</button></div></section>
+    <section class="offer-config no-print"><label>Kunde / Einrichtung<input id="quoteCustomer" value="${escapeHtml(state.quoteCustomer)}" placeholder="z. B. Klinikum Dortmund"></label><label>Ansprechpartner<input id="quoteContact" value="${escapeHtml(state.quoteContact)}" placeholder="Name oder Funktion"></label><label>Gültig bis<input id="quoteValidUntil" type="date" value="${escapeHtml(validUntil)}"></label><label class="wide">Notiz<textarea id="quoteNote" placeholder="Ziel, nächste Schritte oder besondere Anforderungen">${escapeHtml(state.quoteNote)}</textarea></label><div class="offer-actions wide"><button class="secondary-button" data-action="customer-mode">${state.customerMode?'Preise wieder anzeigen':'Preise für Kunden ausblenden'}</button><button class="secondary-button" data-action="export-offer">CSV für Innendienst</button><button class="secondary-button" data-action="email-offer" ${products.length?'':'disabled'}>${icon('talk')}<span>Per E-Mail an Innendienst</span></button><button class="primary-button compact" data-action="print-offer">Drucken / als PDF speichern</button></div></section>
     <section class="offer-sheet"><div class="offer-brand"><img src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher"><div><span>Angebotsentwurf</span><strong>${escapeHtml(state.quoteCustomer || 'Kundentermin')}</strong><small>${escapeHtml(state.quoteContact || '')}</small></div></div><div class="offer-meta"><span>Merkliste: ${escapeHtml(state.activeList)}</span><span>Preisbasis: ${state.customerMode?'ohne Preise':escapeHtml(state.priceList)}</span><span>Gültig bis: ${new Date(validUntil+'T12:00:00').toLocaleDateString('de-DE')}</span><span>Stand: ${new Date().toLocaleDateString('de-DE')}</span></div>
       ${products.length ? `<div class="offer-table-wrap"><table class="offer-table offer-calculation"><thead><tr><th>Produkt</th><th>Gebinde</th><th>Menge</th><th>Rabatt</th><th>Einzelpreis</th><th>Gesamt</th></tr></thead><tbody>${rows}</tbody></table></div>${state.customerMode?'':`<div class="offer-totals"><div><span>Zwischensumme</span><strong>${money(subtotal)}</strong></div><div><span>zzgl. 19 % MwSt.</span><strong>${money(vat)}</strong></div><div class="grand-total"><span>Gesamtsumme</span><strong>${money(total)}</strong></div></div>`}` : '<div class="empty-state"><h2>Die Merkliste ist leer</h2><p>Fügen Sie zuerst Produkte einer Merkliste hinzu.</p></div>'}
       ${state.quoteNote ? `<div class="offer-note"><strong>Notiz</strong><p>${escapeHtml(state.quoteNote)}</p></div>` : ''}
@@ -673,6 +673,46 @@ function exportOfferCsv() {
   a.href=URL.createObjectURL(blob); a.download='angebotsentwurf-'+(state.quoteCustomer||'kunde').replace(/[^a-z0-9äöüß-]+/gi,'-').toLowerCase()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 
+function buildOfferEmail() {
+  const ids = state.lists[state.activeList] || [];
+  const products = ids.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+  let subtotal = 0;
+  const lines = [
+    `Guten Tag,`,
+    ``,
+    `im Kundengespräch mit ${state.quoteCustomer || '(Kunde bitte ergänzen)'}${state.quoteContact ? ' (' + state.quoteContact + ')' : ''} wurden folgende Produkte ausgewählt. Bitte prüfen und dem Kunden zusenden.`,
+    ``,
+    `Merkliste: ${state.activeList}`,
+    `Preisliste: ${state.priceList}`,
+    ``
+  ];
+  products.forEach(p => {
+    const saved = state.quoteItems[p.id] || {};
+    const size = saved.size && p.sizes.includes(saved.size) ? saved.size : (p.sizes[0] || '');
+    const quantity = Math.max(1, Number(saved.quantity) || 1);
+    const discount = Math.min(100, Math.max(0, Number(saved.discount) || 0));
+    const rawPrice = resolvePrice(p, size);
+    const unitPrice = rawPrice === '' || rawPrice == null ? null : Number(rawPrice);
+    const lineTotal = unitPrice == null ? null : unitPrice * quantity * (1 - discount / 100);
+    if (lineTotal != null) subtotal += lineTotal;
+    lines.push(`- ${p.name} (Art.-Nr. ${p.sku}), Gebinde ${size}, Menge ${quantity}${discount ? `, Rabatt ${discount}%` : ''}: ${unitPrice != null ? money(unitPrice) + ' / Stück, Summe ' + money(lineTotal) : 'Preis nicht hinterlegt'}`);
+  });
+  const vat = subtotal * 0.19;
+  const total = subtotal + vat;
+  lines.push('', `Zwischensumme: ${money(subtotal)}`, `zzgl. 19% MwSt.: ${money(vat)}`, `Gesamtsumme: ${money(total)}`);
+  if (state.quoteNote) lines.push('', `Notiz: ${state.quoteNote}`);
+  lines.push('', 'Bitte um Erstellung/Versand des Angebots an den Kunden.', 'Danke und Grüße');
+  return {
+    subject: `Angebot für ${state.quoteCustomer || 'Kundentermin'} – bitte an Kunden senden`,
+    body: lines.join('\n')
+  };
+}
+
+function sendOfferEmail() {
+  const { subject, body } = buildOfferEmail();
+  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 function favoritesScreen() {
   const list = PRODUCTS.filter(p => state.favorites.includes(p.id));
   return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1></div><span class="result-count">${list.length}</span></div><div class="product-list">${list.map(productCard).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
@@ -781,6 +821,7 @@ function bind() {
   $('[data-action="copy-talk"]')?.addEventListener('click', async () => { const text=buildTalkText(); try{await navigator.clipboard.writeText(text);alert('Gesprächsleitfaden kopiert.')}catch{alert(text)} });
   $('[data-action="print-offer"]')?.addEventListener('click', () => window.print());
   $('[data-action="export-offer"]')?.addEventListener('click', exportOfferCsv);
+  $('[data-action="email-offer"]')?.addEventListener('click', sendOfferEmail);
   document.querySelectorAll('[data-report-field]').forEach(input => { const handler=()=>{saveVisitReportField(input.dataset.reportField,input.value); if(input.tagName==='SELECT'||input.type==='date') render();}; input.addEventListener(input.tagName==='SELECT'||input.type==='date'?'change':'input',handler); });
   $('[data-action="copy-report"]')?.addEventListener('click', async () => { const text=buildCrmSummary(); try{await navigator.clipboard.writeText(text);alert('CRM-Text wurde kopiert.')}catch{alert(text)} });
   $('[data-action="export-report"]')?.addEventListener('click', exportVisitReportCsv);
