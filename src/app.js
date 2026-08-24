@@ -1355,7 +1355,8 @@ async function syncLivePrices(manual=false) {
       if (!key) return;
       const sizes = {};
       groups[key].forEach(row => {
-        const size = normalizeSheetSize(row['Inhalt']);
+        const hasPrice = ['Preisliste UVP','Preisliste 1','Preisliste 2','Preisliste 3','Preisliste 4','Preisliste 5'].some(c => toNumber(row[c]) !== '');
+        const size = normalizeSheetSize(row['Inhalt']) || (hasPrice ? p.sizes[0] : '');
         if (!size) return;
         sizes[size] = {
           UVP: toNumber(row['Preisliste UVP']),
