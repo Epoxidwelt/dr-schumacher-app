@@ -532,7 +532,7 @@ function menuScreen() {
 }
 
 function miniProductCard(product) {
-  return `<button class="mini-product" data-product="${product.id}"><span class="mini-product-icon" style="--product-color:${product.color}">${product.category==='hands'?'✋':product.category==='surface'?'▦':product.category==='instruments'?'✂':'▣'}</span><span><strong>${product.name}</strong><small>${product.kind}</small></span><b>›</b></button>`;
+  return `<button class="recent-card" data-product="${product.id}"><span class="recent-card-icon" style="--product-color:${product.color}">${product.category==='hands'?'✋':product.category==='surface'?'▦':product.category==='instruments'?'✂':'▣'}</span><span class="recent-card-copy"><strong>${product.name}</strong><small>${product.kind}</small></span><b>›</b></button>`;
 }
 
 function productsScreen() {
