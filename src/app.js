@@ -385,7 +385,6 @@ function priceScreen() {
       <h1>Welche Preisliste möchten Sie verwenden?</h1>
       <p>Die Auswahl gilt für die gesamte Sitzung. Sie kann später jederzeit geändert werden.</p>
       <div class="price-options">${options.map(option => `<button class="price-option ${state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}</div>
-      <button class="primary-button" data-action="start" ${!state.priceList?'disabled':''}>Produktberater starten <span>→</span></button>
       <p class="privacy-note">Preise bleiben lokal auf diesem Gerät und werden nicht in eine Cloud übertragen.</p>
     </section>
   </main>`;
@@ -520,9 +519,11 @@ function buildProductEmail(p) {
   const price = resolvePrice(p, size);
   const inc = state.emailInclude;
   const lines = [
-    `Guten Tag,`,
+    `Hallo Team,`,
     ``,
-    `anbei die gewünschten Informationen zu ${p.name} (${p.kind}):`,
+    `bitte nachstehende Informationen an den Kunden senden:`,
+    ``,
+    `${p.name} (${p.kind})`,
     `Artikelnummer: ${p.sku}`,
     `Gebinde: ${size}`
   ];
@@ -533,18 +534,27 @@ function buildProductEmail(p) {
   }
   if (inc.sheet) lines.push(`Produktdatenblatt: ${OFFICIAL.sheets}`);
   if (inc.safety) lines.push(`Sicherheitsdatenblatt: ${OFFICIAL.sheets}`);
-  lines.push('', 'Bei Fragen stehe ich gerne zur Verfügung.', 'Beste Grüße');
+  lines.push('', 'Danke und Grüße');
   return {
     subject: `Produktinformation ${p.name} – Dr. Schumacher`,
     body: lines.join('\n')
   };
 }
 
+function openMailto(subject, body) {
+  const a = document.createElement('a');
+  a.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 function sendProductEmail(id) {
   const p = PRODUCTS.find(x => x.id === id);
   if (!p) return;
   const {subject, body} = buildProductEmail(p);
-  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  openMailto(subject, body);
 }
 
 function advisorScreen() {
@@ -854,9 +864,10 @@ function buildOfferEmail() {
   const products = ids.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
   let subtotal = 0;
   const lines = [
-    `Guten Tag,`,
+    `Hallo Team,`,
     ``,
-    `im Kundengespräch mit ${state.quoteCustomer || '(Kunde bitte ergänzen)'}${state.quoteContact ? ' (' + state.quoteContact + ')' : ''} wurden folgende Produkte ausgewählt. Bitte prüfen und dem Kunden zusenden.`,
+    `bitte nachstehende Informationen an den Kunden senden.`,
+    `Im Kundengespräch mit ${state.quoteCustomer || '(Kunde bitte ergänzen)'}${state.quoteContact ? ' (' + state.quoteContact + ')' : ''} wurden folgende Produkte ausgewählt:`,
     ``,
     `Merkliste: ${state.activeList}`,
     `Preisliste: ${state.priceList}`,
@@ -886,7 +897,7 @@ function buildOfferEmail() {
 
 function sendOfferEmail() {
   const { subject, body } = buildOfferEmail();
-  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  openMailto(subject, body);
 }
 
 function favoritesScreen() {
@@ -959,10 +970,10 @@ function bind() {
   document.querySelectorAll('[data-price]').forEach(button => button.onclick = () => {
     state.priceList = button.dataset.price;
     sessionStorage.setItem('priceList', state.priceList);
+    state.screen = 'menu';
     render();
   });
   document.querySelectorAll('[data-action="prices"]').forEach(button => button.onclick = () => { state.screen='prices'; render(); });
-  $('[data-action="start"]')?.addEventListener('click', () => { state.screen='menu'; render(); });
   $('[data-action="back"]')?.addEventListener('click', () => { state.screen = state.screen==='detail' ? 'products' : 'menu'; render(); });
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
