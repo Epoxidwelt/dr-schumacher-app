@@ -147,7 +147,7 @@ function profileScreen() {
 }
 
 function priceScreen() {
-  const options = ['UVP','FH 1','FH 2','FH 3','FH 4','FH 5'];
+  const options = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','PL 6'];
   return `<main class="price-shell">
     <section class="price-panel">
       <img class="welcome-logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher">
@@ -178,6 +178,9 @@ function menuScreen() {
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
   if (!can('sales')) cards = cards.filter(card => !['compare','lists','offer'].includes(card[0]));
+  const coreKeys = ['surface','hands','instruments','application'];
+  const coreCards = cards.filter(c => coreKeys.includes(c[0]));
+  const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
   const today = new Date().toISOString().slice(0,10);
   const openReports = state.savedReports.filter(r => (r.taskStatus || 'Offen') !== 'Erledigt');
   const due = openReports.filter(r => r.followUp && r.followUp <= today).length;
@@ -185,20 +188,22 @@ function menuScreen() {
   const recentProducts = state.recent.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean).slice(0,4);
   const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => `${p.name} ${p.kind} ${p.sku} ${p.summary}`.toLowerCase().includes(state.globalQuery.toLowerCase())).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
-    <section class="cockpit-hero"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Guten Tag – womit möchten Sie starten?</h1><p>Produkte, Preise, Unterlagen und Kundentermine an einem Ort.</p></div><div class="status-card"><span>Aktive Preisliste</span><strong>${state.priceList}</strong><small>${state.customerMode?'Kundenmodus – Preise verborgen':Object.keys(state.prices).length+' Preiszeilen lokal'}</small></div></section>
+    <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.priceList}</h1></div>${state.customerMode?'<div class="status-card"><span>Kundenmodus</span><strong>Preise verborgen</strong></div>':''}</section>
+    <div class="category-grid">${coreCards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>
     <label class="global-search">${icon('search')}<input id="globalSearch" value="${escapeHtml(state.globalQuery)}" placeholder="Produkt, Artikelnummer oder Anwendung suchen"><span>⌘ K</span></label>
     ${state.globalQuery.trim() ? `<section class="cockpit-search-results"><div class="section-heading"><div><span class="eyebrow">Sofortsuche</span><h2>${searchResults.length} Treffer</h2></div><button class="secondary-button" data-action="clear-global-search">Suche löschen</button></div><div class="product-list">${searchResults.map(productCard).join('') || '<div class="empty-state"><h2>Kein Produkt gefunden</h2><p>Versuchen Sie einen anderen Suchbegriff.</p></div>'}</div></section>` : ''}
+    <section class="cockpit-columns">
+      <div class="cockpit-panel"><div class="panel-title"><div><span class="eyebrow">Schnellzugriff</span><h2>Zuletzt angesehen</h2></div><button data-category="recent">Alle</button></div><div class="mini-products">${recentProducts.map(miniProductCard).join('') || '<p class="muted-copy">Noch keine Produkte geöffnet.</p>'}</div></div>
+      <div class="cockpit-panel"><div class="panel-title"><div><span class="eyebrow">Persönlich</span><h2>Favoriten</h2></div><button data-nav="favorites">Alle</button></div><div class="mini-products">${favoriteProducts.map(miniProductCard).join('') || '<p class="muted-copy">Noch keine Favoriten gespeichert.</p>'}</div></div>
+    </section>
     <section class="cockpit-stats">
       <button data-category="dashboard"><strong>${due}</strong><span>heute / überfällig</span><small>Follow-ups öffnen →</small></button>
       <button data-category="favorites"><strong>${state.favorites.length}</strong><span>Favoriten</span><small>Schnellzugriff →</small></button>
       <button data-category="lists"><strong>${Object.keys(state.lists).length}</strong><span>Merklisten</span><small>Termine vorbereiten →</small></button>
       <button data-category="settings"><strong>${Object.keys(state.prices).length}</strong><span>Preisdatensätze</span><small>Import verwalten →</small></button>
     </section>
-    <section class="cockpit-columns">
-      <div class="cockpit-panel"><div class="panel-title"><div><span class="eyebrow">Schnellzugriff</span><h2>Zuletzt angesehen</h2></div><button data-category="recent">Alle</button></div><div class="mini-products">${recentProducts.map(miniProductCard).join('') || '<p class="muted-copy">Noch keine Produkte geöffnet.</p>'}</div></div>
-      <div class="cockpit-panel"><div class="panel-title"><div><span class="eyebrow">Persönlich</span><h2>Favoriten</h2></div><button data-nav="favorites">Alle</button></div><div class="mini-products">${favoriteProducts.map(miniProductCard).join('') || '<p class="muted-copy">Noch keine Favoriten gespeichert.</p>'}</div></div>
-    </section>
-    <div class="category-grid compact-grid">${cards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>
+    <div class="section-heading"><div><span class="eyebrow">Weitere Funktionen</span><h2>Werkzeuge</h2></div></div>
+    <div class="category-grid compact-grid">${toolCards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>
     <section class="online-card"><div class="online-dot"></div><div><strong>Unterlagen immer aktuell</strong><p>Produktinformationen, Datenblätter und Bilder werden direkt von schumacher-online.com geöffnet.</p></div><a href="${OFFICIAL.home}" target="_blank" rel="noopener">Website öffnen</a></section>
   </main>`;
 }
@@ -225,12 +230,14 @@ function productsScreen() {
 }
 
 function productCard(product) {
-  const price = resolvePrice(product);
+  const refSize = product.sizes[0];
+  const price = resolvePrice(product, refSize);
+  const perUnit = perUnitLabel(product, refSize);
   const favorite = state.favorites.includes(product.id);
   return `<article class="product-row" data-product="${product.id}">
     <div class="product-image" style="--product-color:${product.color}"><span>${product.category==='hands'?'✋':product.category==='surface'?'▦':product.category==='instruments'?'✂':'▣'}</span></div>
-    <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}</div><p>Art.-Nr. ${product.sku}</p></div>
-    <div class="row-price">${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong><small>Kundenmodus</small>':`<strong>${money(price)}</strong><small>${state.priceList}</small>`}</div>
+    <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}</div><p>Art.-Nr. ${product.sku} · ${refSize}</p></div>
+    <div class="row-price">${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong><small>Kundenmodus</small>':`<strong>${money(price)}</strong><small>${perUnit || state.priceList}</small>`}</div>
     <button class="favorite-button ${favorite?'active':''}" data-favorite="${product.id}" aria-label="Favorit">${icon('star')}</button>
     <span class="chevron">›</span>
   </article>`;
@@ -249,7 +256,7 @@ function detailScreen() {
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2><ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
-      <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div><div class="price-display"><div>${state.customerMode?'<small>Kundenmodus aktiv</small><strong class="hidden-price">Preis verborgen</strong><span>Interne Konditionen werden nicht angezeigt.</span>':`<small>Ihr Preis (${state.priceList})</small><strong>${money(price)}</strong><span>zzgl. MwSt.</span>`}</div><button data-action="${state.customerMode?'customer-mode':'prices'}">${state.customerMode?'Internen Modus aktivieren':'Preisliste wechseln'}</button></div>
+      <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div><div class="price-display"><div>${state.customerMode?'<small>Kundenmodus aktiv</small><strong class="hidden-price">Preis verborgen</strong><span>Interne Konditionen werden nicht angezeigt.</span>':`<small>Ihr Preis (${state.priceList})</small><strong>${money(price)}</strong><span>${perUnitLabel(p,state.size) || 'zzgl. MwSt.'}</span>`}</div><button data-action="${state.customerMode?'customer-mode':'prices'}">${state.customerMode?'Internen Modus aktivieren':'Preisliste wechseln'}</button></div>
         ${emailCard(p)}
       </div>
     </section>
@@ -287,7 +294,11 @@ function buildProductEmail(p) {
     `Artikelnummer: ${p.sku}`,
     `Gebinde: ${size}`
   ];
-  if (inc.price && !state.customerMode && price !== undefined && price !== null && price !== '') lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
+  if (inc.price && !state.customerMode && price !== undefined && price !== null && price !== '') {
+    lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
+    const per = perUnitLabel(p, size);
+    if (per) lines.push(`Umgerechnet: ${per}`);
+  }
   if (inc.sheet) lines.push(`Produktdatenblatt: ${OFFICIAL.sheets}`);
   if (inc.safety) lines.push(`Sicherheitsdatenblatt: ${OFFICIAL.sheets}`);
   lines.push('', 'Bei Fragen stehe ich gerne zur Verfügung.', 'Beste Grüße');
@@ -576,7 +587,7 @@ function settingsScreen() {
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
     <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${can('prices')?`<label class="file-row"><span><strong>Excel-Preise importieren</strong><small>.xlsx, .xls oder .csv – bleibt lokal</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><div id="importStatus" class="import-status"><strong>${metaText}</strong><br>${Object.keys(state.prices).length} Artikelnummern lokal gespeichert</div><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Merklisten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
-    <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und FH 1 bis FH 5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
+    <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL6</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
     <p class="version">Interner Produktberater · Version 2.2</p>
   </main>`;
 }
@@ -603,6 +614,20 @@ function resolvePrice(product, size='') {
   const row = state.prices[product.sku] || state.prices[product.id] || {};
   if (size && row.sizes && row.sizes[size]) return row.sizes[size][state.priceList];
   return row[state.priceList];
+}
+function unitsInSize(size) {
+  const m = /^(\d+)\s*Tücher/i.exec(size || '');
+  return m ? Number(m[1]) : null;
+}
+function pricePerUnit(product, size) {
+  const units = unitsInSize(size);
+  const price = resolvePrice(product, size);
+  if (!units || price === '' || price == null || isNaN(Number(price))) return null;
+  return Number(price) / units;
+}
+function perUnitLabel(product, size) {
+  const per = pricePerUnit(product, size);
+  return per == null ? '' : `${money(per)} / Tuch`;
 }
 function escapeHtml(text) { return String(text).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
@@ -772,7 +797,7 @@ async function importExcel(event) {
       const sku = String(row.Artikelnummer || row.SKU || row['Artikel-Nr.'] || '').trim();
       const size = String(row.Gebinde || row.Gebindegröße || '').trim();
       if (!sku) { errors.push(`Zeile ${line}: Artikelnummer fehlt`); continue; }
-      const values = {UVP:toNumber(row.UVP), 'FH 1':toNumber(row['FH 1']), 'FH 2':toNumber(row['FH 2']), 'FH 3':toNumber(row['FH 3']), 'FH 4':toNumber(row['FH 4']), 'FH 5':toNumber(row['FH 5'])};
+      const values = {UVP:toNumber(row.UVP), 'PL 1':toNumber(row.PL1 ?? row['PL 1']), 'PL 2':toNumber(row.PL2 ?? row['PL 2']), 'PL 3':toNumber(row.PL3 ?? row['PL 3']), 'PL 4':toNumber(row.PL4 ?? row['PL 4']), 'PL 5':toNumber(row.PL5 ?? row['PL 5']), 'PL 6':toNumber(row.PL6 ?? row['PL 6'])};
       if (Object.values(values).every(v => v === '')) { errors.push(`Zeile ${line}: keine Preise vorhanden`); continue; }
       if (!mapped[sku]) mapped[sku] = {sizes:{}};
       if (size) {
