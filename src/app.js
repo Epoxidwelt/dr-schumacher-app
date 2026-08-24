@@ -123,6 +123,8 @@ const OFFICIAL = {
   disinfectionPlans: 'https://www.eqmed.de/'
 };
 
+const PRICE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1z_FuQiBslt71eLzNA-6cstToQp86PKud_7HXY8JK0eQ/export?format=csv&gid=1904728001';
+
 const PRODUCT_DOCS = {
   'descosept-spezial': {pif:'https://www.schumacher-online.com/products/pif/P_100000_PIF_00208-Descosept-Spezial-DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/SDB-00208_DESCOSEPT_SPEZIAL_VAR_DE_WEB.pdf',ba:'https://www.schumacher-online.com/products/ba/BA-00208_DESCOSEPT_SPEZIAL_VAR_DE_WEB.pdf'},
   'descosept-sensitive': {pif:'https://www.schumacher-online.com/products/pif/PF_100006_PIF_00323DS-DESCOSEPT%20SENSITIVE_DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/SDB-00323DS_DESCOSEPT_SENSITIVE_DE_WEB.pdf',ba:'https://www.schumacher-online.com/products/ba/BA-00323DS_DESCOSEPT_SENSITIVE_VAR_DE_WEB.pdf'},
@@ -575,7 +577,7 @@ function detailScreen() {
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2><ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
-      <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div><div class="price-display"><div>${state.customerMode?'<small>Kundenmodus aktiv</small><strong class="hidden-price">Preis verborgen</strong><span>Interne Konditionen werden nicht angezeigt.</span>':`<small>Ihr Preis (${state.priceList})</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div><button data-action="${state.customerMode?'customer-mode':'prices'}">${state.customerMode?'Internen Modus aktivieren':'Preisliste wechseln'}</button></div>
+      <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div><div class="price-display"><div>${state.customerMode?'<small>Kundenmodus aktiv</small><strong class="hidden-price">Preis verborgen</strong><span>Interne Konditionen werden nicht angezeigt.</span>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${state.customerMode?'<button data-action="customer-mode">Internen Modus aktivieren</button>':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','PL 6'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
         ${state.customerMode ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
@@ -996,9 +998,10 @@ function favoritesScreen() {
 
 function settingsScreen() {
   const meta = state.importMeta || {};
-  const metaText = meta.file ? `${escapeHtml(meta.file)} · ${escapeHtml(meta.date || '')} · ${meta.rows || 0} Zeilen` : 'Noch keine Preisdatei importiert';
+  const isLive = meta.source === 'sheet';
+  const metaText = meta.date ? `Zuletzt aktualisiert: ${escapeHtml(meta.date)} · ${meta.rows || 0} Produkte` : 'Noch nicht synchronisiert';
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
-    <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${can('prices')?`<label class="file-row"><span><strong>Excel-Preise importieren</strong><small>.xlsx, .xls oder .csv – bleibt lokal</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><div id="importStatus" class="import-status"><strong>${metaText}</strong><br>${Object.keys(state.prices).length} Artikelnummern lokal gespeichert</div><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
+    <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Merklisten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
     <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL6</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
     <p class="version">Interner Produktberater · Version 2.2</p>
@@ -1063,13 +1066,17 @@ function bind() {
   document.querySelectorAll('[data-price]').forEach(button => button.onclick = () => {
     state.priceList = button.dataset.price;
     sessionStorage.setItem('priceList', state.priceList);
-    state.screen = 'menu';
+    const returnTo = state.previousScreen;
+    state.previousScreen = null;
+    state.screen = (returnTo && returnTo !== 'prices' && returnTo !== 'profile') ? returnTo : 'menu';
     render();
   });
-  document.querySelectorAll('[data-action="prices"]').forEach(button => button.onclick = () => { state.screen='prices'; render(); });
+  document.querySelectorAll('[data-action="prices"]').forEach(button => button.onclick = () => { state.previousScreen = state.screen; state.screen='prices'; render(); });
+  document.querySelectorAll('[data-action="price-list-inline"]').forEach(select => select.onchange = () => { state.priceList = select.value; sessionStorage.setItem('priceList', state.priceList); render(); });
   $('[data-action="back"]')?.addEventListener('click', () => { state.screen = state.screen==='detail' ? 'products' : 'menu'; render(); });
   document.querySelectorAll('[data-action="home"]').forEach(el => el.addEventListener('click', () => { state.screen='menu'; render(); }));
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
+  $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
   document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','lists','competition','talk','offer','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
@@ -1261,6 +1268,76 @@ function toNumber(value) {
   if (typeof value==='number') return value;
   return Number(String(value).replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''));
 }
+function normSheetKey(s) {
+  return String(s||'').toUpperCase().replace(/®/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function normalizeSheetSize(raw) {
+  const s = String(raw||'').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d+(?:,\d+)?)\s*(ml|L|g|kg)$/i);
+  if (!m) return s;
+  const unit = m[2].toLowerCase()==='l' ? 'L' : m[2].toLowerCase();
+  return `${m[1]} ${unit}`;
+}
+async function syncLivePrices(manual=false) {
+  const status = $('#importStatus');
+  if (manual && status) status.textContent = 'Preise werden von Google Sheets geladen …';
+  try {
+    if (typeof XLSX === 'undefined') throw new Error('Excel-Modul nicht geladen');
+    const res = await fetch(PRICE_SHEET_CSV_URL, {cache:'no-store'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    const workbook = XLSX.read(text, {type:'string'});
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {defval:''});
+    const groups = {};
+    rows.forEach(row => {
+      const key = normSheetKey((row['Produkt']||'') + ' ' + (row['Variante']||''));
+      if (!key) return;
+      (groups[key] = groups[key] || []).push(row);
+    });
+    const groupKeys = Object.keys(groups);
+    const mapped = {};
+    let matchedProducts = 0;
+    PRODUCTS.forEach(p => {
+      const pk = normSheetKey(p.name);
+      let key = groups[pk] ? pk : null;
+      if (!key) {
+        let best = null, bestLen = -1;
+        groupKeys.forEach(k => {
+          if (k===pk) return;
+          if ((k.includes(pk) || pk.includes(k)) && k.length>bestLen) { best=k; bestLen=k.length; }
+        });
+        key = best;
+      }
+      if (!key) return;
+      const sizes = {};
+      groups[key].forEach(row => {
+        const size = normalizeSheetSize(row['Inhalt']);
+        if (!size) return;
+        sizes[size] = {
+          UVP: toNumber(row['Preisliste UVP']),
+          'PL 1': toNumber(row['Preisliste 1']),
+          'PL 2': toNumber(row['Preisliste 2']),
+          'PL 3': toNumber(row['Preisliste 3']),
+          'PL 4': toNumber(row['Preisliste 4']),
+          'PL 5': toNumber(row['Preisliste 5']),
+          'PL 6': ''
+        };
+      });
+      if (Object.keys(sizes).length) { mapped[p.sku] = {sizes}; matchedProducts++; }
+    });
+    if (!matchedProducts) throw new Error('Keine Preise im Sheet gefunden');
+    state.prices = mapped;
+    localStorage.setItem('prices', JSON.stringify(mapped));
+    state.importMeta = {file:'Google Sheets (live)', date:new Date().toLocaleString('de-DE'), rows: matchedProducts, source:'sheet'};
+    localStorage.setItem('priceImportMeta', JSON.stringify(state.importMeta));
+    if (state.screen==='settings' || state.screen==='detail' || state.screen==='products') render();
+  } catch (error) {
+    if (manual && status) status.textContent = 'Live-Abgleich fehlgeschlagen: ' + error.message + ' – zuletzt gespeicherter Preisstand bleibt aktiv.';
+    console.warn('Preis-Sync von Google Sheets fehlgeschlagen', error);
+  }
+}
 
 render();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
+syncLivePrices();
