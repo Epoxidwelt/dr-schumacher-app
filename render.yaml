@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: schumacher-produktberater
+    runtime: static
+    staticPublishPath: .
+    buildCommand: ""
+    autoDeploy: true
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin

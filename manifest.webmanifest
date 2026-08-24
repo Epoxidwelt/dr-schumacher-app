@@ -1,0 +1,9 @@
+{
+  "name": "Dr. Schumacher Produktberater",
+  "short_name": "Produktberater",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0067b1",
+  "icons": []
+}
