@@ -1372,7 +1372,7 @@ async function syncLivePrices(manual=false) {
     if (!matchedProducts) throw new Error('Keine Preise im Sheet gefunden');
     state.prices = mapped;
     localStorage.setItem('prices', JSON.stringify(mapped));
-    state.importMeta = {file:'Google Sheets (live)', date:new Date().toLocaleString('de-DE'), rows: matchedProducts, source:'sheet'};
+    state.importMeta = {file:'Google Sheets (live)', date:new Date().toLocaleString('de-DE'), ts:Date.now(), rows: matchedProducts, source:'sheet'};
     localStorage.setItem('priceImportMeta', JSON.stringify(state.importMeta));
     if (state.screen==='settings' || state.screen==='detail' || state.screen==='products') render();
   } catch (error) {
@@ -1384,3 +1384,10 @@ async function syncLivePrices(manual=false) {
 render();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
 syncLivePrices();
+setInterval(() => { if (document.visibilityState === 'visible') syncLivePrices(); }, 20 * 60 * 1000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const last = (state.importMeta && state.importMeta.ts) || 0;
+    if (Date.now() - last > 15 * 60 * 1000) syncLivePrices();
+  }
+});

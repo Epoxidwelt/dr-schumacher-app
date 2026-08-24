@@ -2,6 +2,12 @@
 
 Eine installierbare, responsive Web-App für die interne Produktberatung.
 
+## Live-Demo
+
+**https://epoxidwelt.github.io/dr-schumacher-app/**
+
+Gehostet über GitHub Pages, aktualisiert sich automatisch bei jedem Push auf `main`. Hier funktionieren E-Mail-Versand und der Live-Preisabgleich vollständig (im Gegensatz zur Sandbox-Vorschau eines Claude Artifacts, wo `mailto:`-Links aus Sicherheitsgründen blockiert sind).
+
 ## Funktionen
 
 - Preislistenwahl vor dem Start: UVP oder FH 1–FH 5
