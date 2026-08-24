@@ -42,11 +42,11 @@ const state = {
   size: '',
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
   emailInclude: {price:true, sheet:true, safety:true},
+  vsCompare: JSON.parse(localStorage.getItem('vsCompare') || 'null') || {productId:'', size:'', competitorName:'', competitorPrice:'', annualUnits:''},
   advisor: {category:'', spectrum:'', alcohol:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   lists: JSON.parse(localStorage.getItem('productLists') || '{}'),
   activeList: localStorage.getItem('activeProductList') || 'Meine Merkliste',
-  competitorQuery: '',
   talkProduct: '', talkSituation: 'Kurzvorstellung',
   quoteCustomer: localStorage.getItem('quoteCustomer') || '',
   quoteContact: localStorage.getItem('quoteContact') || '',
@@ -63,6 +63,9 @@ const $ = (selector) => document.querySelector(selector);
 const money = (value) => value === undefined || value === null || value === ''
   ? 'Preis nicht hinterlegt'
   : new Intl.NumberFormat('de-DE', {style:'currency', currency:'EUR'}).format(Number(value));
+const moneyPerUnit = (value) => value === undefined || value === null || value === ''
+  ? ''
+  : new Intl.NumberFormat('de-DE', {style:'currency', currency:'EUR', minimumFractionDigits:3, maximumFractionDigits:3}).format(Number(value));
 
 function icon(name) {
   const icons = {
@@ -169,6 +172,7 @@ function menuScreen() {
     ['application','Applikation','Spendersysteme & Zubehör'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
+    ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
     ['lists','Merklisten','Produkte für Termine zusammenstellen'],
     ['offer','Kundenübersicht','Merkliste als Präsentation oder PDF'],
     ['report','Besuchsbericht','CRM-Zusammenfassung und Follow-up'],
@@ -257,6 +261,7 @@ function detailScreen() {
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2><ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
       <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div><div class="price-display"><div>${state.customerMode?'<small>Kundenmodus aktiv</small><strong class="hidden-price">Preis verborgen</strong><span>Interne Konditionen werden nicht angezeigt.</span>':`<small>Ihr Preis (${state.priceList})</small><strong>${money(price)}</strong><span>${perUnitLabel(p,state.size) || 'zzgl. MwSt.'}</span>`}</div><button data-action="${state.customerMode?'customer-mode':'prices'}">${state.customerMode?'Internen Modus aktivieren':'Preisliste wechseln'}</button></div>
+        ${state.customerMode ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
     </section>
@@ -371,14 +376,28 @@ function comparisonPitch(list) {
   return `Wir vergleichen ${names}. Entscheidend sind Einsatzbereich, benötigtes Wirkspektrum, Materialverträglichkeit und gewünschte Gebindeform. Anschließend prüfen wir die verbindlichen Einwirkzeiten und Freigaben in den aktuellen offiziellen Unterlagen.`;
 }
 
-const COMPETITORS = [
-  {term:'mikrobac', label:'Mikrobac / alkoholfreie Fläche', matches:['descosept-spezial'], note:'Für empfindliche Oberflächen und alkoholfreie Anwendung prüfen.'},
-  {term:'incidin', label:'Incidin / Flächendesinfektion', matches:['descosept-sensitive','descosept-sensitive-wipes','ultrasol-oxy'], note:'Je nach Material, Tuchform und benötigtem Wirkspektrum auswählen.'},
-  {term:'desderman', label:'Desderman / Händedesinfektion', matches:['aseptoman-med','descoderm','aseptoman-viral'], note:'Hautverträglichkeit und erforderliches Wirkspektrum vergleichen.'},
-  {term:'sterillium', label:'Sterillium / Händedesinfektion', matches:['aseptoman-med','aseptoman-gel','descoderm'], note:'Darreichungsform und Anwenderpräferenz berücksichtigen.'},
-  {term:'perform', label:'Perform / Ausbruchsfall Fläche', matches:['ultrasol-active','ultrasol-oxy'], note:'Verbindliche Listungen und Einwirkzeiten aktuell prüfen.'},
-  {term:'gigasept', label:'Gigasept / Instrumente', matches:['perfektan-active','descoton-extra'], note:'Instrumentenmaterial, Konzentration und Standzeit prüfen.'}
-];
+function saveVsCompare(patch) {
+  state.vsCompare = {...state.vsCompare, ...patch};
+  localStorage.setItem('vsCompare', JSON.stringify(state.vsCompare));
+}
+
+function vsCalculation() {
+  const v = state.vsCompare;
+  const product = PRODUCTS.find(p => p.id === v.productId) || null;
+  const size = product && v.size && product.sizes.includes(v.size) ? v.size : (product ? product.sizes[0] : '');
+  const rawOurPrice = product ? resolvePrice(product, size) : null;
+  const ourPrice = (rawOurPrice === '' || rawOurPrice == null) ? null : Number(rawOurPrice);
+  const units = size ? unitsInSize(size) : null;
+  const ourPerUnit = (ourPrice != null && units) ? ourPrice / units : null;
+  const compPrice = v.competitorPrice === '' ? null : Number(v.competitorPrice);
+  const compPerUnit = (compPrice != null && units) ? compPrice / units : null;
+  const consumption = v.annualUnits === '' ? null : Number(v.annualUnits);
+  const ourAnnual = (consumption != null) ? (units ? consumption * (ourPerUnit ?? NaN) : (ourPrice != null ? consumption * ourPrice : null)) : null;
+  const compAnnual = (consumption != null && compPrice != null) ? (units ? consumption * (compPerUnit ?? NaN) : consumption * compPrice) : null;
+  const savings = (ourAnnual != null && compAnnual != null && !isNaN(ourAnnual) && !isNaN(compAnnual)) ? compAnnual - ourAnnual : null;
+  const ready = !!(product && ourPrice != null && compPrice != null && consumption != null);
+  return {product, size, ourPrice, units, ourPerUnit, compPrice, compPerUnit, consumption, ourAnnual, compAnnual, savings, ready};
+}
 
 function listsScreen(){
   if(!state.lists[state.activeList]) state.lists[state.activeList]=[];
@@ -394,8 +413,35 @@ function removeFromList(id){state.lists[state.activeList]=(state.lists[state.act
 function createList(){const name=prompt('Name der neuen Merkliste, z. B. Klinikum Dortmund');if(!name)return;const clean=name.trim().slice(0,50);if(!clean)return;state.lists[clean]=state.lists[clean]||[];state.activeList=clean;localStorage.setItem('activeProductList',clean);persistLists();render();}
 
 function competitionScreen(){
- const q=state.competitorQuery.toLowerCase().trim(); const rows=COMPETITORS.filter(x=>!q||`${x.term} ${x.label}`.includes(q));
- return `<main class="page competition-page"><div class="section-heading"><div><span class="eyebrow">Interne Orientierung</span><h1>Wettbewerbsvergleich</h1><p>Suchbegriff eingeben und mögliche Dr.-Schumacher-Alternativen anzeigen.</p></div></div><label class="search-box">${icon('search')}<input id="competitorSearch" value="${escapeHtml(state.competitorQuery)}" placeholder="z. B. Mikrobac, Sterillium oder Gigasept"></label><div class="competition-list">${rows.map(r=>`<section class="competition-card"><div><small>Wettbewerbsbezug</small><h2>${r.label}</h2><p>${r.note}</p></div><div class="alternative-grid">${r.matches.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean).map(p=>`<button data-product="${p.id}"><strong>${p.name}</strong><small>${p.kind}</small><span>Produkt öffnen →</span></button>`).join('')}</div></section>`).join('')||'<div class="empty-state"><h2>Keine Zuordnung gefunden</h2><p>Versuchen Sie einen allgemeineren Produkt- oder Markennamen.</p></div>'}</div><div class="advisor-note">Diese Zuordnung ist eine interne Gesprächshilfe und keine Gleichwertigkeits- oder Freigabeerklärung. Anwendung, Materialverträglichkeit, Wirkbereich und Einwirkzeit müssen anhand der aktuellen Unterlagen geprüft werden.</div></main>`;
+  const v = state.vsCompare;
+  const calc = vsCalculation();
+  const unitWord = calc.units ? 'Tuch' : 'Packung';
+  const consumptionLabel = calc.units ? 'Verbrauch (Tücher/Jahr)' : 'Verbrauch (Packungen/Jahr)';
+  return `<main class="page vs-page">
+    <div class="section-heading no-print"><div><span class="eyebrow">Kundengespräch</span><h1>Wettbewerbsvergleich</h1><p>Aktuellen Preis des Kunden eintragen – die App rechnet Jahreskosten und Ersparnis sofort aus.</p></div></div>
+    <section class="vs-config no-print">
+      <label>Unser Produkt<select id="vsProduct"><option value="">Bitte wählen…</option>${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===v.productId?'selected':''}>${p.name}</option>`).join('')}</select></label>
+      ${calc.product ? `<label>Gebinde<select id="vsSize">${calc.product.sizes.map(s=>`<option ${s===calc.size?'selected':''}>${s}</option>`).join('')}</select></label>` : '<div></div>'}
+      <label>Wettbewerber<input id="vsCompetitorName" value="${escapeHtml(v.competitorName)}" placeholder="Hersteller / Produktname"></label>
+      <label>Kundenpreis (${escapeHtml(calc.size || 'gleiches Gebinde')})<input id="vsCompetitorPrice" type="number" min="0" step="0.01" value="${escapeHtml(v.competitorPrice)}" placeholder="z. B. 9,45"></label>
+      <label class="wide">${consumptionLabel}<input id="vsAnnualUnits" type="number" min="0" step="1" value="${escapeHtml(v.annualUnits)}" placeholder="z. B. 10000"></label>
+    </section>
+    ${!calc.product ? '<div class="empty-state no-print"><h2>Produkt wählen, um zu starten</h2><p>Wählen Sie oben unser Produkt, tragen Sie den Kundenpreis des Wettbewerbers ein und ergänzen Sie den Jahresverbrauch.</p></div>' : `
+    <section class="vs-sheet">
+      <div class="offer-brand"><img src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher"><div><span>Wirtschaftlichkeitsvergleich</span><strong>${escapeHtml(calc.product.name)} vs. ${escapeHtml(v.competitorName || 'Wettbewerber')}</strong><small>Preisliste ${escapeHtml(state.priceList)} · ${new Date().toLocaleDateString('de-DE')}</small></div></div>
+      <div class="offer-table-wrap"><table class="offer-table vs-table"><thead><tr><th>Kennzahl</th><th>Unser Produkt</th><th>Wettbewerber</th><th>Vorteil</th></tr></thead><tbody>
+        <tr><td>Produkt</td><td>${escapeHtml(calc.product.name)}</td><td>${escapeHtml(v.competitorName || '–')}</td><td></td></tr>
+        <tr><td>Gebinde</td><td>${escapeHtml(calc.size)}</td><td>${escapeHtml(calc.size)}</td><td></td></tr>
+        <tr><td>Preis</td><td>${calc.ourPrice!=null?money(calc.ourPrice):'–'}</td><td>${calc.compPrice!=null?money(calc.compPrice):'–'}</td><td>${(calc.ourPrice!=null&&calc.compPrice!=null)?money(calc.compPrice-calc.ourPrice):''}</td></tr>
+        ${calc.units?`<tr><td>Preis pro ${unitWord}</td><td>${calc.ourPerUnit!=null?moneyPerUnit(calc.ourPerUnit):'–'}</td><td>${calc.compPerUnit!=null?moneyPerUnit(calc.compPerUnit):'–'}</td><td>${(calc.ourPerUnit!=null&&calc.compPerUnit!=null)?moneyPerUnit(calc.compPerUnit-calc.ourPerUnit):''}</td></tr>`:''}
+        <tr><td>Verbrauch/Jahr</td><td colspan="2">${calc.consumption!=null?calc.consumption.toLocaleString('de-DE')+' '+unitWord+(calc.consumption===1?'':'er'):'–'}</td><td></td></tr>
+        <tr><td>Jahreskosten</td><td>${calc.ourAnnual!=null?money(calc.ourAnnual):'–'}</td><td>${calc.compAnnual!=null?money(calc.compAnnual):'–'}</td><td class="line-total">${calc.savings!=null?money(calc.savings):''}</td></tr>
+      </tbody></table></div>
+      ${calc.savings!=null ? `<div class="vs-result ${calc.savings>=0?'positive':'negative'}">Ergebnis: ${money(Math.abs(calc.savings))} ${calc.savings>=0?'Ersparnis':'Mehrkosten'} pro Jahr bei ${calc.consumption.toLocaleString('de-DE')} ${unitWord}${calc.consumption===1?'':'ern'} – Berechnung auf Basis der eingegebenen Kundenpreise.</div>` : '<div class="empty-state no-print"><p>Kundenpreis und Jahresverbrauch eintragen, um das Ergebnis zu berechnen.</p></div>'}
+      <div class="offer-actions no-print"><button class="primary-button compact" data-action="print-vs" ${calc.ready?'':'disabled'}>Drucken / als PDF speichern</button></div>
+      <div class="offer-disclaimer">Berechnung auf Basis der vom Nutzer eingegebenen Kundenpreise und Verbrauchsangaben. Keine Gleichwertigkeits- oder Freigabeerklärung. Anwendung, Materialverträglichkeit, Wirkbereich und Einwirkzeit bitte anhand der aktuellen Produktunterlagen prüfen.</div>
+    </section>`}
+  </main>`;
 }
 
 function talkScreen(){
@@ -627,7 +673,7 @@ function pricePerUnit(product, size) {
 }
 function perUnitLabel(product, size) {
   const per = pricePerUnit(product, size);
-  return per == null ? '' : `${money(per)} / Tuch`;
+  return per == null ? '' : `${moneyPerUnit(per)} / Tuch`;
 }
 function escapeHtml(text) { return String(text).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
@@ -643,8 +689,8 @@ function bind() {
   $('[data-action="start"]')?.addEventListener('click', () => { state.screen='menu'; render(); });
   $('[data-action="back"]')?.addEventListener('click', () => { state.screen = state.screen==='detail' ? 'products' : 'menu'; render(); });
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
-  document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(['advisor','recent','compare','lists','competition','talk','offer','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','lists','competition','talk','offer','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); toggleFavorite(button.dataset.favorite); });
@@ -663,7 +709,13 @@ function bind() {
   document.querySelectorAll('[data-list-remove]').forEach(button => button.onclick = () => removeFromList(button.dataset.listRemove));
   $('[data-action="new-list"]')?.addEventListener('click', createList);
   document.querySelectorAll('[data-list-select]').forEach(button => button.onclick = () => { state.activeList=button.dataset.listSelect; localStorage.setItem('activeProductList',state.activeList); render(); });
-  $('#competitorSearch')?.addEventListener('input', e => { state.competitorQuery=e.target.value; render(); });
+  $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); saveVsCompare({productId:e.target.value, size:p?p.sizes[0]:''}); render(); });
+  $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
+  $('#vsCompetitorName')?.addEventListener('input', e => { saveVsCompare({competitorName:e.target.value}); render(); });
+  $('#vsCompetitorPrice')?.addEventListener('input', e => { saveVsCompare({competitorPrice:e.target.value}); render(); });
+  $('#vsAnnualUnits')?.addEventListener('input', e => { saveVsCompare({annualUnits:e.target.value}); render(); });
+  $('[data-action="print-vs"]')?.addEventListener('click', () => window.print());
+  document.querySelectorAll('[data-action="compare-competitor"]').forEach(button => button.onclick = () => { saveVsCompare({productId:button.dataset.product, size:state.size||''}); state.screen='competition'; render(); });
   $('#talkProduct')?.addEventListener('change', e => { state.talkProduct=e.target.value; render(); });
   $('#talkSituation')?.addEventListener('change', e => { state.talkSituation=e.target.value; render(); });
   $('[data-action="copy-talk"]')?.addEventListener('click', async () => { const text=buildTalkText(); try{await navigator.clipboard.writeText(text);alert('Gesprächsleitfaden kopiert.')}catch{alert(text)} });
