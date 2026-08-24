@@ -338,6 +338,7 @@ const state = {
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
   prices: {...DEFAULT_PRICES, ...JSON.parse(localStorage.getItem('prices') || '{}')},
+  sizeArtNr: JSON.parse(localStorage.getItem('sizeArtNr') || '{}'),
   favorites: JSON.parse(localStorage.getItem('favorites') || '[]'),
   size: '',
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
@@ -574,7 +575,7 @@ function detailScreen() {
   return `<main class="page detail-page">
     <section class="detail-hero">
       <div class="detail-image" style="--product-color:${p.color}">${p.photo?`<img src="${p.photo}" alt="${escapeHtml(p.name)}">`:`<div class="bottle"><span>${p.name.split(' ')[0]}</span></div>`}</div>
-      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}</div><p>${p.summary}</p><small>Artikelnummer: ${p.sku}</small></div>
+      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}</div><p>${p.summary}</p><small>Artikelnummer: ${resolveArtNr(p, state.size)}</small></div>
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2><ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
@@ -617,7 +618,7 @@ function buildProductEmail(p) {
     `bitte nachstehende Informationen an den Kunden senden:`,
     ``,
     `${p.name} (${p.kind})`,
-    `Artikelnummer: ${p.sku}`,
+    `Artikelnummer: ${resolveArtNr(p, size)}`,
     `Gebinde: ${size}`
   ];
   if (inc.price && !state.customerMode && price !== undefined && price !== null && price !== '') {
@@ -819,7 +820,7 @@ function offerScreen() {
     const lineTotal = unitPrice == null ? null : unitPrice * quantity * (1 - discount / 100);
     if (lineTotal != null) subtotal += lineTotal;
     return `<tr>
-      <td><strong>${p.name}</strong><small>${p.kind}<br>Art.-Nr. ${p.sku}</small></td>
+      <td><strong>${p.name}</strong><small>${p.kind}<br>Art.-Nr. ${resolveArtNr(p, size)}</small></td>
       <td><select class="offer-input" data-quote-item="${p.id}" data-field="size">${p.sizes.map(x=>`<option ${x===size?'selected':''}>${x}</option>`).join('')}</select></td>
       <td><input class="offer-input quantity" data-quote-item="${p.id}" data-field="quantity" type="number" min="1" step="1" value="${quantity}"></td>
       <td><input class="offer-input discount" data-quote-item="${p.id}" data-field="discount" type="number" min="0" max="100" step="0.1" value="${discount}"><span class="unit">%</span></td>
@@ -968,7 +969,7 @@ function exportOfferCsv() {
     const discount=Math.min(100,Math.max(0,Number(saved.discount)||0));
     const raw=resolvePrice(p,size); const unit=raw===''||raw==null?'':Number(raw);
     const total=unit===''?'':unit*qty*(1-discount/100);
-    lines.push([state.quoteCustomer,state.quoteContact,state.priceList,p.sku,p.name,size,qty,discount,unit,total]);
+    lines.push([state.quoteCustomer,state.quoteContact,state.priceList,resolveArtNr(p,size),p.name,size,qty,discount,unit,total]);
   });
   const csv='\ufeff'+lines.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a');
@@ -998,7 +999,7 @@ function buildOfferEmail() {
     const unitPrice = rawPrice === '' || rawPrice == null ? null : Number(rawPrice);
     const lineTotal = unitPrice == null ? null : unitPrice * quantity * (1 - discount / 100);
     if (lineTotal != null) subtotal += lineTotal;
-    lines.push(`- ${p.name} (Art.-Nr. ${p.sku}), Gebinde ${size}, Menge ${quantity}${discount ? `, Rabatt ${discount}%` : ''}: ${unitPrice != null ? money(unitPrice) + ' / Stück, Summe ' + money(lineTotal) : 'Preis nicht hinterlegt'}`);
+    lines.push(`- ${p.name} (Art.-Nr. ${resolveArtNr(p, size)}), Gebinde ${size}, Menge ${quantity}${discount ? `, Rabatt ${discount}%` : ''}: ${unitPrice != null ? money(unitPrice) + ' / Stück, Summe ' + money(lineTotal) : 'Preis nicht hinterlegt'}`);
   });
   const vat = subtotal * 0.19;
   const total = subtotal + vat;
@@ -1066,6 +1067,11 @@ function resolvePrice(product, size='') {
   const row = state.prices[product.sku] || state.prices[product.id] || {};
   if (size && row.sizes && row.sizes[size]) return row.sizes[size][state.priceList];
   return row[state.priceList];
+}
+function resolveArtNr(product, size='') {
+  const perSize = state.sizeArtNr[product.sku];
+  if (size && perSize && perSize[size]) return perSize[size];
+  return product.sku;
 }
 function unitsInSize(size) {
   const m = /^(\d+)\s*Tücher/i.exec(size || '');
@@ -1328,6 +1334,7 @@ async function syncLivePrices(manual=false) {
     });
     const groupKeys = Object.keys(groups);
     const mapped = {};
+    const sizeArtNr = {};
     let matchedProducts = 0;
     PRODUCTS.forEach(p => {
       const pk = normSheetKey(p.name);
@@ -1342,6 +1349,7 @@ async function syncLivePrices(manual=false) {
       }
       if (!key) return;
       const sizes = {};
+      const artNr = {};
       groups[key].forEach(row => {
         const hasPrice = ['Preisliste UVP','Preisliste 1','Preisliste 2','Preisliste 3','Preisliste 4','Preisliste 5'].some(c => toNumber(row[c]) !== '');
         const size = normalizeSheetSize(row['Inhalt']) || (hasPrice ? p.sizes[0] : '');
@@ -1355,12 +1363,17 @@ async function syncLivePrices(manual=false) {
           'PL 5': toNumber(row['Preisliste 5']),
           'PL 6': ''
         };
+        const rowArtNr = String(row['Art. Nr.']||'').trim();
+        if (rowArtNr) artNr[size] = rowArtNr;
       });
       if (Object.keys(sizes).length) { mapped[p.sku] = {sizes}; matchedProducts++; }
+      if (Object.keys(artNr).length) sizeArtNr[p.sku] = artNr;
     });
     if (!matchedProducts) throw new Error('Keine Preise im Sheet gefunden');
     state.prices = mapped;
+    state.sizeArtNr = sizeArtNr;
     localStorage.setItem('prices', JSON.stringify(mapped));
+    localStorage.setItem('sizeArtNr', JSON.stringify(sizeArtNr));
     state.importMeta = {file:'Google Sheets (live)', date:new Date().toLocaleString('de-DE'), ts:Date.now(), rows: matchedProducts, source:'sheet'};
     localStorage.setItem('priceImportMeta', JSON.stringify(state.importMeta));
     if (state.screen==='settings' || state.screen==='detail' || state.screen==='products') render();
