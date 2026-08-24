@@ -1364,9 +1364,18 @@ async function syncLivePrices(manual=false) {
       const artNr = {};
       groups[key].forEach(row => {
         const hasPrice = ['Preisliste UVP','Preisliste 1','Preisliste 2','Preisliste 3','Preisliste 4','Preisliste 5'].some(c => toNumber(row[c]) !== '');
-        const baseSize = normalizeSheetSize(row['Inhalt']) || (hasPrice ? p.sizes[0] : '');
+        let baseSize = normalizeSheetSize(row['Inhalt']) || (hasPrice ? p.sizes[0] : '');
         if (!baseSize) return;
-        const size = resolveSizeLabel(p, baseSize, row['Gebinde']);
+        let size = resolveSizeLabel(p, baseSize, row['Gebinde']);
+        if (!p.sizes.includes(size)) {
+          // Inhalt didn't match any known size (e.g. sheet columns shifted for this row) — try VE as a fallback source
+          const altBase = normalizeSheetSize(row['VE']);
+          if (altBase) {
+            const altSize = resolveSizeLabel(p, altBase, row['Gebinde']);
+            if (p.sizes.includes(altSize)) size = altSize;
+          }
+        }
+        if (!p.sizes.includes(size)) return;
         sizes[size] = {
           UVP: toNumber(row['Preisliste UVP']),
           'PL 1': toNumber(row['Preisliste 1']),
