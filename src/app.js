@@ -330,6 +330,23 @@ const USER_PROFILES = [
   {id:'admin', name:'Administrator', description:'Vollzugriff einschließlich lokaler Datenverwaltung', permissions:['products','sales','reports','prices','admin']}
 ];
 
+function migrateFavorites(raw) {
+  let arr;
+  try { arr = JSON.parse(raw || '[]'); } catch (e) { arr = []; }
+  if (!Array.isArray(arr)) return [];
+  if (arr.length && typeof arr[0] === 'string') {
+    let legacySizes = {};
+    try { legacySizes = JSON.parse(localStorage.getItem('summarySizes') || '{}'); } catch (e) {}
+    return arr.map(id => {
+      const p = PRODUCTS.find(x => x.id === id);
+      if (!p) return null;
+      const size = (legacySizes[id] && p.sizes.includes(legacySizes[id])) ? legacySizes[id] : p.sizes[0];
+      return { id, size };
+    }).filter(Boolean);
+  }
+  return arr.filter(f => f && f.id && f.size);
+}
+
 const storedProfile = sessionStorage.getItem('activeProfile') || '';
 const state = {
   screen: storedProfile ? (sessionStorage.getItem('priceList') ? 'menu' : 'prices') : 'profile',
@@ -339,7 +356,7 @@ const state = {
   category: 'all', query: '', spectrum: 'all', selected: null,
   prices: {...DEFAULT_PRICES, ...JSON.parse(localStorage.getItem('prices') || '{}')},
   sizeArtNr: JSON.parse(localStorage.getItem('sizeArtNr') || '{}'),
-  favorites: JSON.parse(localStorage.getItem('favorites') || '[]'),
+  favorites: migrateFavorites(localStorage.getItem('favorites')),
   size: '',
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
   emailInclude: {price:true, sheet:true, safety:true, ba:true},
@@ -348,7 +365,6 @@ const state = {
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   lists: JSON.parse(localStorage.getItem('productLists') || '{}'),
   activeList: localStorage.getItem('activeProductList') || 'Meine Merkliste',
-  summarySizes: JSON.parse(localStorage.getItem('summarySizes') || '{}'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryOccasion: localStorage.getItem('summaryOccasion') || 'unser heutiges Gespräch',
   summaryIncludePrices: localStorage.getItem('summaryIncludePrices') === 'true',
@@ -514,7 +530,7 @@ function menuScreen() {
   const today = new Date().toISOString().slice(0,10);
   const openReports = state.savedReports.filter(r => (r.taskStatus || 'Offen') !== 'Erledigt');
   const due = openReports.filter(r => r.followUp && r.followUp <= today).length;
-  const favoriteProducts = state.favorites.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean).slice(0,4);
+  const favoriteProducts = [...new Set(state.favorites.map(f => f.id))].map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean).slice(0,4);
   const recentProducts = state.recent.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean).slice(0,4);
   const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => `${p.name} ${p.kind} ${p.sku} ${p.summary}`.toLowerCase().includes(state.globalQuery.toLowerCase())).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
@@ -563,7 +579,7 @@ function productCard(product) {
   const refSize = product.sizes[0];
   const price = resolvePrice(product, refSize);
   const perUnit = perUnitLabel(product, refSize);
-  const favorite = state.favorites.includes(product.id);
+  const favorite = state.favorites.some(f => f.id === product.id);
   return `<article class="product-row" data-product="${product.id}">
     <div class="product-image" style="--product-color:${product.color}">${product.photo?`<img src="${product.photo}" alt="${escapeHtml(product.name)}">`:`<span>${product.category==='hands'?'✋':product.category==='surface'?'▦':product.category==='instruments'?'✂':'▣'}</span>`}</div>
     <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}</div><p>Art.-Nr. ${product.sku} · ${refSize}</p></div>
@@ -578,11 +594,12 @@ function detailScreen() {
   if (!p) { state.screen = 'products'; return productsScreen(); }
   if (!state.size) state.size = p.sizes[0];
   const price = resolvePrice(p, state.size);
-  const favorite = state.favorites.includes(p.id);
+  const favorite = state.favorites.some(f => f.id === p.id && f.size === state.size);
+  const markedSizes = state.favorites.filter(f => f.id === p.id).map(f => f.size);
   return `<main class="page detail-page">
     <section class="detail-hero">
       <div class="detail-image" style="--product-color:${p.color}">${(() => { const img = (p.sizePhotos && p.sizePhotos[state.size]) || p.photo; return img ? `<img src="${img}" alt="${escapeHtml(p.name)}">` : `<div class="bottle"><span>${p.name.split(' ')[0]}</span></div>`; })()}</div>
-      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}</div><p>${p.summary}</p><small>Artikelnummer: ${resolveArtNr(p, state.size)}</small></div>
+      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}</div><p>${p.summary}</p><small>Artikelnummer: ${resolveArtNr(p, state.size)}</small>${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2><ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
@@ -617,12 +634,15 @@ function emailCard(p) {
   </div>`;
 }
 
+function favoriteEntries() {
+  return state.favorites.map(f => ({...f, product: PRODUCTS.find(p => p.id === f.id)})).filter(e => e.product);
+}
+
 function buildStarredProductsEmail() {
-  const products = state.favorites.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+  const entries = favoriteEntries();
   const inc = state.emailInclude;
   const lines = [`Hallo Team,`, ``, `bitte nachstehende Informationen an den Kunden senden:`, ``];
-  products.forEach(p => {
-    const size = summarySizeFor(p);
+  entries.forEach(({product: p, size}) => {
     const price = resolvePrice(p, size);
     lines.push(`PRODUKT: ${p.name}`, `Artikelnummer: ${resolveArtNr(p, size)}`, `Gebinde: ${size}`);
     if (inc.price && !state.customerMode && price !== undefined && price !== null && price !== '') {
@@ -636,7 +656,7 @@ function buildStarredProductsEmail() {
     lines.push('');
   });
   lines.push('Danke und Grüße');
-  const subject = products.length === 1 ? `Produktinformation ${products[0].name} – Dr. Schumacher` : `Produktinformationen (${products.length} Produkte) – Dr. Schumacher`;
+  const subject = entries.length === 1 ? `Produktinformation ${entries[0].product.name} – Dr. Schumacher` : `Produktinformationen (${entries.length} Produkte) – Dr. Schumacher`;
   return { subject, body: lines.join('\n') };
 }
 
@@ -908,10 +928,10 @@ function removeFromList(id){state.lists[state.activeList]=(state.lists[state.act
 function createList(){const name=prompt('Name der neuen Merkliste, z. B. Klinikum Dortmund');if(!name)return;const clean=name.trim().slice(0,50);if(!clean)return;state.lists[clean]=state.lists[clean]||[];state.activeList=clean;localStorage.setItem('activeProductList',clean);persistLists();render();}
 
 function summaryScreen(){
-  const chosen=state.favorites.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+  const chosen=favoriteEntries();
   const query=(state.summaryQuery||'').toLowerCase();
   const pickable=query?PRODUCTS.filter(p=>`${p.name} ${p.kind}`.toLowerCase().includes(query)):PRODUCTS;
-  return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Alle Produkte, die Sie unterwegs mit dem Stern (★) markiert haben, erscheinen automatisch hier. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
+  return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Alle Produkte, die Sie unterwegs mit dem Stern (★) markiert haben, erscheinen automatisch hier – je Gebinde einzeln, falls Sie z. B. mehrere Packungsgrößen besprochen haben. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
   <section class="offer-config">
     <label>Anrede<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller"></label>
     <label>Anlass des Gesprächs<input id="summaryOccasion" value="${escapeHtml(state.summaryOccasion)}" placeholder="z. B. unser heutiges Teams-Meeting"></label>
@@ -925,30 +945,27 @@ function summaryScreen(){
     ${state.customerMode ? '<small class="muted-copy">Preise sind im Kundenmodus verborgen.</small>' : ''}
   </section>
   <section class="list-builder">
-    <div><h2>Mit Stern markiert (${chosen.length})</h2><div class="product-list">${chosen.map(p=>summaryChosenCard(p)).join('')||'<div class="empty-state"><h2>Noch keine Produkte markiert</h2><p>Tippen Sie im Gespräch bei einem Produkt auf den Stern, oder wählen Sie rechts direkt aus.</p></div>'}</div></div>
+    <div><h2>Mit Stern markiert (${chosen.length})</h2><div class="product-list">${chosen.map(e=>summaryChosenCard(e)).join('')||'<div class="empty-state"><h2>Noch keine Produkte markiert</h2><p>Tippen Sie im Gespräch bei einem Produkt auf den Stern, oder wählen Sie rechts direkt aus.</p></div>'}</div></div>
     <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="summarySearch" value="${escapeHtml(state.summaryQuery||'')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p=>summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
   </section>
   <div class="offer-actions summary-send"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
   </main>`;
 }
-function summaryProductCard(p){const selected=state.favorites.includes(p.id);return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button data-favorite="${p.id}">${selected?'−':'+'}</button></article>`}
-function summarySizeFor(p){return state.summarySizes[p.id] && p.sizes.includes(state.summarySizes[p.id]) ? state.summarySizes[p.id] : p.sizes[0];}
-function summaryChosenCard(p){
-  const size=summarySizeFor(p);
+function summaryProductCard(p){const selected=state.favorites.some(f=>f.id===p.id);return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button data-favorite="${p.id}">${selected?'−':'+'}</button></article>`}
+function summaryChosenCard(entry){
+  const p=entry.product, size=entry.size;
   const sizePicker=p.sizes.length>1
-    ? `<select class="offer-input summary-size" data-summary-size="${p.id}" aria-label="Gebinde">${p.sizes.map(s=>`<option ${s===size?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select>`
+    ? `<select class="offer-input summary-size" data-favorite-id="${p.id}" data-favorite-old-size="${escapeHtml(size)}" aria-label="Gebinde">${p.sizes.map(s=>`<option ${s===size?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select>`
     : `<small>${escapeHtml(size||'')}</small>`;
-  return `<article class="mini-product summary-chosen-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small>${sizePicker}</div><button data-favorite="${p.id}">−</button></article>`;
+  return `<article class="mini-product summary-chosen-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small>${sizePicker}</div><button data-favorite="${p.id}" data-favorite-size="${escapeHtml(size)}">−</button></article>`;
 }
-function setSummarySize(id,size){state.summarySizes[id]=size;localStorage.setItem('summarySizes',JSON.stringify(state.summarySizes));render();}
 function buildCustomerSummaryEmail(){
-  const products=state.favorites.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+  const entries=favoriteEntries();
   const salutation=state.summaryCustomer.trim()||'Sehr geehrte Damen und Herren';
   const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
   const lines=[`${salutation},`,``,`vielen Dank für ${occasion}. Wie besprochen fassen wir Ihnen nachfolgend die passenden Produkte und deren Vorteile zusammen:`,``];
   const showPrices = state.summaryIncludePrices && !state.customerMode;
-  products.forEach(p=>{
-    const size=summarySizeFor(p);
+  entries.forEach(({product: p, size})=>{
     lines.push(`${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
     if (showPrices) {
       const price = resolvePrice(p, size);
@@ -1223,7 +1240,8 @@ function copyOfferEmail(button) {
 }
 
 function favoritesScreen() {
-  const list = PRODUCTS.filter(p => state.favorites.includes(p.id));
+  const favoriteIds = [...new Set(state.favorites.map(f => f.id))];
+  const list = PRODUCTS.filter(p => favoriteIds.includes(p.id));
   return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1><p>Mit dem Stern markierte Produkte landen automatisch auch in der Kundenzusammenfassung.</p></div><span class="result-count">${list.length}</span></div><div class="product-list">${list.map(productCard).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
 }
 
@@ -1318,7 +1336,7 @@ function bind() {
   document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','lists','competition','talk','offer','summary','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
-  document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); toggleFavorite(button.dataset.favorite); });
+  document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
   document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => { state.size=button.dataset.size; render(); });
   document.querySelectorAll('[data-email-toggle]').forEach(button => button.onclick = () => { const key=button.dataset.emailToggle; state.emailInclude[key]=!state.emailInclude[key]; render(); });
   document.querySelectorAll('[data-action="send-email"]').forEach(button => button.onclick = () => sendStarredProductsEmail());
@@ -1339,7 +1357,7 @@ function bind() {
   $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#summaryOccasion')?.addEventListener('input', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; render(); });
-  document.querySelectorAll('[data-summary-size]').forEach(select => select.onchange = () => setSummarySize(select.dataset.summarySize, select.value));
+  document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
   $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
   $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); saveVsCompare({productId:e.target.value, size:p?p.sizes[0]:''}); render(); });
@@ -1393,17 +1411,37 @@ function toggleCompare(id) {
   render();
 }
 
-function toggleFavorite(id) {
-  const wasFavorite = state.favorites.includes(id);
-  state.favorites = wasFavorite ? state.favorites.filter(x => x!==id) : [...state.favorites,id];
-  if (!wasFavorite) {
+function persistFavorites() { localStorage.setItem('favorites', JSON.stringify(state.favorites)); }
+
+function toggleFavorite(id, size) {
+  const p = PRODUCTS.find(x => x.id === id);
+  if (!p) return;
+  const resolvedSize = (size && p.sizes.includes(size)) ? size : p.sizes[0];
+  const idx = state.favorites.findIndex(f => f.id === id && f.size === resolvedSize);
+  if (idx >= 0) state.favorites.splice(idx, 1);
+  else state.favorites = [...state.favorites, {id, size: resolvedSize}];
+  persistFavorites();
+  render();
+}
+
+function toggleFavoriteAny(id) {
+  const has = state.favorites.some(f => f.id === id);
+  if (has) {
+    state.favorites = state.favorites.filter(f => f.id !== id);
+  } else {
     const p = PRODUCTS.find(x => x.id === id);
-    if (p && !state.summarySizes[id]) {
-      state.summarySizes[id] = (state.selected === id && state.size) ? state.size : p.sizes[0];
-      localStorage.setItem('summarySizes', JSON.stringify(state.summarySizes));
-    }
+    if (!p) return;
+    state.favorites = [...state.favorites, {id, size: p.sizes[0]}];
   }
-  localStorage.setItem('favorites', JSON.stringify(state.favorites));
+  persistFavorites();
+  render();
+}
+
+function changeFavoriteSize(id, oldSize, newSize) {
+  state.favorites = state.favorites.filter(f => !(f.id === id && f.size === newSize));
+  const entry = state.favorites.find(f => f.id === id && f.size === oldSize);
+  if (entry) entry.size = newSize;
+  persistFavorites();
   render();
 }
 
@@ -1412,7 +1450,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds','productLists','activeProductList',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summarySizes','summaryCustomer','summaryOccasion','summaryIncludePrices'
+  'summaryCustomer','summaryOccasion','summaryIncludePrices'
 ];
 
 function exportDeviceBackup() {
@@ -1473,9 +1511,8 @@ async function importDeviceBackup(event) {
 
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf werden zurückgesetzt. Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
-  ['favorites','summarySizes','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
-  state.summarySizes = {};
   state.summaryCustomer = '';
   state.summaryOccasion = 'unser heutiges Gespräch';
   state.summaryIncludePrices = false;
