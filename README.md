@@ -129,6 +129,12 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 - Neue Besuchsberichte direkt vom Dashboard anlegen
 
 
+## Neu in Version 2.3
+
+- Kundenzusammenfassung: besprochene Produkte per Klick auswählen
+- automatisch erzeugte E-Mail direkt an den Kunden mit persönlicher Anrede, Gesprächsbezug und den wichtigsten Produktvorteilen
+- Auswahl bleibt lokal auf dem Gerät gespeichert
+
 ## Version 2.2
 
 - lokale Rollenauswahl für Außendienst, Innendienst und Administrator

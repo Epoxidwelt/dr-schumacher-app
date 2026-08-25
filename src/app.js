@@ -348,6 +348,9 @@ const state = {
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   lists: JSON.parse(localStorage.getItem('productLists') || '{}'),
   activeList: localStorage.getItem('activeProductList') || 'Meine Merkliste',
+  summaryIds: JSON.parse(localStorage.getItem('summaryIds') || '[]'),
+  summaryCustomer: localStorage.getItem('summaryCustomer') || '',
+  summaryOccasion: localStorage.getItem('summaryOccasion') || 'unser heutiges Gespräch',
   talkProduct: '', talkSituation: 'Kurzvorstellung',
   quoteCustomer: localStorage.getItem('quoteCustomer') || '',
   quoteContact: localStorage.getItem('quoteContact') || '',
@@ -386,6 +389,7 @@ function icon(name) {
     competition:'<svg viewBox="0 0 24 24"><path d="M4 7h16M7 4v16M17 4v16M4 17h16"/></svg>',
     talk:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8M8 12h6"/></svg>',
     offer:'<svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4M9 11h6M9 15h6"/></svg>',
+    summary:'<svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="m8.5 9 2 2 4-4M8 15h8"/></svg>',
     report:'<svg viewBox="0 0 24 24"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="m15 16 2 2 3-4"/></svg>',
     dashboard:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 18h7M17.5 14.5V21"/></svg>',
     copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>'
@@ -442,6 +446,7 @@ function render() {
   if (state.screen === 'competition') html = header(true) + competitionScreen() + bottomNav('home');
   if (state.screen === 'talk') html = header(true) + talkScreen() + bottomNav('home');
   if (state.screen === 'offer') html = header(true) + offerScreen() + bottomNav('home');
+  if (state.screen === 'summary') html = header(true) + summaryScreen() + bottomNav('home');
   if (state.screen === 'report') html = header(true) + reportScreen() + bottomNav('home');
   if (state.screen === 'dashboard') html = header(true) + dashboardScreen() + bottomNav('home');
   app.innerHTML = html;
@@ -494,13 +499,14 @@ function menuScreen() {
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
     ['lists','Merklisten','Produkte für Termine zusammenstellen'],
     ['offer','Kundenübersicht','Merkliste als Präsentation oder PDF'],
+    ['summary','Kundenzusammenfassung','Besprochene Produkte per E-Mail an den Kunden'],
     ['report','Besuchsbericht','CRM-Zusammenfassung und Follow-up'],
     ['dashboard','Follow-up Dashboard','Offene Termine und Aufgaben im Blick'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','lists','offer'].includes(card[0]));
+  if (!can('sales')) cards = cards.filter(card => !['compare','lists','offer','summary'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const coreCards = cards.filter(c => coreKeys.includes(c[0]));
   const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
@@ -766,6 +772,43 @@ function persistLists(){localStorage.setItem('productLists',JSON.stringify(state
 function addToList(id){if(!state.lists[state.activeList])state.lists[state.activeList]=[];if(!state.lists[state.activeList].includes(id))state.lists[state.activeList].push(id);persistLists();render();}
 function removeFromList(id){state.lists[state.activeList]=(state.lists[state.activeList]||[]).filter(x=>x!==id);persistLists();render();}
 function createList(){const name=prompt('Name der neuen Merkliste, z. B. Klinikum Dortmund');if(!name)return;const clean=name.trim().slice(0,50);if(!clean)return;state.lists[clean]=state.lists[clean]||[];state.activeList=clean;localStorage.setItem('activeProductList',clean);persistLists();render();}
+
+function summaryScreen(){
+  const chosen=state.summaryIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+  return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Wählen Sie aus, über welche Produkte Sie mit dem Kunden gesprochen haben. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
+  <section class="offer-config">
+    <label>Anrede<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller"></label>
+    <label>Anlass des Gesprächs<input id="summaryOccasion" value="${escapeHtml(state.summaryOccasion)}" placeholder="z. B. unser heutiges Teams-Meeting"></label>
+  </section>
+  <section class="list-builder">
+    <div><h2>Besprochene Produkte (${chosen.length})</h2><div class="product-list">${chosen.map(p=>summaryProductCard(p,true)).join('')||'<div class="empty-state"><h2>Noch keine Produkte ausgewählt</h2><p>Wählen Sie rechts die besprochenen Produkte aus.</p></div>'}</div></div>
+    <div><h2>Produkte auswählen</h2><div class="quick-product-list">${PRODUCTS.map(p=>summaryProductCard(p,false)).join('')}</div></div>
+  </section>
+  <div class="offer-actions"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
+  </main>`;
+}
+function summaryProductCard(p,selected){return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button ${selected?`data-summary-remove="${p.id}"`:`data-summary-add="${p.id}"`}>${selected?'−':'+'}</button></article>`}
+function persistSummary(){localStorage.setItem('summaryIds',JSON.stringify(state.summaryIds));}
+function addToSummary(id){if(!state.summaryIds.includes(id))state.summaryIds=[...state.summaryIds,id];persistSummary();render();}
+function removeFromSummary(id){state.summaryIds=state.summaryIds.filter(x=>x!==id);persistSummary();render();}
+function buildCustomerSummaryEmail(){
+  const products=state.summaryIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+  const salutation=state.summaryCustomer.trim()||'Sehr geehrte Damen und Herren';
+  const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
+  const lines=[`${salutation},`,``,`vielen Dank für ${occasion}. Wie besprochen fassen wir Ihnen nachfolgend die passenden Produkte und deren Vorteile zusammen:`,``];
+  products.forEach(p=>{
+    lines.push(p.name.toUpperCase());
+    p.facts.slice(0,3).forEach(f=>lines.push(`- ${f}`));
+    lines.push('');
+  });
+  lines.push('Bei Fragen sprechen Sie uns gerne jederzeit an.','','Mit freundlichen Grüßen');
+  return {subject:`Zusammenfassung unseres Gesprächs – Dr. Schumacher`, body:lines.join('\n')};
+}
+function sendCustomerSummaryEmail(){
+  if(!state.summaryIds.length)return;
+  const {subject,body}=buildCustomerSummaryEmail();
+  openMailto(subject,body);
+}
 
 function competitionScreen(){
   const v = state.vsCompare;
@@ -1115,7 +1158,7 @@ function bind() {
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','lists','competition','talk','offer','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','lists','competition','talk','offer','summary','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); toggleFavorite(button.dataset.favorite); });
@@ -1134,6 +1177,11 @@ function bind() {
   document.querySelectorAll('[data-list-remove]').forEach(button => button.onclick = () => removeFromList(button.dataset.listRemove));
   $('[data-action="new-list"]')?.addEventListener('click', createList);
   document.querySelectorAll('[data-list-select]').forEach(button => button.onclick = () => { state.activeList=button.dataset.listSelect; localStorage.setItem('activeProductList',state.activeList); render(); });
+  document.querySelectorAll('[data-summary-add]').forEach(button => button.onclick = () => addToSummary(button.dataset.summaryAdd));
+  document.querySelectorAll('[data-summary-remove]').forEach(button => button.onclick = () => removeFromSummary(button.dataset.summaryRemove));
+  $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
+  $('#summaryOccasion')?.addEventListener('input', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
+  $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
   $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); saveVsCompare({productId:e.target.value, size:p?p.sizes[0]:''}); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
   $('#vsCompetitorName')?.addEventListener('input', e => { saveVsCompare({competitorName:e.target.value}); render(); });
@@ -1194,7 +1242,8 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds','productLists','activeProductList',
-  'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports'
+  'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
+  'summaryIds','summaryCustomer','summaryOccasion'
 ];
 
 function exportDeviceBackup() {
