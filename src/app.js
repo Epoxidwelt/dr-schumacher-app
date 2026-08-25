@@ -351,6 +351,7 @@ const state = {
   summarySizes: JSON.parse(localStorage.getItem('summarySizes') || '{}'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryOccasion: localStorage.getItem('summaryOccasion') || 'unser heutiges Gespräch',
+  summaryIncludePrices: localStorage.getItem('summaryIncludePrices') === 'true',
   summaryQuery: '',
   talkProduct: '', talkSituation: 'Kurzvorstellung',
   quoteCustomer: localStorage.getItem('quoteCustomer') || '',
@@ -607,40 +608,36 @@ function emailCard(p) {
     ['safety','Sicherheitsdatenblatt', true],
     ['ba','Betriebsanweisung', true]
   ];
+  const count = state.favorites.length;
   return `<div class="email-card">
-    <span>Kundeninfo per E-Mail</span>
+    <span>Kundeninfo per E-Mail${count ? ` · ${count} mit ★ markiert` : ''}</span>
     <div class="email-chips">${chips.map(([key,label,available]) => available ? `<button class="filter-chip email-chip ${state.emailInclude[key]?'active':''}" data-email-toggle="${key}">${label}</button>` : '').join('')}</div>
-    <button class="primary-button compact" data-action="send-email" data-product="${p.id}">${icon('talk')}<span>Info per E-Mail senden</span></button>
+    <button class="primary-button compact" data-action="send-email" ${count?'':'disabled'}>${icon('talk')}<span>Info per E-Mail senden${count>1?` (${count} Produkte)`:''}</span></button>
+    ${count===0 ? '<small class="muted-copy">Markieren Sie zuerst mindestens ein Produkt mit dem Stern (★).</small>' : ''}
   </div>`;
 }
 
-function buildProductEmail(p) {
-  const size = state.size || p.sizes[0];
-  const price = resolvePrice(p, size);
+function buildStarredProductsEmail() {
+  const products = state.favorites.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
   const inc = state.emailInclude;
-  const lines = [
-    `Hallo Team,`,
-    ``,
-    `bitte nachstehende Informationen an den Kunden senden:`,
-    ``,
-    `PRODUKT: ${p.name}`,
-    `Artikelnummer: ${resolveArtNr(p, size)}`,
-    `Gebinde: ${size}`
-  ];
-  if (inc.price && !state.customerMode && price !== undefined && price !== null && price !== '') {
-    lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
-    const per = perUnitLabel(p, size);
-    if (per) lines.push(`Umgerechnet: ${per}`);
-  }
-  lines.push('');
-  if (inc.sheet) lines.push(`PRODUKTDATENBLATT (PIF): ${productDocUrl(p,'pif')}`);
-  if (inc.safety) lines.push(`SICHERHEITSDATENBLATT: ${productDocUrl(p,'sdb')}`);
-  if (inc.ba) lines.push(`BETRIEBSANWEISUNG (BA): ${productDocUrl(p,'ba')}`);
-  lines.push('', 'Danke und Grüße');
-  return {
-    subject: `Produktinformation ${p.name} – Dr. Schumacher`,
-    body: lines.join('\n')
-  };
+  const lines = [`Hallo Team,`, ``, `bitte nachstehende Informationen an den Kunden senden:`, ``];
+  products.forEach(p => {
+    const size = summarySizeFor(p);
+    const price = resolvePrice(p, size);
+    lines.push(`PRODUKT: ${p.name}`, `Artikelnummer: ${resolveArtNr(p, size)}`, `Gebinde: ${size}`);
+    if (inc.price && !state.customerMode && price !== undefined && price !== null && price !== '') {
+      lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
+      const per = perUnitLabel(p, size);
+      if (per) lines.push(`Umgerechnet: ${per}`);
+    }
+    if (inc.sheet) lines.push(`PRODUKTDATENBLATT (PIF): ${productDocUrl(p,'pif')}`);
+    if (inc.safety) lines.push(`SICHERHEITSDATENBLATT: ${productDocUrl(p,'sdb')}`);
+    if (inc.ba) lines.push(`BETRIEBSANWEISUNG (BA): ${productDocUrl(p,'ba')}`);
+    lines.push('');
+  });
+  lines.push('Danke und Grüße');
+  const subject = products.length === 1 ? `Produktinformation ${products[0].name} – Dr. Schumacher` : `Produktinformationen (${products.length} Produkte) – Dr. Schumacher`;
+  return { subject, body: lines.join('\n') };
 }
 
 function openMailto(subject, body) {
@@ -652,10 +649,9 @@ function openMailto(subject, body) {
   a.remove();
 }
 
-function sendProductEmail(id) {
-  const p = PRODUCTS.find(x => x.id === id);
-  if (!p) return;
-  const {subject, body} = buildProductEmail(p);
+function sendStarredProductsEmail() {
+  if (!state.favorites.length) return;
+  const {subject, body} = buildStarredProductsEmail();
   openMailto(subject, body);
 }
 
@@ -920,6 +916,14 @@ function summaryScreen(){
     <label>Anrede<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller"></label>
     <label>Anlass des Gesprächs<input id="summaryOccasion" value="${escapeHtml(state.summaryOccasion)}" placeholder="z. B. unser heutiges Teams-Meeting"></label>
   </section>
+  <section class="summary-price-toggle">
+    <span>E-Mail-Inhalt</span>
+    <div class="price-toggle-row">
+      <button class="filter-chip ${!state.summaryIncludePrices?'active':''}" data-summary-prices="false">Nur Zusammenfassung (ohne Preise)</button>
+      ${state.customerMode ? '' : `<button class="filter-chip ${state.summaryIncludePrices?'active':''}" data-summary-prices="true">Mit Preisen (${escapeHtml(state.priceList)})</button>`}
+    </div>
+    ${state.customerMode ? '<small class="muted-copy">Preise sind im Kundenmodus verborgen.</small>' : ''}
+  </section>
   <section class="list-builder">
     <div><h2>Mit Stern markiert (${chosen.length})</h2><div class="product-list">${chosen.map(p=>summaryChosenCard(p)).join('')||'<div class="empty-state"><h2>Noch keine Produkte markiert</h2><p>Tippen Sie im Gespräch bei einem Produkt auf den Stern, oder wählen Sie rechts direkt aus.</p></div>'}</div></div>
     <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="summarySearch" value="${escapeHtml(state.summaryQuery||'')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p=>summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
@@ -942,9 +946,14 @@ function buildCustomerSummaryEmail(){
   const salutation=state.summaryCustomer.trim()||'Sehr geehrte Damen und Herren';
   const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
   const lines=[`${salutation},`,``,`vielen Dank für ${occasion}. Wie besprochen fassen wir Ihnen nachfolgend die passenden Produkte und deren Vorteile zusammen:`,``];
+  const showPrices = state.summaryIncludePrices && !state.customerMode;
   products.forEach(p=>{
     const size=summarySizeFor(p);
     lines.push(`${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
+    if (showPrices) {
+      const price = resolvePrice(p, size);
+      if (price !== undefined && price !== null && price !== '') lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
+    }
     p.facts.slice(0,3).forEach(f=>lines.push(`- ${f}`));
     lines.push('');
   });
@@ -1312,7 +1321,7 @@ function bind() {
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); toggleFavorite(button.dataset.favorite); });
   document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => { state.size=button.dataset.size; render(); });
   document.querySelectorAll('[data-email-toggle]').forEach(button => button.onclick = () => { const key=button.dataset.emailToggle; state.emailInclude[key]=!state.emailInclude[key]; render(); });
-  document.querySelectorAll('[data-action="send-email"]').forEach(button => button.onclick = () => sendProductEmail(button.dataset.product));
+  document.querySelectorAll('[data-action="send-email"]').forEach(button => button.onclick = () => sendStarredProductsEmail());
   $('#search')?.addEventListener('input', event => { state.query=event.target.value; render(); });
   $('#globalSearch')?.addEventListener('input', event => { state.globalQuery=event.target.value; render(); });
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
@@ -1331,6 +1340,7 @@ function bind() {
   $('#summaryOccasion')?.addEventListener('input', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; render(); });
   document.querySelectorAll('[data-summary-size]').forEach(select => select.onchange = () => setSummarySize(select.dataset.summarySize, select.value));
+  document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
   $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
   $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); saveVsCompare({productId:e.target.value, size:p?p.sizes[0]:''}); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
@@ -1402,7 +1412,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds','productLists','activeProductList',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summarySizes','summaryCustomer','summaryOccasion'
+  'summarySizes','summaryCustomer','summaryOccasion','summaryIncludePrices'
 ];
 
 function exportDeviceBackup() {
@@ -1463,11 +1473,12 @@ async function importDeviceBackup(event) {
 
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf werden zurückgesetzt. Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
-  ['favorites','summarySizes','summaryCustomer','summaryOccasion','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summarySizes','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summarySizes = {};
   state.summaryCustomer = '';
   state.summaryOccasion = 'unser heutiges Gespräch';
+  state.summaryIncludePrices = false;
   state.quoteCustomer = '';
   state.quoteContact = '';
   state.quoteNote = '';
