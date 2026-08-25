@@ -344,7 +344,7 @@ const state = {
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
   emailInclude: {price:true, sheet:true, safety:true, ba:true},
   vsCompare: JSON.parse(localStorage.getItem('vsCompare') || 'null') || {productId:'', size:'', competitorName:'', competitorPrice:'', annualUnits:''},
-  advisor: {category:'', spectrum:'', alcohol:'', need:''},
+  advisor: {category:'', subtype:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   lists: JSON.parse(localStorage.getItem('productLists') || '{}'),
   activeList: localStorage.getItem('activeProductList') || 'Meine Merkliste',
@@ -683,24 +683,116 @@ async function copyEmailText(subject, body, button) {
   }
 }
 
+const ADVISOR_CATEGORIES = [
+  {key:'surface', label:'Fläche', sub:'Desinfektion & Reinigung'},
+  {key:'hands', label:'Hände & Haut', sub:'Händedesinfektion & Pflege'},
+  {key:'instruments', label:'Instrumente', sub:'Aufbereitung & Desinfektion'},
+  {key:'application', label:'Applikation', sub:'Spendersysteme & Zubehör'}
+];
+
+const ADVISOR_SUBTYPES = {
+  surface: [
+    {key:'liquid', label:'Flächendesinfektion (Konzentrat/gebrauchsfertig)', match:p=>/Flächendesinfektion|Desinfektionsmittel/.test(p.kind)},
+    {key:'wipes', label:'Desinfektionstücher', match:p=>/tücher/i.test(p.kind)},
+    {key:'dispenser', label:'Tuchspendersystem', match:p=>p.kind==='Vliestuchspendersysteme'}
+  ],
+  hands: [
+    {key:'handdis', label:'Händedesinfektion', match:p=>/Händedesinfektion/.test(p.kind)},
+    {key:'skindis', label:'Hautdesinfektion (OP/Injektion)', match:p=>p.kind==='Hautdesinfektion'},
+    {key:'care', label:'Hautpflege & Hautschutz', match:p=>/Hautschutz/.test(p.kind)},
+    {key:'remediation', label:'Sanierung (Schimmel etc.)', match:p=>p.kind==='Sanierung'}
+  ],
+  instruments: [
+    {key:'manual', label:'Manuelle Aufbereitung', match:p=>/Manuelle|Instrumentendesinfektion/.test(p.kind)},
+    {key:'machine', label:'Maschinelle Aufbereitung', match:p=>/Maschinelle/.test(p.kind)}
+  ],
+  application: [
+    {key:'wall', label:'Wandspender', match:p=>p.kind==='Wandspender & Zubehör'},
+    {key:'wipesdisp', label:'Tuchspender & Zubehör', match:p=>/Vliestuchspender|Spender und Applikation/.test(p.kind)},
+    {key:'holder', label:'Halter & Dosierhilfen', match:p=>p.kind==='Halter, Dosierhilfen & Zubehör'}
+  ]
+};
+
+function advisorRefinement(category, subtype) {
+  const text = p => `${p.kind} ${p.summary} ${p.facts.join(' ')}`;
+  if (category === 'surface' && (subtype === 'liquid' || subtype === 'wipes')) {
+    return {question:'Was ist besonders wichtig?', options:[
+      {value:'routine', label:'Routineanwendung', match:()=>true},
+      {value:'material', label:'Empfindliche Materialien', match:p=>/material|empfindlich|schonend/i.test(text(p))},
+      {value:'ausbruch', label:'Ausbruchsfall / breites Spektrum', match:p=>p.spectrum.includes('viruzid')||p.spectrum.includes('sporizid')},
+      {value:'alkoholisch', label:'Alkoholisch gewünscht', match:p=>/alkoholisch|schnelldesinfektion/i.test(text(p))},
+      {value:'alkoholfrei', label:'Alkoholfrei gewünscht', match:p=>/alkoholfrei|oxidativ|pulver/i.test(text(p))}
+    ]};
+  }
+  if (category === 'hands' && subtype === 'handdis') {
+    return {question:'Was ist besonders wichtig?', options:[
+      {value:'routine', label:'Routineanwendung', match:()=>true},
+      {value:'sensibel', label:'Sensible Haut / parfümfrei', match:p=>/parfüm|sensib/i.test(text(p))},
+      {value:'ausbruch', label:'Ausbruchsfall (Noro/Adeno/Rota)', match:p=>p.spectrum.includes('viruzid')},
+      {value:'gel', label:'Gelform gewünscht', match:p=>/gel/i.test(p.kind)}
+    ]};
+  }
+  if (category === 'hands' && subtype === 'skindis') {
+    return {question:'Gefärbt oder farblos?', options:[
+      {value:'egal', label:'Egal', match:()=>true},
+      {value:'gefaerbt', label:'Gefärbt', match:p=>/GEFÄRBT/i.test(p.name)},
+      {value:'farblos', label:'Farblos', match:p=>!/GEFÄRBT/i.test(p.name)}
+    ]};
+  }
+  if (category === 'hands' && subtype === 'care') {
+    return {question:'Welche Produktform suchen Sie?', options:[
+      {value:'wasch', label:'Waschlotion', match:p=>/waschlotion/i.test(text(p))},
+      {value:'creme', label:'Creme / Emulsion', match:p=>/crem|cream|emulsion/i.test(`${p.name} ${text(p)}`) && !/wipes/i.test(p.name)},
+      {value:'tuch', label:'Pflegetücher', match:p=>/wipes/i.test(p.name)},
+      {value:'spezial', label:'Spezialpflege (Ölbad, Gel)', match:p=>/ölbad|vital gel/i.test(p.name)}
+    ]};
+  }
+  if (category === 'instruments' && subtype === 'manual') {
+    return {question:'Reinigung, Desinfektion oder beides?', options:[
+      {value:'reinigung', label:'Nur Reinigung', match:p=>!(p.spectrum && p.spectrum.length)},
+      {value:'kombi', label:'Reinigung + Desinfektion', match:p=>p.spectrum && p.spectrum.length>0},
+      {value:'sporizid', label:'Sporizid / Ausbruchsfall', match:p=>p.spectrum && p.spectrum.includes('sporizid')}
+    ]};
+  }
+  if (category === 'instruments' && subtype === 'machine') {
+    const names = {
+      reinigung: ['THERMOSHIELD® FLEX','XTREME'],
+      desinfektion: ['THERMOSHIELD®','DESINFEKTANT','THERMOSHIELD® NR'],
+      neutralisation: ['THERMOSHIELD® BASIX','THERMOSHIELD® C','THERMOSHIELD® P','THERMOSHIELD® SHINE','THERMO CLEAR','THERMO ALKA CLEAR'],
+      pflege: ['SPEZIAL ÖLSPRAY']
+    };
+    return {question:'Welcher Prozessschritt wird benötigt?', options:[
+      {value:'reinigung', label:'Reinigung', match:p=>names.reinigung.includes(p.name)},
+      {value:'desinfektion', label:'Desinfektion (Endoskope)', match:p=>names.desinfektion.includes(p.name)},
+      {value:'neutralisation', label:'Neutralisation & Klarspülung', match:p=>names.neutralisation.includes(p.name)},
+      {value:'pflege', label:'Pflege & Schmierung', match:p=>names.pflege.includes(p.name)}
+    ]};
+  }
+  if (category === 'application' && subtype === 'wall') {
+    return {question:'Touchless (berührungslos) gewünscht?', options:[
+      {value:'egal', label:'Egal', match:()=>true},
+      {value:'touchless', label:'Ja, touchless', match:p=>/touchless/i.test(p.name)},
+      {value:'manuell', label:'Nein, manuell', match:p=>!/touchless/i.test(p.name)}
+    ]};
+  }
+  return null;
+}
+
 function advisorScreen() {
   const a = state.advisor;
-  const categoryOptions = [['surface','Fläche','Desinfektion & Reinigung'],['hands','Hände & Haut','Händedesinfektion & Pflege'],['instruments','Instrumente','Aufbereitung & Desinfektion'],['application','Applikation','Spendersysteme & Zubehör']];
-  const spectrumOptions = ['egal','begrenzt viruzid','begrenzt viruzid PLUS','viruzid','sporizid'];
-  const alcoholOptions = ['egal','alkoholisch','alkoholfrei'];
-  const needOptions = ['Routine','empfindliche Materialien','Ausbruchsfall','breites Wirkungsspektrum'];
-  const steps = [
-    {key:'category', question:'Was ist die Indikation? Wo soll das Produkt eingesetzt werden?'},
-    {key:'spectrum', question:'Welches Wirkspektrum wird benötigt?'},
-    {key:'alcohol', question:'Alkoholisch oder alkoholfrei?'},
-    {key:'need', question:'Was ist besonders wichtig?'}
-  ];
-  const stepIndex = steps.findIndex(s => !a[s.key]);
-  const done = stepIndex === -1;
-  const progressDots = steps.map((s,i) => `<span class="advisor-dot ${a[s.key]?'done':''} ${i===stepIndex?'current':''}"></span>`).join('');
-  const categoryLabel = categoryOptions.find(([v]) => v === a.category)?.[1] || a.category;
-  const trailLabel = key => key === 'category' ? categoryLabel : a[key];
-  const trail = steps.filter(s => a[s.key]).map(s => `<button class="advisor-chip" data-advisor-edit="${s.key}">${escapeHtml(trailLabel(s.key))}</button>`).join('<span class="advisor-arrow">→</span>');
+  const categoryDef = ADVISOR_CATEGORIES.find(c => c.key === a.category);
+  const subtypeDef = a.category ? (ADVISOR_SUBTYPES[a.category]||[]).find(s => s.key === a.subtype) : null;
+  const refinement = (a.category && a.subtype) ? advisorRefinement(a.category, a.subtype) : null;
+  const done = !!a.category && !!a.subtype && (!refinement || !!a.need);
+
+  const trailParts = [];
+  if (categoryDef) trailParts.push(['category', categoryDef.label]);
+  if (a.subtype && subtypeDef) trailParts.push(['subtype', subtypeDef.label]);
+  if (refinement && a.need) { const opt = refinement.options.find(o => o.value === a.need); if (opt) trailParts.push(['need', opt.label]); }
+  const trail = trailParts.map(([k,l]) => `<button class="advisor-chip" data-advisor-edit="${k}">${escapeHtml(l)}</button>`).join('<span class="advisor-arrow">→</span>');
+  const totalSteps = refinement ? 3 : (a.category && a.subtype) ? 2 : 3;
+  const answeredCount = trailParts.length;
+  const progressDots = Array.from({length: totalSteps}).map((_,i) => `<span class="advisor-dot ${i < answeredCount ? 'done' : (i===answeredCount ? 'current' : '')}"></span>`).join('');
 
   if (done) {
     const results = advisorResults();
@@ -712,42 +804,51 @@ function advisorScreen() {
     </main>`;
   }
 
-  const step = steps[stepIndex];
-  const tilesHtml = step.key === 'category'
-    ? `<div class="category-grid">${categoryOptions.map(([v,l,sub]) => `<button class="category-card ${v}" data-advisor="category" data-value="${v}"><span class="category-icon">${icon(v)}</span><span><strong>${l}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>`
-    : `<div class="answer-grid wizard">${(step.key==='spectrum'?spectrumOptions:step.key==='alcohol'?alcoholOptions:needOptions).map(v => `<button class="answer-button" data-advisor="${step.key}" data-value="${v}">${v}</button>`).join('')}</div>`;
+  let question, tilesHtml;
+  if (!a.category) {
+    question = 'Was ist die Indikation? Wo soll das Produkt eingesetzt werden?';
+    tilesHtml = `<div class="category-grid">${ADVISOR_CATEGORIES.map(c => `<button class="category-card ${c.key}" data-advisor="category" data-value="${c.key}"><span class="category-icon">${icon(c.key)}</span><span><strong>${c.label}</strong><small>${c.sub}</small></span><b>›</b></button>`).join('')}</div>`;
+  } else if (!a.subtype) {
+    question = 'Welche Produktart suchen Sie?';
+    const opts = ADVISOR_SUBTYPES[a.category] || [];
+    tilesHtml = `<div class="answer-grid wizard">${opts.map(o => `<button class="answer-button" data-advisor="subtype" data-value="${o.key}">${o.label}</button>`).join('')}</div>`;
+  } else {
+    question = refinement.question;
+    tilesHtml = `<div class="answer-grid wizard">${refinement.options.map(o => `<button class="answer-button" data-advisor="need" data-value="${o.value}">${o.label}</button>`).join('')}</div>`;
+  }
 
   return `<main class="page advisor-page">
-    <div class="section-heading"><div><span class="eyebrow">Frage ${stepIndex+1} von ${steps.length}</span><h1>${step.question}</h1></div>${stepIndex>0 ? '<button class="secondary-button" data-action="advisor-back">Zurück</button>' : ''}</div>
+    <div class="section-heading"><div><span class="eyebrow">Frage ${answeredCount+1} von ${totalSteps}</span><h1>${question}</h1></div>${answeredCount>0 ? '<button class="secondary-button" data-action="advisor-back">Zurück</button>' : ''}</div>
     <div class="advisor-progress">${progressDots}</div>
     ${trail ? `<div class="advisor-trail">${trail}</div>` : ''}
     <section class="advisor-card">${tilesHtml}</section>
   </main>`;
 }
 function advisorBack() {
-  const order = ['category','spectrum','alcohol','need'];
+  const order = ['category','subtype','need'];
   for (let i = order.length - 1; i >= 0; i--) {
     if (state.advisor[order[i]]) { state.advisor[order[i]] = ''; break; }
   }
   render();
 }
 function advisorEdit(key) {
-  const order = ['category','spectrum','alcohol','need'];
+  const order = ['category','subtype','need'];
   order.slice(order.indexOf(key)).forEach(k => state.advisor[k] = '');
   render();
 }
 
 function advisorResults() {
   const a = state.advisor;
-  if (!a.category) return [];
-  let list = PRODUCTS.filter(p => p.category === a.category);
-  if (a.spectrum && a.spectrum !== 'egal') list = list.filter(p => p.spectrum.includes(a.spectrum));
-  if (a.alcohol === 'alkoholfrei') list = list.filter(p => /alkoholfrei|oxidativ|pulver/i.test(`${p.kind} ${p.summary} ${p.facts.join(' ')}`));
-  if (a.alcohol === 'alkoholisch') list = list.filter(p => /alkoholisch|alkoholisches|schnelldesinfektion/i.test(`${p.kind} ${p.summary} ${p.facts.join(' ')}`));
-  if (a.need === 'empfindliche Materialien') list = list.filter(p => /material|empfindlich|schonend/i.test(`${p.summary} ${p.facts.join(' ')}`));
-  if (a.need === 'Ausbruchsfall') list = list.filter(p => p.spectrum.includes('viruzid') || p.spectrum.includes('sporizid'));
-  if (a.need === 'breites Wirkungsspektrum') list = list.sort((x,y)=>y.spectrum.length-x.spectrum.length);
-  return list.slice(0,6);
+  if (!a.category || !a.subtype) return [];
+  const subtypeDef = (ADVISOR_SUBTYPES[a.category]||[]).find(s => s.key === a.subtype);
+  if (!subtypeDef) return [];
+  let list = PRODUCTS.filter(p => p.category === a.category && subtypeDef.match(p));
+  const refinement = advisorRefinement(a.category, a.subtype);
+  if (refinement && a.need) {
+    const opt = refinement.options.find(o => o.value === a.need);
+    if (opt) list = list.filter(opt.match);
+  }
+  return list.slice(0,8);
 }
 
 function recentScreen() {
@@ -1228,7 +1329,7 @@ function bind() {
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
   $('#excel')?.addEventListener('change', importExcel);
   document.querySelectorAll('[data-advisor]').forEach(button => button.onclick = () => { state.advisor[button.dataset.advisor]=button.dataset.value; render(); });
-  $('[data-action="reset-advisor"]')?.addEventListener('click', () => { state.advisor={category:'',spectrum:'',alcohol:'',need:''}; render(); });
+  $('[data-action="reset-advisor"]')?.addEventListener('click', () => { state.advisor={category:'',subtype:'',need:''}; render(); });
   $('[data-action="advisor-back"]')?.addEventListener('click', advisorBack);
   document.querySelectorAll('[data-advisor-edit]').forEach(button => button.onclick = () => advisorEdit(button.dataset.advisorEdit));
   document.querySelectorAll('[data-compare]').forEach(button => button.onclick = () => toggleCompare(button.dataset.compare));
