@@ -1224,6 +1224,7 @@ function settingsScreen() {
   const metaText = meta.date ? `Zuletzt aktualisiert: ${escapeHtml(meta.date)} · ${meta.rows || 0} Produkte` : 'Noch nicht synchronisiert';
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
     <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
+    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf zurücksetzen</small></span><b>×</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht.</span></div></section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Merklisten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
     <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
     <p class="version">Interner Produktberater · Version 2.2</p>
@@ -1357,6 +1358,7 @@ function bind() {
   $('[data-action="new-report"]')?.addEventListener('click', () => { state.visitReport={date:new Date().toISOString().slice(0,10),type:'Produktvorstellung',result:'Offen'}; localStorage.setItem('visitReport',JSON.stringify(state.visitReport)); state.screen='report'; render(); });
   document.querySelectorAll('[data-quote-item]').forEach(input => input.onchange = () => { saveQuoteItem(input.dataset.quoteItem, input.dataset.field, input.value); render(); });
   $('[data-action="export-prices"]')?.addEventListener('click', exportPrices);
+  $('[data-action="reset-customer"]')?.addEventListener('click', resetCustomerData);
   $('[data-action="export-backup"]')?.addEventListener('click', exportDeviceBackup);
   $('#backupImport')?.addEventListener('change', importDeviceBackup);
   $('#quoteCustomer')?.addEventListener('input', e => saveQuoteField('quoteCustomer', e.target.value));
@@ -1457,6 +1459,24 @@ async function importDeviceBackup(event) {
     alert('Wiederherstellung fehlgeschlagen: ' + error.message);
     event.target.value = '';
   }
+}
+
+function resetCustomerData() {
+  if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf werden zurückgesetzt. Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
+  ['favorites','summarySizes','summaryCustomer','summaryOccasion','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport'].forEach(key => localStorage.removeItem(key));
+  state.favorites = [];
+  state.summarySizes = {};
+  state.summaryCustomer = '';
+  state.summaryOccasion = 'unser heutiges Gespräch';
+  state.quoteCustomer = '';
+  state.quoteContact = '';
+  state.quoteNote = '';
+  state.quoteValidUntil = '';
+  state.quoteItems = {};
+  state.visitReport = {};
+  alert('Kundendaten wurden zurückgesetzt. Bereit für den nächsten Termin.');
+  state.screen = 'menu';
+  render();
 }
 
 function exportPrices() { if (!can('prices')) { alert('Für diese Rolle ist der Export nicht freigeschaltet.'); return; } const payload={exportedAt:new Date().toISOString(),meta:state.importMeta,prices:state.prices}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='schumacher-preisstand-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); URL.revokeObjectURL(a.href); }
