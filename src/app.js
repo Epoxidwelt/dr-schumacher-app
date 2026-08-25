@@ -348,7 +348,6 @@ const state = {
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   lists: JSON.parse(localStorage.getItem('productLists') || '{}'),
   activeList: localStorage.getItem('activeProductList') || 'Meine Merkliste',
-  summaryIds: JSON.parse(localStorage.getItem('summaryIds') || '[]'),
   summarySizes: JSON.parse(localStorage.getItem('summarySizes') || '{}'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryOccasion: localStorage.getItem('summaryOccasion') || 'unser heutiges Gespräch',
@@ -500,7 +499,7 @@ function menuScreen() {
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
     ['lists','Merklisten','Produkte für Termine zusammenstellen'],
     ['offer','Kundenübersicht','Merkliste als Präsentation oder PDF'],
-    ['summary','Kundenzusammenfassung','Besprochene Produkte per E-Mail an den Kunden'],
+    ['summary','Kundenzusammenfassung','Mit ★ markierte Produkte per E-Mail an den Kunden'],
     ['report','Besuchsbericht','CRM-Zusammenfassung und Follow-up'],
     ['dashboard','Follow-up Dashboard','Offene Termine und Aufgaben im Blick'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
@@ -913,43 +912,33 @@ function removeFromList(id){state.lists[state.activeList]=(state.lists[state.act
 function createList(){const name=prompt('Name der neuen Merkliste, z. B. Klinikum Dortmund');if(!name)return;const clean=name.trim().slice(0,50);if(!clean)return;state.lists[clean]=state.lists[clean]||[];state.activeList=clean;localStorage.setItem('activeProductList',clean);persistLists();render();}
 
 function summaryScreen(){
-  const chosen=state.summaryIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+  const chosen=state.favorites.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
   const query=(state.summaryQuery||'').toLowerCase();
   const pickable=query?PRODUCTS.filter(p=>`${p.name} ${p.kind}`.toLowerCase().includes(query)):PRODUCTS;
-  return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Wählen Sie aus, über welche Produkte Sie mit dem Kunden gesprochen haben. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
+  return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Alle Produkte, die Sie unterwegs mit dem Stern (★) markiert haben, erscheinen automatisch hier. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
   <section class="offer-config">
     <label>Anrede<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller"></label>
     <label>Anlass des Gesprächs<input id="summaryOccasion" value="${escapeHtml(state.summaryOccasion)}" placeholder="z. B. unser heutiges Teams-Meeting"></label>
   </section>
   <section class="list-builder">
-    <div><h2>Besprochene Produkte (${chosen.length})</h2><div class="product-list">${chosen.map(p=>summaryChosenCard(p)).join('')||'<div class="empty-state"><h2>Noch keine Produkte ausgewählt</h2><p>Wählen Sie rechts die besprochenen Produkte aus.</p></div>'}</div></div>
-    <div><h2>Produkte auswählen</h2><label class="search-box summary-search">${icon('search')}<input id="summarySearch" value="${escapeHtml(state.summaryQuery||'')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p=>summaryProductCard(p,false)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
+    <div><h2>Mit Stern markiert (${chosen.length})</h2><div class="product-list">${chosen.map(p=>summaryChosenCard(p)).join('')||'<div class="empty-state"><h2>Noch keine Produkte markiert</h2><p>Tippen Sie im Gespräch bei einem Produkt auf den Stern, oder wählen Sie rechts direkt aus.</p></div>'}</div></div>
+    <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="summarySearch" value="${escapeHtml(state.summaryQuery||'')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p=>summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
   </section>
   <div class="offer-actions summary-send"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
   </main>`;
 }
-function summaryProductCard(p,selected){return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button ${selected?`data-summary-remove="${p.id}"`:`data-summary-add="${p.id}"`}>${selected?'−':'+'}</button></article>`}
+function summaryProductCard(p){const selected=state.favorites.includes(p.id);return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button data-favorite="${p.id}">${selected?'−':'+'}</button></article>`}
 function summarySizeFor(p){return state.summarySizes[p.id] && p.sizes.includes(state.summarySizes[p.id]) ? state.summarySizes[p.id] : p.sizes[0];}
 function summaryChosenCard(p){
   const size=summarySizeFor(p);
   const sizePicker=p.sizes.length>1
     ? `<select class="offer-input summary-size" data-summary-size="${p.id}" aria-label="Gebinde">${p.sizes.map(s=>`<option ${s===size?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select>`
     : `<small>${escapeHtml(size||'')}</small>`;
-  return `<article class="mini-product summary-chosen-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small>${sizePicker}</div><button data-summary-remove="${p.id}">−</button></article>`;
+  return `<article class="mini-product summary-chosen-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small>${sizePicker}</div><button data-favorite="${p.id}">−</button></article>`;
 }
-function persistSummary(){localStorage.setItem('summaryIds',JSON.stringify(state.summaryIds));localStorage.setItem('summarySizes',JSON.stringify(state.summarySizes));}
-function addToSummary(id){
-  if(!state.summaryIds.includes(id)){
-    state.summaryIds=[...state.summaryIds,id];
-    const p=PRODUCTS.find(x=>x.id===id);
-    if(p && !state.summarySizes[id]) state.summarySizes[id]=p.sizes[0];
-  }
-  persistSummary();render();
-}
-function removeFromSummary(id){state.summaryIds=state.summaryIds.filter(x=>x!==id);delete state.summarySizes[id];persistSummary();render();}
-function setSummarySize(id,size){state.summarySizes[id]=size;persistSummary();render();}
+function setSummarySize(id,size){state.summarySizes[id]=size;localStorage.setItem('summarySizes',JSON.stringify(state.summarySizes));render();}
 function buildCustomerSummaryEmail(){
-  const products=state.summaryIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+  const products=state.favorites.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
   const salutation=state.summaryCustomer.trim()||'Sehr geehrte Damen und Herren';
   const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
   const lines=[`${salutation},`,``,`vielen Dank für ${occasion}. Wie besprochen fassen wir Ihnen nachfolgend die passenden Produkte und deren Vorteile zusammen:`,``];
@@ -963,7 +952,7 @@ function buildCustomerSummaryEmail(){
   return {subject:`Zusammenfassung unseres Gesprächs – Dr. Schumacher`, body:lines.join('\n')};
 }
 function sendCustomerSummaryEmail(){
-  if(!state.summaryIds.length)return;
+  if(!state.favorites.length)return;
   const {subject,body}=buildCustomerSummaryEmail();
   openMailto(subject,body);
 }
@@ -1226,7 +1215,7 @@ function copyOfferEmail(button) {
 
 function favoritesScreen() {
   const list = PRODUCTS.filter(p => state.favorites.includes(p.id));
-  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1></div><span class="result-count">${list.length}</span></div><div class="product-list">${list.map(productCard).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
+  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1><p>Mit dem Stern markierte Produkte landen automatisch auch in der Kundenzusammenfassung.</p></div><span class="result-count">${list.length}</span></div><div class="product-list">${list.map(productCard).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
 }
 
 function settingsScreen() {
@@ -1337,8 +1326,6 @@ function bind() {
   document.querySelectorAll('[data-list-remove]').forEach(button => button.onclick = () => removeFromList(button.dataset.listRemove));
   $('[data-action="new-list"]')?.addEventListener('click', createList);
   document.querySelectorAll('[data-list-select]').forEach(button => button.onclick = () => { state.activeList=button.dataset.listSelect; localStorage.setItem('activeProductList',state.activeList); render(); });
-  document.querySelectorAll('[data-summary-add]').forEach(button => button.onclick = () => addToSummary(button.dataset.summaryAdd));
-  document.querySelectorAll('[data-summary-remove]').forEach(button => button.onclick = () => removeFromSummary(button.dataset.summaryRemove));
   $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#summaryOccasion')?.addEventListener('input', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; render(); });
@@ -1395,7 +1382,15 @@ function toggleCompare(id) {
 }
 
 function toggleFavorite(id) {
-  state.favorites = state.favorites.includes(id) ? state.favorites.filter(x => x!==id) : [...state.favorites,id];
+  const wasFavorite = state.favorites.includes(id);
+  state.favorites = wasFavorite ? state.favorites.filter(x => x!==id) : [...state.favorites,id];
+  if (!wasFavorite) {
+    const p = PRODUCTS.find(x => x.id === id);
+    if (p && !state.summarySizes[id]) {
+      state.summarySizes[id] = (state.selected === id && state.size) ? state.size : p.sizes[0];
+      localStorage.setItem('summarySizes', JSON.stringify(state.summarySizes));
+    }
+  }
   localStorage.setItem('favorites', JSON.stringify(state.favorites));
   render();
 }
@@ -1405,7 +1400,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds','productLists','activeProductList',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryIds','summarySizes','summaryCustomer','summaryOccasion'
+  'summarySizes','summaryCustomer','summaryOccasion'
 ];
 
 function exportDeviceBackup() {
