@@ -351,6 +351,7 @@ const state = {
   summaryIds: JSON.parse(localStorage.getItem('summaryIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryOccasion: localStorage.getItem('summaryOccasion') || 'unser heutiges Gespräch',
+  summaryQuery: '',
   talkProduct: '', talkSituation: 'Kurzvorstellung',
   quoteCustomer: localStorage.getItem('quoteCustomer') || '',
   quoteContact: localStorage.getItem('quoteContact') || '',
@@ -775,6 +776,8 @@ function createList(){const name=prompt('Name der neuen Merkliste, z. B. Kliniku
 
 function summaryScreen(){
   const chosen=state.summaryIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+  const query=(state.summaryQuery||'').toLowerCase();
+  const pickable=query?PRODUCTS.filter(p=>`${p.name} ${p.kind}`.toLowerCase().includes(query)):PRODUCTS;
   return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Wählen Sie aus, über welche Produkte Sie mit dem Kunden gesprochen haben. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
   <section class="offer-config">
     <label>Anrede<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller"></label>
@@ -782,9 +785,9 @@ function summaryScreen(){
   </section>
   <section class="list-builder">
     <div><h2>Besprochene Produkte (${chosen.length})</h2><div class="product-list">${chosen.map(p=>summaryProductCard(p,true)).join('')||'<div class="empty-state"><h2>Noch keine Produkte ausgewählt</h2><p>Wählen Sie rechts die besprochenen Produkte aus.</p></div>'}</div></div>
-    <div><h2>Produkte auswählen</h2><div class="quick-product-list">${PRODUCTS.map(p=>summaryProductCard(p,false)).join('')}</div></div>
+    <div><h2>Produkte auswählen</h2><label class="search-box summary-search">${icon('search')}<input id="summarySearch" value="${escapeHtml(state.summaryQuery||'')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p=>summaryProductCard(p,false)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
   </section>
-  <div class="offer-actions"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
+  <div class="offer-actions summary-send"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
   </main>`;
 }
 function summaryProductCard(p,selected){return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button ${selected?`data-summary-remove="${p.id}"`:`data-summary-add="${p.id}"`}>${selected?'−':'+'}</button></article>`}
@@ -1181,6 +1184,7 @@ function bind() {
   document.querySelectorAll('[data-summary-remove]').forEach(button => button.onclick = () => removeFromSummary(button.dataset.summaryRemove));
   $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#summaryOccasion')?.addEventListener('input', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
+  $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; render(); });
   $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
   $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); saveVsCompare({productId:e.target.value, size:p?p.sizes[0]:''}); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
