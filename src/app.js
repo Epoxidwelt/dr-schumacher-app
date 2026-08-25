@@ -349,6 +349,7 @@ const state = {
   lists: JSON.parse(localStorage.getItem('productLists') || '{}'),
   activeList: localStorage.getItem('activeProductList') || 'Meine Merkliste',
   summaryIds: JSON.parse(localStorage.getItem('summaryIds') || '[]'),
+  summarySizes: JSON.parse(localStorage.getItem('summarySizes') || '{}'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryOccasion: localStorage.getItem('summaryOccasion') || 'unser heutiges Gespräch',
   summaryQuery: '',
@@ -784,23 +785,40 @@ function summaryScreen(){
     <label>Anlass des Gesprächs<input id="summaryOccasion" value="${escapeHtml(state.summaryOccasion)}" placeholder="z. B. unser heutiges Teams-Meeting"></label>
   </section>
   <section class="list-builder">
-    <div><h2>Besprochene Produkte (${chosen.length})</h2><div class="product-list">${chosen.map(p=>summaryProductCard(p,true)).join('')||'<div class="empty-state"><h2>Noch keine Produkte ausgewählt</h2><p>Wählen Sie rechts die besprochenen Produkte aus.</p></div>'}</div></div>
+    <div><h2>Besprochene Produkte (${chosen.length})</h2><div class="product-list">${chosen.map(p=>summaryChosenCard(p)).join('')||'<div class="empty-state"><h2>Noch keine Produkte ausgewählt</h2><p>Wählen Sie rechts die besprochenen Produkte aus.</p></div>'}</div></div>
     <div><h2>Produkte auswählen</h2><label class="search-box summary-search">${icon('search')}<input id="summarySearch" value="${escapeHtml(state.summaryQuery||'')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p=>summaryProductCard(p,false)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
   </section>
   <div class="offer-actions summary-send"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
   </main>`;
 }
 function summaryProductCard(p,selected){return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button ${selected?`data-summary-remove="${p.id}"`:`data-summary-add="${p.id}"`}>${selected?'−':'+'}</button></article>`}
-function persistSummary(){localStorage.setItem('summaryIds',JSON.stringify(state.summaryIds));}
-function addToSummary(id){if(!state.summaryIds.includes(id))state.summaryIds=[...state.summaryIds,id];persistSummary();render();}
-function removeFromSummary(id){state.summaryIds=state.summaryIds.filter(x=>x!==id);persistSummary();render();}
+function summarySizeFor(p){return state.summarySizes[p.id] && p.sizes.includes(state.summarySizes[p.id]) ? state.summarySizes[p.id] : p.sizes[0];}
+function summaryChosenCard(p){
+  const size=summarySizeFor(p);
+  const sizePicker=p.sizes.length>1
+    ? `<select class="offer-input summary-size" data-summary-size="${p.id}" aria-label="Gebinde">${p.sizes.map(s=>`<option ${s===size?'selected':''}>${escapeHtml(s)}</option>`).join('')}</select>`
+    : `<small>${escapeHtml(size||'')}</small>`;
+  return `<article class="mini-product summary-chosen-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small>${sizePicker}</div><button data-summary-remove="${p.id}">−</button></article>`;
+}
+function persistSummary(){localStorage.setItem('summaryIds',JSON.stringify(state.summaryIds));localStorage.setItem('summarySizes',JSON.stringify(state.summarySizes));}
+function addToSummary(id){
+  if(!state.summaryIds.includes(id)){
+    state.summaryIds=[...state.summaryIds,id];
+    const p=PRODUCTS.find(x=>x.id===id);
+    if(p && !state.summarySizes[id]) state.summarySizes[id]=p.sizes[0];
+  }
+  persistSummary();render();
+}
+function removeFromSummary(id){state.summaryIds=state.summaryIds.filter(x=>x!==id);delete state.summarySizes[id];persistSummary();render();}
+function setSummarySize(id,size){state.summarySizes[id]=size;persistSummary();render();}
 function buildCustomerSummaryEmail(){
   const products=state.summaryIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
   const salutation=state.summaryCustomer.trim()||'Sehr geehrte Damen und Herren';
   const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
   const lines=[`${salutation},`,``,`vielen Dank für ${occasion}. Wie besprochen fassen wir Ihnen nachfolgend die passenden Produkte und deren Vorteile zusammen:`,``];
   products.forEach(p=>{
-    lines.push(p.name.toUpperCase());
+    const size=summarySizeFor(p);
+    lines.push(`${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
     p.facts.slice(0,3).forEach(f=>lines.push(`- ${f}`));
     lines.push('');
   });
@@ -1185,6 +1203,7 @@ function bind() {
   $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#summaryOccasion')?.addEventListener('input', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; render(); });
+  document.querySelectorAll('[data-summary-size]').forEach(select => select.onchange = () => setSummarySize(select.dataset.summarySize, select.value));
   $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
   $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); saveVsCompare({productId:e.target.value, size:p?p.sizes[0]:''}); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
@@ -1247,7 +1266,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds','productLists','activeProductList',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryIds','summaryCustomer','summaryOccasion'
+  'summaryIds','summarySizes','summaryCustomer','summaryOccasion'
 ];
 
 function exportDeviceBackup() {
