@@ -685,19 +685,56 @@ async function copyEmailText(subject, body, button) {
 
 function advisorScreen() {
   const a = state.advisor;
-  const categoryOptions = [['surface','Fläche'],['hands','Hände & Haut'],['instruments','Instrumente'],['application','Applikation']];
+  const categoryOptions = [['surface','Fläche','Desinfektion & Reinigung'],['hands','Hände & Haut','Händedesinfektion & Pflege'],['instruments','Instrumente','Aufbereitung & Desinfektion'],['application','Applikation','Spendersysteme & Zubehör']];
   const spectrumOptions = ['egal','begrenzt viruzid','begrenzt viruzid PLUS','viruzid','sporizid'];
   const alcoholOptions = ['egal','alkoholisch','alkoholfrei'];
   const needOptions = ['Routine','empfindliche Materialien','Ausbruchsfall','breites Wirkungsspektrum'];
-  const results = advisorResults();
+  const steps = [
+    {key:'category', question:'Was ist die Indikation? Wo soll das Produkt eingesetzt werden?'},
+    {key:'spectrum', question:'Welches Wirkspektrum wird benötigt?'},
+    {key:'alcohol', question:'Alkoholisch oder alkoholfrei?'},
+    {key:'need', question:'Was ist besonders wichtig?'}
+  ];
+  const stepIndex = steps.findIndex(s => !a[s.key]);
+  const done = stepIndex === -1;
+  const progressDots = steps.map((s,i) => `<span class="advisor-dot ${a[s.key]?'done':''} ${i===stepIndex?'current':''}"></span>`).join('');
+  const categoryLabel = categoryOptions.find(([v]) => v === a.category)?.[1] || a.category;
+  const trailLabel = key => key === 'category' ? categoryLabel : a[key];
+  const trail = steps.filter(s => a[s.key]).map(s => `<button class="advisor-chip" data-advisor-edit="${s.key}">${escapeHtml(trailLabel(s.key))}</button>`).join('<span class="advisor-arrow">→</span>');
+
+  if (done) {
+    const results = advisorResults();
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Geführte Auswahl</span><h1>Produktberater</h1><p>Empfehlung auf Basis Ihrer Angaben. Ersetzt keine verbindliche Produktinformation.</p></div><button class="secondary-button" data-action="reset-advisor">Neu starten</button></div>
+      <div class="advisor-progress">${progressDots}</div>
+      ${trail ? `<div class="advisor-trail">${trail}</div>` : ''}
+      <section class="advisor-results"><div class="section-heading"><div><span class="eyebrow">Empfehlung</span><h2>${results.length ? 'Passende Produkte' : 'Keine Treffer für diese Kombination'}</h2></div></div><div class="product-list">${results.map(productCard).join('')}</div><div class="advisor-note">Die Auswahl basiert auf den hinterlegten Kurzmerkmalen. Vor einer verbindlichen Empfehlung müssen aktuelle Produktinformation, Einwirkzeiten, Freigaben und Materialverträglichkeit geprüft werden.</div></section>
+    </main>`;
+  }
+
+  const step = steps[stepIndex];
+  const tilesHtml = step.key === 'category'
+    ? `<div class="category-grid">${categoryOptions.map(([v,l,sub]) => `<button class="category-card ${v}" data-advisor="category" data-value="${v}"><span class="category-icon">${icon(v)}</span><span><strong>${l}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>`
+    : `<div class="answer-grid wizard">${(step.key==='spectrum'?spectrumOptions:step.key==='alcohol'?alcoholOptions:needOptions).map(v => `<button class="answer-button" data-advisor="${step.key}" data-value="${v}">${v}</button>`).join('')}</div>`;
+
   return `<main class="page advisor-page">
-    <div class="section-heading"><div><span class="eyebrow">Geführte Auswahl</span><h1>Produktberater</h1><p>Beantworten Sie wenige Fragen. Die Empfehlung ersetzt keine verbindliche Produktinformation.</p></div></div>
-    <section class="advisor-card"><h2>1. Wo soll das Produkt eingesetzt werden?</h2><div class="answer-grid">${categoryOptions.map(([v,l])=>`<button class="answer-button ${a.category===v?'active':''}" data-advisor="category" data-value="${v}">${l}</button>`).join('')}</div></section>
-    <section class="advisor-card"><h2>2. Welches Wirkspektrum wird benötigt?</h2><div class="answer-grid compact">${spectrumOptions.map(v=>`<button class="answer-button ${a.spectrum===v?'active':''}" data-advisor="spectrum" data-value="${v}">${v}</button>`).join('')}</div></section>
-    <section class="advisor-card"><h2>3. Alkoholisch oder alkoholfrei?</h2><div class="answer-grid compact">${alcoholOptions.map(v=>`<button class="answer-button ${a.alcohol===v?'active':''}" data-advisor="alcohol" data-value="${v}">${v}</button>`).join('')}</div></section>
-    <section class="advisor-card"><h2>4. Was ist besonders wichtig?</h2><div class="answer-grid compact">${needOptions.map(v=>`<button class="answer-button ${a.need===v?'active':''}" data-advisor="need" data-value="${v}">${v}</button>`).join('')}</div></section>
-    <section class="advisor-results"><div class="section-heading"><div><span class="eyebrow">Empfehlung</span><h2>${results.length ? 'Passende Produkte' : 'Bitte zuerst Einsatzbereich wählen'}</h2></div><button class="secondary-button" data-action="reset-advisor">Zurücksetzen</button></div><div class="product-list">${results.map(productCard).join('')}</div><div class="advisor-note">Die Auswahl basiert auf den hinterlegten Kurzmerkmalen. Vor einer verbindlichen Empfehlung müssen aktuelle Produktinformation, Einwirkzeiten, Freigaben und Materialverträglichkeit geprüft werden.</div></section>
+    <div class="section-heading"><div><span class="eyebrow">Frage ${stepIndex+1} von ${steps.length}</span><h1>${step.question}</h1></div>${stepIndex>0 ? '<button class="secondary-button" data-action="advisor-back">Zurück</button>' : ''}</div>
+    <div class="advisor-progress">${progressDots}</div>
+    ${trail ? `<div class="advisor-trail">${trail}</div>` : ''}
+    <section class="advisor-card">${tilesHtml}</section>
   </main>`;
+}
+function advisorBack() {
+  const order = ['category','spectrum','alcohol','need'];
+  for (let i = order.length - 1; i >= 0; i--) {
+    if (state.advisor[order[i]]) { state.advisor[order[i]] = ''; break; }
+  }
+  render();
+}
+function advisorEdit(key) {
+  const order = ['category','spectrum','alcohol','need'];
+  order.slice(order.indexOf(key)).forEach(k => state.advisor[k] = '');
+  render();
 }
 
 function advisorResults() {
@@ -1192,6 +1229,8 @@ function bind() {
   $('#excel')?.addEventListener('change', importExcel);
   document.querySelectorAll('[data-advisor]').forEach(button => button.onclick = () => { state.advisor[button.dataset.advisor]=button.dataset.value; render(); });
   $('[data-action="reset-advisor"]')?.addEventListener('click', () => { state.advisor={category:'',spectrum:'',alcohol:'',need:''}; render(); });
+  $('[data-action="advisor-back"]')?.addEventListener('click', advisorBack);
+  document.querySelectorAll('[data-advisor-edit]').forEach(button => button.onclick = () => advisorEdit(button.dataset.advisorEdit));
   document.querySelectorAll('[data-compare]').forEach(button => button.onclick = () => toggleCompare(button.dataset.compare));
   $('[data-action="copy-pitch"]')?.addEventListener('click', async () => { const text=comparisonPitch(state.compareIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean)); try { await navigator.clipboard.writeText(text); alert('Text wurde kopiert.'); } catch { alert(text); } });
   document.querySelectorAll('[data-list-add]').forEach(button => button.onclick = () => addToList(button.dataset.listAdd));
