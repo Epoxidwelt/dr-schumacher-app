@@ -379,6 +379,7 @@ const state = {
   importMeta: JSON.parse(localStorage.getItem('priceImportMeta') || '{}'),
   visitReport: JSON.parse(localStorage.getItem('visitReport') || '{}'),
   savedReports: JSON.parse(localStorage.getItem('savedVisitReports') || '[]'),
+  customerHistory: JSON.parse(localStorage.getItem('customerHistory') || '[]'),
   globalQuery: ''
 };
 
@@ -458,6 +459,7 @@ function render() {
   if (state.screen === 'detail') html = header(true) + detailScreen() + bottomNav('search');
   if (state.screen === 'favorites') html = header(true) + favoritesScreen() + bottomNav('favorites');
   if (state.screen === 'settings') html = header(true) + settingsScreen() + bottomNav('settings');
+  if (state.screen === 'customer-history') html = header(true) + customerHistoryScreen() + bottomNav('settings');
   if (state.screen === 'advisor') html = header(true) + advisorScreen() + bottomNav('home');
   if (state.screen === 'recent') html = header(true) + recentScreen() + bottomNav('home');
   if (state.screen === 'compare') html = header(true) + compareScreen() + bottomNav('home');
@@ -1243,7 +1245,7 @@ function copyOfferEmail(button) {
 function favoritesScreen() {
   const favoriteIds = [...new Set(state.favorites.map(f => f.id))];
   const list = PRODUCTS.filter(p => favoriteIds.includes(p.id));
-  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1><p>Mit dem Stern markierte Produkte landen automatisch auch in der Kundenzusammenfassung.</p></div><span class="result-count">${list.length}</span></div><div class="product-list">${list.map(productCard).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
+  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1><p>Mit dem Stern markierte Produkte landen automatisch auch in der Kundenzusammenfassung.</p></div>${list.length ? '<button class="secondary-button" data-action="clear-favorites">Favoriten leeren</button>' : ''}</div><div class="product-list">${list.map(productCard).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
 }
 
 function settingsScreen() {
@@ -1252,7 +1254,7 @@ function settingsScreen() {
   const metaText = meta.date ? `Zuletzt aktualisiert: ${escapeHtml(meta.date)} · ${meta.rows || 0} Produkte` : 'Noch nicht synchronisiert';
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
     <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
-    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf zurücksetzen</small></span><b>×</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht.</span></div></section>
+    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf zurücksetzen</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Merklisten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
     <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
     <p class="version">Interner Produktberater · Version 2.2</p>
@@ -1394,6 +1396,8 @@ function bind() {
   document.querySelectorAll('[data-quote-item]').forEach(input => input.onchange = () => { saveQuoteItem(input.dataset.quoteItem, input.dataset.field, input.value); render(); });
   $('[data-action="export-prices"]')?.addEventListener('click', exportPrices);
   $('[data-action="reset-customer"]')?.addEventListener('click', resetCustomerData);
+  $('[data-action="customer-history"]')?.addEventListener('click', () => { state.screen='customer-history'; render(); });
+  $('[data-action="clear-favorites"]')?.addEventListener('click', clearFavoritesOnly);
   $('[data-action="export-backup"]')?.addEventListener('click', exportDeviceBackup);
   $('#backupImport')?.addEventListener('change', importDeviceBackup);
   $('#quoteCustomer')?.addEventListener('input', e => saveQuoteField('quoteCustomer', e.target.value));
@@ -1457,7 +1461,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds','productLists','activeProductList',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryCustomer','summaryOccasion','summaryIncludePrices'
+  'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory'
 ];
 
 function exportDeviceBackup() {
@@ -1516,8 +1520,39 @@ async function importDeviceBackup(event) {
   }
 }
 
+function snapshotCustomerData() {
+  const entries = favoriteEntries().map(e => ({name: e.product.name, size: e.size}));
+  const customer = state.summaryCustomer.trim() || state.quoteCustomer.trim();
+  if (!entries.length && !customer) return;
+  const snapshot = {
+    date: new Date().toISOString(),
+    customer: customer || '',
+    occasion: state.summaryOccasion.trim(),
+    products: entries
+  };
+  state.customerHistory = [snapshot, ...state.customerHistory].slice(0,5);
+  localStorage.setItem('customerHistory', JSON.stringify(state.customerHistory));
+}
+
+function clearFavoritesOnly() {
+  if (!state.favorites.length) return;
+  if (!confirm('Alle markierten Favoriten löschen?')) return;
+  snapshotCustomerData();
+  state.favorites = [];
+  localStorage.removeItem('favorites');
+  render();
+}
+
+function customerHistoryScreen() {
+  const items = state.customerHistory;
+  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Rückblick</span><h1>Letzte Kundengespräche</h1><p>Wird automatisch gesichert, sobald Sie „Speicher löschen – neuer Kunde" oder „Favoriten leeren" nutzen.</p></div></div>
+  ${items.length ? items.map(snap => `<section class="advisor-results" style="margin-bottom:14px"><div class="section-heading"><div><span class="eyebrow">${escapeHtml(new Date(snap.date).toLocaleString('de-DE'))}</span><h2>${escapeHtml(snap.customer || 'Ohne Namen')}</h2></div></div>${snap.occasion ? `<p>${escapeHtml(snap.occasion)}</p>` : ''}${snap.products.length ? `<ul>${snap.products.map(p=>`<li>${escapeHtml(p.name)} – ${escapeHtml(p.size)}</li>`).join('')}</ul>` : '<p class="muted-copy">Keine Produkte markiert.</p>'}</section>`).join('') : '<div class="empty-state"><h2>Noch keine Einträge</h2><p>Sobald Sie den Speicher für einen neuen Kunden löschen, wird der vorherige Stand hier gesichert.</p></div>'}
+  </main>`;
+}
+
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf werden zurückgesetzt. Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
+  snapshotCustomerData();
   ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
