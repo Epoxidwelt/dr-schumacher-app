@@ -364,8 +364,6 @@ const state = {
   vsCompare: JSON.parse(localStorage.getItem('vsCompare') || 'null') || {productId:'', size:'', competitorName:'', competitorPrice:'', annualUnits:''},
   advisor: {category:'', subtype:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
-  lists: JSON.parse(localStorage.getItem('productLists') || '{}'),
-  activeList: localStorage.getItem('activeProductList') || 'Meine Merkliste',
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryOccasion: localStorage.getItem('summaryOccasion') || 'unser heutiges Gespräch',
   summaryIncludePrices: localStorage.getItem('summaryIncludePrices') === 'true',
@@ -463,7 +461,6 @@ function render() {
   if (state.screen === 'advisor') html = header(true) + advisorScreen() + bottomNav('home');
   if (state.screen === 'recent') html = header(true) + recentScreen() + bottomNav('home');
   if (state.screen === 'compare') html = header(true) + compareScreen() + bottomNav('home');
-  if (state.screen === 'lists') html = header(true) + listsScreen() + bottomNav('favorites');
   if (state.screen === 'competition') html = header(true) + competitionScreen() + bottomNav('home');
   if (state.screen === 'talk') html = header(true) + talkScreen() + bottomNav('home');
   if (state.screen === 'offer') html = header(true) + offerScreen() + bottomNav('home');
@@ -517,8 +514,7 @@ function menuScreen() {
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
-    ['lists','Merklisten','Produkte für Termine zusammenstellen'],
-    ['offer','Kundenübersicht','Merkliste als Präsentation oder PDF'],
+    ['offer','Kundenübersicht','Markierte Produkte als Angebot oder PDF'],
     ['summary','Kundenzusammenfassung','Mit ★ markierte Produkte per E-Mail an den Kunden'],
     ['report','Besuchsbericht','CRM-Zusammenfassung und Follow-up'],
     ['dashboard','Follow-up Dashboard','Offene Termine und Aufgaben im Blick'],
@@ -526,7 +522,7 @@ function menuScreen() {
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','lists','offer','summary'].includes(card[0]));
+  if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const coreCards = cards.filter(c => coreKeys.includes(c[0]));
   const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
@@ -548,7 +544,7 @@ function menuScreen() {
     <section class="cockpit-stats">
       <button data-category="dashboard"><strong>${due}</strong><span>heute / überfällig</span><small>Follow-ups öffnen →</small></button>
       <button data-category="favorites"><strong>${state.favorites.length}</strong><span>Favoriten</span><small>Schnellzugriff →</small></button>
-      <button data-category="lists"><strong>${Object.keys(state.lists).length}</strong><span>Merklisten</span><small>Termine vorbereiten →</small></button>
+      <button data-category="recent"><strong>${state.recent.length}</strong><span>Zuletzt angesehen</span><small>Verlauf öffnen →</small></button>
       <button data-category="settings"><strong>${Object.keys(state.prices).length}</strong><span>Preisdatensätze</span><small>Import verwalten →</small></button>
     </section>
     <div class="section-heading"><div><span class="eyebrow">Weitere Funktionen</span><h2>Werkzeuge</h2></div></div>
@@ -925,18 +921,6 @@ function vsCalculation() {
   return {product, size, ourPrice, units, ourPerUnit, compPrice, compPerUnit, consumption, ourAnnual, compAnnual, savings, ready};
 }
 
-function listsScreen(){
-  if(!state.lists[state.activeList]) state.lists[state.activeList]=[];
-  const names=Object.keys(state.lists).length?Object.keys(state.lists):['Meine Merkliste'];
-  const ids=state.lists[state.activeList]||[];
-  const chosen=ids.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
-  return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Terminvorbereitung</span><h1>Merklisten</h1><p>Stellen Sie Produkte für Kundentermine zusammen. Alles bleibt lokal auf diesem Gerät.</p></div><button class="secondary-button" data-action="new-list">Neue Liste</button></div><div class="list-tabs">${names.map(n=>`<button class="filter-chip ${n===state.activeList?'active':''}" data-list-select="${escapeHtml(n)}">${escapeHtml(n)}</button>`).join('')}</div><section class="list-builder"><div><h2>${escapeHtml(state.activeList)}</h2><div class="product-list">${chosen.map(p=>listProductCard(p,true)).join('')||'<div class="empty-state"><h2>Liste ist noch leer</h2><p>Wählen Sie rechts Produkte aus.</p></div>'}</div></div><div><h2>Produkte hinzufügen</h2><div class="quick-product-list">${PRODUCTS.map(p=>listProductCard(p,false)).join('')}</div></div></section></main>`;
-}
-function listProductCard(p,selected){return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button ${selected?`data-list-remove="${p.id}"`:`data-list-add="${p.id}"`}>${selected?'−':'+'}</button></article>`}
-function persistLists(){localStorage.setItem('productLists',JSON.stringify(state.lists));}
-function addToList(id){if(!state.lists[state.activeList])state.lists[state.activeList]=[];if(!state.lists[state.activeList].includes(id))state.lists[state.activeList].push(id);persistLists();render();}
-function removeFromList(id){state.lists[state.activeList]=(state.lists[state.activeList]||[]).filter(x=>x!==id);persistLists();render();}
-function createList(){const name=prompt('Name der neuen Merkliste, z. B. Klinikum Dortmund');if(!name)return;const clean=name.trim().slice(0,50);if(!clean)return;state.lists[clean]=state.lists[clean]||[];state.activeList=clean;localStorage.setItem('activeProductList',clean);persistLists();render();}
 
 function summaryScreen(){
   const chosen=favoriteEntries();
@@ -1034,13 +1018,14 @@ function talkScreen(){
 function buildTalkText(){const p=PRODUCTS.find(x=>x.id===state.talkProduct)||PRODUCTS[0];const fact=p.facts[0].replace(/^[A-ZÄÖÜ]/,m=>m.toLowerCase());if(state.talkSituation==='Bedarf ermitteln')return `Damit ich Ihnen das passende Produkt empfehlen kann: Auf welchen Flächen oder in welchem Prozess möchten Sie es einsetzen, welches Wirkspektrum benötigen Sie und gibt es empfindliche Materialien oder besondere Vorgaben? Anschließend prüfen wir gemeinsam, ob ${p.name} passt.`;if(state.talkSituation==='Einwand: zu teuer')return `Ich verstehe, dass der Preis wichtig ist. Bei ${p.name} sollten wir deshalb nicht nur den Gebindepreis betrachten, sondern Anwendung, Verbrauch, Prozessaufwand und Produktausnutzung. Besonders relevant ist, dass ${fact}. Lassen Sie uns die Kosten pro Anwendung vergleichen.`;if(state.talkSituation==='Abschlussfrage')return `Auf Basis Ihrer Anforderungen halte ich ${p.name} für eine passende Option. Sollen wir die aktuelle Produktinformation gemeinsam prüfen und anschließend ein Muster beziehungsweise ein konkretes Angebot für das passende Gebinde vorbereiten?`;return `${p.name} ist für ${p.kind.toLowerCase()} vorgesehen. Der zentrale Mehrwert: ${fact}. Entscheidend ist, dass wir das Produkt passend zu Ihrem Einsatzbereich und dem benötigten Wirkspektrum auswählen. Die verbindlichen Einwirkzeiten und Freigaben prüfen wir direkt in der aktuellen Produktinformation.`}
 
 
+function quoteKey(id, size) { return id + '__' + size; }
+
 function offerScreen() {
-  const ids = state.lists[state.activeList] || [];
-  const products = ids.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+  const entries = favoriteEntries();
   let subtotal = 0;
-  const rows = products.map(p => {
-    const saved = state.quoteItems[p.id] || {};
-    const size = saved.size && p.sizes.includes(saved.size) ? saved.size : (p.sizes[0] || '');
+  const rows = entries.map(({product: p, size}) => {
+    const key = quoteKey(p.id, size);
+    const saved = state.quoteItems[key] || {};
     const quantity = Math.max(1, Number(saved.quantity) || 1);
     const discount = Math.min(100, Math.max(0, Number(saved.discount) || 0));
     const rawPrice = resolvePrice(p, size);
@@ -1048,10 +1033,9 @@ function offerScreen() {
     const lineTotal = unitPrice == null ? null : unitPrice * quantity * (1 - discount / 100);
     if (lineTotal != null) subtotal += lineTotal;
     return `<tr>
-      <td><strong>${p.name}</strong><small>${p.kind}<br>Art.-Nr. ${resolveArtNr(p, size)}</small></td>
-      <td><select class="offer-input" data-quote-item="${p.id}" data-field="size">${p.sizes.map(x=>`<option ${x===size?'selected':''}>${x}</option>`).join('')}</select></td>
-      <td><input class="offer-input quantity" data-quote-item="${p.id}" data-field="quantity" type="number" min="1" step="1" value="${quantity}"></td>
-      <td><input class="offer-input discount" data-quote-item="${p.id}" data-field="discount" type="number" min="0" max="100" step="0.1" value="${discount}"><span class="unit">%</span></td>
+      <td><strong>${p.name}</strong><small>${p.kind}<br>Art.-Nr. ${resolveArtNr(p, size)} · ${escapeHtml(size)}</small></td>
+      <td><input class="offer-input quantity" data-quote-item="${key}" data-field="quantity" type="number" min="1" step="1" value="${quantity}"></td>
+      <td><input class="offer-input discount" data-quote-item="${key}" data-field="discount" type="number" min="0" max="100" step="0.1" value="${discount}"><span class="unit">%</span></td>
       <td class="offer-price">${state.customerMode ? 'ausgeblendet' : money(unitPrice)}</td>
       <td class="offer-price line-total">${state.customerMode ? 'ausgeblendet' : money(lineTotal)}</td>
     </tr>`;
@@ -1059,10 +1043,10 @@ function offerScreen() {
   const vat = subtotal * 0.19;
   const total = subtotal + vat;
   const validUntil = state.quoteValidUntil || new Date(Date.now()+14*86400000).toISOString().slice(0,10);
-  return `<main class="page offer-page"><div class="section-heading no-print"><div><span class="eyebrow">Angebotsentwurf</span><h1>Kundenübersicht & Kalkulation</h1><p>Erstellt aus der aktiven Merkliste „${escapeHtml(state.activeList)}“.</p></div></div>
-    <section class="offer-config no-print"><label>Kunde / Einrichtung<input id="quoteCustomer" value="${escapeHtml(state.quoteCustomer)}" placeholder="z. B. Klinikum Dortmund"></label><label>Ansprechpartner<input id="quoteContact" value="${escapeHtml(state.quoteContact)}" placeholder="Name oder Funktion"></label><label>Gültig bis<input id="quoteValidUntil" type="date" value="${escapeHtml(validUntil)}"></label><label class="wide">Notiz<textarea id="quoteNote" placeholder="Ziel, nächste Schritte oder besondere Anforderungen">${escapeHtml(state.quoteNote)}</textarea></label><div class="offer-actions wide"><button class="secondary-button" data-action="customer-mode">${state.customerMode?'Preise wieder anzeigen':'Preise für Kunden ausblenden'}</button><button class="secondary-button" data-action="export-offer">CSV für Innendienst</button><button class="secondary-button" data-action="copy-offer" ${products.length?'':'disabled'}>${icon('copy')}<span>Text kopieren</span></button><button class="secondary-button" data-action="email-offer" ${products.length?'':'disabled'}>${icon('talk')}<span>Per E-Mail-Programm öffnen</span></button><button class="primary-button compact" data-action="print-offer">Drucken / als PDF speichern</button></div></section>
-    <section class="offer-sheet"><div class="offer-brand"><img src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher"><div><span>Angebotsentwurf</span><strong>${escapeHtml(state.quoteCustomer || 'Kundentermin')}</strong><small>${escapeHtml(state.quoteContact || '')}</small></div></div><div class="offer-meta"><span>Merkliste: ${escapeHtml(state.activeList)}</span><span>Preisbasis: ${state.customerMode?'ohne Preise':escapeHtml(state.priceList)}</span><span>Gültig bis: ${new Date(validUntil+'T12:00:00').toLocaleDateString('de-DE')}</span><span>Stand: ${new Date().toLocaleDateString('de-DE')}</span></div>
-      ${products.length ? `<div class="offer-table-wrap"><table class="offer-table offer-calculation"><thead><tr><th>Produkt</th><th>Gebinde</th><th>Menge</th><th>Rabatt</th><th>Einzelpreis</th><th>Gesamt</th></tr></thead><tbody>${rows}</tbody></table></div>${state.customerMode?'':`<div class="offer-totals"><div><span>Zwischensumme</span><strong>${money(subtotal)}</strong></div><div><span>zzgl. 19 % MwSt.</span><strong>${money(vat)}</strong></div><div class="grand-total"><span>Gesamtsumme</span><strong>${money(total)}</strong></div></div>`}` : '<div class="empty-state"><h2>Die Merkliste ist leer</h2><p>Fügen Sie zuerst Produkte einer Merkliste hinzu.</p></div>'}
+  return `<main class="page offer-page"><div class="section-heading no-print"><div><span class="eyebrow">Angebotsentwurf</span><h1>Kundenübersicht & Kalkulation</h1><p>Erstellt aus den mit ★ markierten Produkten.</p></div></div>
+    <section class="offer-config no-print"><label>Kunde / Einrichtung<input id="quoteCustomer" value="${escapeHtml(state.quoteCustomer)}" placeholder="z. B. Klinikum Dortmund"></label><label>Ansprechpartner<input id="quoteContact" value="${escapeHtml(state.quoteContact)}" placeholder="Name oder Funktion"></label><label>Gültig bis<input id="quoteValidUntil" type="date" value="${escapeHtml(validUntil)}"></label><label class="wide">Notiz<textarea id="quoteNote" placeholder="Ziel, nächste Schritte oder besondere Anforderungen">${escapeHtml(state.quoteNote)}</textarea></label><div class="offer-actions wide"><button class="secondary-button" data-action="customer-mode">${state.customerMode?'Preise wieder anzeigen':'Preise für Kunden ausblenden'}</button><button class="secondary-button" data-action="export-offer">CSV für Innendienst</button><button class="secondary-button" data-action="copy-offer" ${entries.length?'':'disabled'}>${icon('copy')}<span>Text kopieren</span></button><button class="secondary-button" data-action="email-offer" ${entries.length?'':'disabled'}>${icon('talk')}<span>Per E-Mail-Programm öffnen</span></button><button class="primary-button compact" data-action="print-offer">Drucken / als PDF speichern</button></div></section>
+    <section class="offer-sheet"><div class="offer-brand"><img src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher"><div><span>Angebotsentwurf</span><strong>${escapeHtml(state.quoteCustomer || 'Kundentermin')}</strong><small>${escapeHtml(state.quoteContact || '')}</small></div></div><div class="offer-meta"><span>Markierte Produkte: ${entries.length}</span><span>Preisbasis: ${state.customerMode?'ohne Preise':escapeHtml(state.priceList)}</span><span>Gültig bis: ${new Date(validUntil+'T12:00:00').toLocaleDateString('de-DE')}</span><span>Stand: ${new Date().toLocaleDateString('de-DE')}</span></div>
+      ${entries.length ? `<div class="offer-table-wrap"><table class="offer-table offer-calculation"><thead><tr><th>Produkt</th><th>Menge</th><th>Rabatt</th><th>Einzelpreis</th><th>Gesamt</th></tr></thead><tbody>${rows}</tbody></table></div>${state.customerMode?'':`<div class="offer-totals"><div><span>Zwischensumme</span><strong>${money(subtotal)}</strong></div><div><span>zzgl. 19 % MwSt.</span><strong>${money(vat)}</strong></div><div class="grand-total"><span>Gesamtsumme</span><strong>${money(total)}</strong></div></div>`}` : '<div class="empty-state"><h2>Keine Produkte markiert</h2><p>Markieren Sie zuerst Produkte im Gespräch mit dem Stern (★).</p></div>'}
       ${state.quoteNote ? `<div class="offer-note"><strong>Notiz</strong><p>${escapeHtml(state.quoteNote)}</p></div>` : ''}
       <div class="offer-disclaimer">Unverbindlicher interner Angebotsentwurf. Preise, Steuern, Lieferfähigkeit und Konditionen sind vor Versand durch den Innendienst zu prüfen. Verbindliche Anwendung, Einwirkzeiten, Materialverträglichkeit und Sicherheit ausschließlich anhand der aktuellen offiziellen Produktinformationen prüfen.</div>
     </section></main>`;
@@ -1071,8 +1055,7 @@ function offerScreen() {
 
 function reportScreen() {
   const r = state.visitReport || {};
-  const selected = (state.lists[state.activeList] || []).map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
-  const productNames = selected.map(p => p.name).join(', ');
+  const productNames = favoriteEntries().map(e => `${e.product.name} (${e.size})`).join(', ');
   const reportDate = r.date || new Date().toISOString().slice(0,10);
   const followUp = r.followUp || '';
   const summary = buildCrmSummary({...r, date: reportDate, products: productNames});
@@ -1083,7 +1066,7 @@ function reportScreen() {
       <label>Ansprechpartner<input data-report-field="contacts" value="${escapeHtml(r.contacts || state.quoteContact || '')}" placeholder="Namen und Funktionen"></label>
       <label>Terminart<select data-report-field="type">${['Erstvorstellung','Produktvorstellung','Feedbackgespräch','Testauswertung','Preisgespräch','Follow-up'].map(x=>`<option ${x===(r.type||'Produktvorstellung')?'selected':''}>${x}</option>`).join('')}</select></label>
       <label class="wide">Ausgangssituation / eingesetzte Produkte<textarea data-report-field="current" placeholder="Was nutzt der Kunde aktuell? Welche Herausforderung besteht?">${escapeHtml(r.current || '')}</textarea></label>
-      <label class="wide">Besprochene Produkte<textarea data-report-field="products" placeholder="Produkte aus der Merkliste oder manuell ergänzen">${escapeHtml(r.products || productNames)}</textarea></label>
+      <label class="wide">Besprochene Produkte<textarea data-report-field="products" placeholder="Mit ★ markierte Produkte oder manuell ergänzen">${escapeHtml(r.products || productNames)}</textarea></label>
       <label class="wide">Feedback und Bedarf<textarea data-report-field="feedback" placeholder="Interesse, Einwände, Anforderungen und Aussagen des Kunden">${escapeHtml(r.feedback || '')}</textarea></label>
       <label>Muster / Unterlagen<select data-report-field="samples">${['Keine','Unterlagen gesendet','Muster übergeben','Test vereinbart','Angebot angefordert'].map(x=>`<option ${x===(r.samples||'Keine')?'selected':''}>${x}</option>`).join('')}</select></label>
       <label>Ergebnis<select data-report-field="result">${['Offen','Interesse vorhanden','Testphase','Angebot erforderlich','Kein aktueller Bedarf','Abschluss vorbereitet'].map(x=>`<option ${x===(r.result||'Offen')?'selected':''}>${x}</option>`).join('')}</select></label>
@@ -1176,23 +1159,19 @@ function exportVisitReportCsv() {
   a.href=URL.createObjectURL(blob); a.download='besuchsbericht-'+(r.customer||'kunde').replace(/[^a-z0-9äöüß-]+/gi,'-').toLowerCase()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 
-function saveQuoteItem(id, field, value) {
-  const product = PRODUCTS.find(p => p.id === id);
-  if (!product) return;
-  const current = state.quoteItems[id] || {};
+function saveQuoteItem(key, field, value) {
+  const current = state.quoteItems[key] || {};
   if (field === 'quantity') value = Math.max(1, Math.round(Number(value) || 1));
   if (field === 'discount') value = Math.min(100, Math.max(0, Number(value) || 0));
-  if (field === 'size' && !product.sizes.includes(value)) value = product.sizes[0] || '';
-  state.quoteItems[id] = {...current, [field]: value};
+  state.quoteItems[key] = {...current, [field]: value};
   localStorage.setItem('quoteItems', JSON.stringify(state.quoteItems));
 }
 
 function exportOfferCsv() {
-  const ids = state.lists[state.activeList] || [];
   const lines = [['Kunde','Ansprechpartner','Preisliste','Artikelnummer','Produkt','Gebinde','Menge','Rabatt %','Einzelpreis','Gesamtpreis']];
-  ids.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean).forEach(p => {
-    const saved=state.quoteItems[p.id]||{};
-    const size=saved.size&&p.sizes.includes(saved.size)?saved.size:(p.sizes[0]||'');
+  favoriteEntries().forEach(({product: p, size}) => {
+    const key = quoteKey(p.id, size);
+    const saved=state.quoteItems[key]||{};
     const qty=Math.max(1,Number(saved.quantity)||1);
     const discount=Math.min(100,Math.max(0,Number(saved.discount)||0));
     const raw=resolvePrice(p,size); const unit=raw===''||raw==null?'':Number(raw);
@@ -1205,8 +1184,6 @@ function exportOfferCsv() {
 }
 
 function buildOfferEmail() {
-  const ids = state.lists[state.activeList] || [];
-  const products = ids.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
   let subtotal = 0;
   const lines = [
     `Hallo Team,`,
@@ -1214,13 +1191,12 @@ function buildOfferEmail() {
     `bitte nachstehende Informationen an den Kunden senden.`,
     `Im Kundengespräch mit ${state.quoteCustomer || '(Kunde bitte ergänzen)'}${state.quoteContact ? ' (' + state.quoteContact + ')' : ''} wurden folgende Produkte ausgewählt:`,
     ``,
-    `Merkliste: ${state.activeList}`,
     `Preisliste: ${state.priceList}`,
     ``
   ];
-  products.forEach(p => {
-    const saved = state.quoteItems[p.id] || {};
-    const size = saved.size && p.sizes.includes(saved.size) ? saved.size : (p.sizes[0] || '');
+  favoriteEntries().forEach(({product: p, size}) => {
+    const key = quoteKey(p.id, size);
+    const saved = state.quoteItems[key] || {};
     const quantity = Math.max(1, Number(saved.quantity) || 1);
     const discount = Math.min(100, Math.max(0, Number(saved.discount) || 0));
     const rawPrice = resolvePrice(p, size);
@@ -1261,8 +1237,8 @@ function settingsScreen() {
   const metaText = meta.date ? `Zuletzt aktualisiert: ${escapeHtml(meta.date)} · ${meta.rows || 0} Produkte` : 'Noch nicht synchronisiert';
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
     <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
-    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf zurücksetzen</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
-    <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Merklisten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
+    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf zurücksetzen</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
+    <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Favoriten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
     <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
     <p class="version">Interner Produktberater · Version 2.2</p>
   </main>`;
@@ -1349,7 +1325,7 @@ function bind() {
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','lists','competition','talk','offer','summary','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
@@ -1366,10 +1342,6 @@ function bind() {
   document.querySelectorAll('[data-advisor-edit]').forEach(button => button.onclick = () => advisorEdit(button.dataset.advisorEdit));
   document.querySelectorAll('[data-compare]').forEach(button => button.onclick = () => toggleCompare(button.dataset.compare));
   $('[data-action="copy-pitch"]')?.addEventListener('click', async () => { const text=comparisonPitch(state.compareIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean)); try { await navigator.clipboard.writeText(text); alert('Text wurde kopiert.'); } catch { alert(text); } });
-  document.querySelectorAll('[data-list-add]').forEach(button => button.onclick = () => addToList(button.dataset.listAdd));
-  document.querySelectorAll('[data-list-remove]').forEach(button => button.onclick = () => removeFromList(button.dataset.listRemove));
-  $('[data-action="new-list"]')?.addEventListener('click', createList);
-  document.querySelectorAll('[data-list-select]').forEach(button => button.onclick = () => { state.activeList=button.dataset.listSelect; localStorage.setItem('activeProductList',state.activeList); render(); });
   $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#summaryOccasion')?.addEventListener('input', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; render(); });
@@ -1415,7 +1387,7 @@ function bind() {
     const nav = button.dataset.nav;
     if (nav==='home') state.screen='menu';
     if (nav==='search') { state.screen='products'; state.category='all'; }
-    if (nav==='favorites') state.screen='lists';
+    if (nav==='favorites') state.screen='favorites';
     if (nav==='settings') state.screen='settings';
     render();
   });
@@ -1466,7 +1438,7 @@ function changeFavoriteSize(id, oldSize, newSize) {
 function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key,value); }
 
 const BACKUP_KEYS = [
-  'prices','priceImportMeta','favorites','recentProducts','compareIds','productLists','activeProductList',
+  'prices','priceImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
   'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory'
 ];
@@ -1558,7 +1530,7 @@ function customerHistoryScreen() {
 }
 
 function resetCustomerData() {
-  if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf werden zurückgesetzt. Preise, Merklisten und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
+  if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
   snapshotCustomerData();
   ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
