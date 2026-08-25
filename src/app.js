@@ -1,118 +1,118 @@
 // Placeholder pricing seeded from the Gesamtkatalog 2026 Google Sheet the user
-// maintains (UVP/PL1-PL5 - PL6 has no data there yet). Every size currently carries
+// maintains (UVP/PL1-PL5). Every size currently carries
 // the same flat 10/9/8/7/6/5 EUR test values, confirmed with the user as intentional
 // placeholder data for exercising the import pipeline - NOT real prices. Replace by
 // re-running scripts (see docs/referenz-katalog-artikel-roh.csv) once real per-product
 // prices exist, or by importing a real price CSV via Einstellungen, which overrides
 // this at the per-SKU level.
 const DEFAULT_PRICES = {
-  '00-208-005':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'750 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-323DS-005':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'750 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'2,5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-323-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-270-020':{sizes:{'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-204-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-201-010-02':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-214-0004-01':{sizes:{'40 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'25 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-245-0002-01':{sizes:{'20 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'25 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-205-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-255-0004':{sizes:{'40 g':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 kg':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-050Z-T080':{sizes:{'80 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-639HI6-T050':{sizes:{'50 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-208-D100-01':{sizes:{'100 Tücher (Spenderdose)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'100 Tücher (Nachfüllpack)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-208-T100':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-208-ERS100-01':{sizes:{'100 Tücher (Vliestuchspender)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'100 Tücher (Nachfüllpack)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-401-T100-01':{sizes:{'100 Sachets':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-323DS-T060':{sizes:{'60 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-323DS-OSEB120':{sizes:{'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-323-RS120':{sizes:{'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-235-D100':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-235-T100':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-270-T072':{sizes:{'72 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-270-OSEB120':{sizes:{'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-OSEE100-01':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-OSEB120-01':{sizes:{'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-SD001':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'6 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-SKD001':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-RD10003-01':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-RD10006-01':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'50 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-RD7003-01':{sizes:{'70 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-SE002':{sizes:{'6 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-SE003':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-REW10006-01':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'110 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'50 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-531-005':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-530-T010':{sizes:{'10 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-530-H001':{sizes:{'1 Haube':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-401-0015-02':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'250 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-403OP-0015-01':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-457OP-0005-01':{sizes:{'50 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'700 ml (ESH Vacu-Bag kurze Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'700 ml (ESH Vacu-Bag lange Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-407OP-0015':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-407OP-0015-30':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-485OP-0005':{sizes:{'50 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-410OP-0015':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-409-0015-02':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-501OP-0025':{sizes:{'250 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-502OP-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-607-005-01':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-602-001-03':{sizes:{'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-602-005-03':{sizes:{'500 ml (Spenderflasche)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-631OP-005-01':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'700 ml (ESH Vacu-Bag kurze Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'700 ml (ESH Vacu-Bag lange Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-602DS-001':{sizes:{'100 ml (Tube)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-622IS-005':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-614-005-03':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-620HC-001-01':{sizes:{'100 ml (Tube)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-623-B007':{sizes:{'700 ml (ESH Vacu-Bag kurze Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'700 ml (ESH Vacu-Bag lange Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-627-001':{sizes:{'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-609-0025-01':{sizes:{'250 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-605-001':{sizes:{'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-604DW1-T010-01':{sizes:{'10 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-639NK-T080':{sizes:{'80 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-639NK-T080-01':{sizes:{'80 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-138-010':{sizes:{'1 L (Spenderflasche)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 L (Dosierflasche)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-104-020-02':{sizes:{'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-115-010':{sizes:{'1 kg':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 kg':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-805-0025':{sizes:{'250 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-156-001':{sizes:{'2x 100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-128-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-136-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-122-010-01':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-121-010-01':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-150-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-155-0004':{sizes:{'40 g':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 kg':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-818-050-01':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-814-050-01':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-817-050-01':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-803-020-01':{sizes:{'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-813-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-134-050-01':{sizes:{'5 L (Flachkanister)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-134-FD200':{sizes:{'200 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-183-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'200 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-119-050-02':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'200 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-170-FD200':{sizes:{'200 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-173-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-180-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-181-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-182-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-127-050':{sizes:{'5 L (Flachkanister)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'5 L (Kanister)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-137-050':{sizes:{'4,25 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-108-003':{sizes:{'300 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-901-005-01':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-903-010-01':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-911-010TO':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-918-110':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-918-005':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-911-305':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-902-OSB':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-902-MH':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-902-EIMK':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-906-005-03':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-906-030':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  'PSP-000146':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  'PSP-000144':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  '00-915-SD001':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  'EIM-OT05KOMNABL-02':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  'EIM-OT05KOMNAWE-02':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  'EIM-OT05WE06':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
-  'EIM-OT03KOMNAWE-02':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5,'PL 6':''}}},
+  '00-208-005':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'750 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-323DS-005':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'750 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'2,5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-323-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-270-020':{sizes:{'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-204-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-201-010-02':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-214-0004-01':{sizes:{'40 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'25 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-245-0002-01':{sizes:{'20 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'25 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-205-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-255-0004':{sizes:{'40 g':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 kg':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-050Z-T080':{sizes:{'80 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-639HI6-T050':{sizes:{'50 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-208-D100-01':{sizes:{'100 Tücher (Spenderdose)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'100 Tücher (Nachfüllpack)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-208-T100':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-208-ERS100-01':{sizes:{'100 Tücher (Vliestuchspender)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'100 Tücher (Nachfüllpack)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-401-T100-01':{sizes:{'100 Sachets':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-323DS-T060':{sizes:{'60 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-323DS-OSEB120':{sizes:{'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-323-RS120':{sizes:{'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-235-D100':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-235-T100':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-270-T072':{sizes:{'72 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-270-OSEB120':{sizes:{'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-OSEE100-01':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-OSEB120-01':{sizes:{'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-SD001':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'6 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-SKD001':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-RD10003-01':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-RD10006-01':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'50 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-RD7003-01':{sizes:{'70 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-SE002':{sizes:{'6 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-SE003':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-REW10006-01':{sizes:{'100 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'110 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'120 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'50 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-531-005':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-530-T010':{sizes:{'10 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-530-H001':{sizes:{'1 Haube':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-401-0015-02':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'250 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-403OP-0015-01':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-457OP-0005-01':{sizes:{'50 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'700 ml (ESH Vacu-Bag kurze Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'700 ml (ESH Vacu-Bag lange Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-407OP-0015':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-407OP-0015-30':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-485OP-0005':{sizes:{'50 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-410OP-0015':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-409-0015-02':{sizes:{'150 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-501OP-0025':{sizes:{'250 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-502OP-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-607-005-01':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-602-001-03':{sizes:{'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-602-005-03':{sizes:{'500 ml (Spenderflasche)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-631OP-005-01':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'700 ml (ESH Vacu-Bag kurze Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'700 ml (ESH Vacu-Bag lange Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-602DS-001':{sizes:{'100 ml (Tube)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-622IS-005':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-614-005-03':{sizes:{'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-620HC-001-01':{sizes:{'100 ml (Tube)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-623-B007':{sizes:{'700 ml (ESH Vacu-Bag kurze Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'700 ml (ESH Vacu-Bag lange Pumpe)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-627-001':{sizes:{'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-609-0025-01':{sizes:{'250 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-605-001':{sizes:{'100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-604DW1-T010-01':{sizes:{'10 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-639NK-T080':{sizes:{'80 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-639NK-T080-01':{sizes:{'80 Tücher':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-138-010':{sizes:{'1 L (Spenderflasche)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 L (Dosierflasche)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-104-020-02':{sizes:{'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-115-010':{sizes:{'1 kg':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 kg':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-805-0025':{sizes:{'250 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'500 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-156-001':{sizes:{'2x 100 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-128-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-136-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-122-010-01':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-121-010-01':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-150-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-155-0004':{sizes:{'40 g':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 kg':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-818-050-01':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-814-050-01':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-817-050-01':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-803-020-01':{sizes:{'2 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-813-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-134-050-01':{sizes:{'5 L (Flachkanister)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'10 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-134-FD200':{sizes:{'200 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-183-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'200 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-119-050-02':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'200 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-170-FD200':{sizes:{'200 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-173-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-180-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-181-050':{sizes:{'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-182-010':{sizes:{'1 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-127-050':{sizes:{'5 L (Flachkanister)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'5 L (Kanister)':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-137-050':{sizes:{'4,25 L':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-108-003':{sizes:{'300 ml':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-901-005-01':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-903-010-01':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-911-010TO':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-918-110':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-918-005':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-911-305':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-902-OSB':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-902-MH':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-902-EIMK':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-906-005-03':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-906-030':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  'PSP-000146':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  'PSP-000144':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5},'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  '00-915-SD001':{sizes:{'Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  'EIM-OT05KOMNABL-02':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  'EIM-OT05KOMNAWE-02':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  'EIM-OT05WE06':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
+  'EIM-OT03KOMNAWE-02':{sizes:{'1 Stück':{'UVP':10,'PL 1':9,'PL 2':8,'PL 3':7,'PL 4':6,'PL 5':5}}},
 };
 const OFFICIAL = {
   home: 'https://www.schumacher-online.com/de',
@@ -472,12 +472,11 @@ function profileScreen() {
     <span class="eyebrow">Interne Nutzung</span><h1>Wie möchten Sie die App verwenden?</h1>
     <p>Wählen Sie Ihre Rolle. Die Auswahl steuert die sichtbaren Funktionen auf diesem Gerät.</p>
     <div class="profile-options">${USER_PROFILES.map(profile=>`<button class="profile-option ${state.activeProfile===profile.id?'selected':''}" data-profile="${profile.id}"><span class="profile-avatar">${profile.id==='sales'?'AD':profile.id==='inside'?'ID':'A'}</span><span><strong>${profile.name}</strong><small>${profile.description}</small></span><b>›</b></button>`).join('')}</div>
-    <div class="role-note"><strong>Hinweis:</strong> Diese lokale Rollenauswahl verbessert die Bedienung, ersetzt aber keine zentrale Firmenanmeldung oder technische Zugriffskontrolle.</div>
   </section></main>`;
 }
 
 function priceScreen() {
-  const options = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','PL 6'];
+  const options = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'];
   return `<main class="price-shell">
     <section class="price-panel">
       <img class="welcome-logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher">
@@ -587,7 +586,7 @@ function detailScreen() {
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2><ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
-      <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${state.customerMode?'<button data-action="customer-mode">Internen Modus aktivieren</button>':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','PL 6'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
+      <div class="price-card-detail"><span>Gebinde auswählen</span><div class="size-selector">${p.sizes.map(size => `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${state.customerMode?'<button data-action="customer-mode">Internen Modus aktivieren</button>':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
         ${state.customerMode ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
@@ -1237,7 +1236,7 @@ function settingsScreen() {
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
     <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Merklisten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
-    <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL6</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
+    <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
     <p class="version">Interner Produktberater · Version 2.2</p>
   </main>`;
 }
@@ -1488,7 +1487,7 @@ async function importExcel(event) {
       const sku = String(row.Artikelnummer || row.SKU || row['Artikel-Nr.'] || '').trim();
       const size = String(row.Gebinde || row.Gebindegröße || '').trim();
       if (!sku) { errors.push(`Zeile ${line}: Artikelnummer fehlt`); continue; }
-      const values = {UVP:toNumber(row.UVP), 'PL 1':toNumber(row.PL1 ?? row['PL 1']), 'PL 2':toNumber(row.PL2 ?? row['PL 2']), 'PL 3':toNumber(row.PL3 ?? row['PL 3']), 'PL 4':toNumber(row.PL4 ?? row['PL 4']), 'PL 5':toNumber(row.PL5 ?? row['PL 5']), 'PL 6':toNumber(row.PL6 ?? row['PL 6'])};
+      const values = {UVP:toNumber(row.UVP), 'PL 1':toNumber(row.PL1 ?? row['PL 1']), 'PL 2':toNumber(row.PL2 ?? row['PL 2']), 'PL 3':toNumber(row.PL3 ?? row['PL 3']), 'PL 4':toNumber(row.PL4 ?? row['PL 4']), 'PL 5':toNumber(row.PL5 ?? row['PL 5'])};
       if (Object.values(values).every(v => v === '')) { errors.push(`Zeile ${line}: keine Preise vorhanden`); continue; }
       if (!mapped[sku]) mapped[sku] = {sizes:{}};
       if (size) {
@@ -1595,8 +1594,7 @@ async function syncLivePrices(manual=false) {
           'PL 2': toNumber(row['Preisliste 2']),
           'PL 3': toNumber(row['Preisliste 3']),
           'PL 4': toNumber(row['Preisliste 4']),
-          'PL 5': toNumber(row['Preisliste 5']),
-          'PL 6': ''
+          'PL 5': toNumber(row['Preisliste 5'])
         };
         const rowArtNr = String(row['Art. Nr.']||'').trim();
         if (rowArtNr) artNr[size] = rowArtNr;
