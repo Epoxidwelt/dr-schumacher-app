@@ -617,7 +617,7 @@ function buildProductEmail(p) {
     ``,
     `bitte nachstehende Informationen an den Kunden senden:`,
     ``,
-    `${p.name} (${p.kind})`,
+    `PRODUKT: ${p.name}`,
     `Artikelnummer: ${resolveArtNr(p, size)}`,
     `Gebinde: ${size}`
   ];
@@ -626,9 +626,10 @@ function buildProductEmail(p) {
     const per = perUnitLabel(p, size);
     if (per) lines.push(`Umgerechnet: ${per}`);
   }
-  if (inc.sheet) lines.push(`Produktdatenblatt: ${productDocUrl(p,'pif')}`);
-  if (inc.safety) lines.push(`Sicherheitsdatenblatt: ${productDocUrl(p,'sdb')}`);
-  if (inc.ba) lines.push(`Betriebsanweisung: ${productDocUrl(p,'ba')}`);
+  lines.push('');
+  if (inc.sheet) lines.push(`PRODUKTDATENBLATT (PIF): ${productDocUrl(p,'pif')}`);
+  if (inc.safety) lines.push(`SICHERHEITSDATENBLATT: ${productDocUrl(p,'sdb')}`);
+  if (inc.ba) lines.push(`BETRIEBSANWEISUNG (BA): ${productDocUrl(p,'ba')}`);
   lines.push('', 'Danke und Grüße');
   return {
     subject: `Produktinformation ${p.name} – Dr. Schumacher`,
