@@ -348,10 +348,11 @@ function migrateFavorites(raw) {
 }
 
 const storedProfile = sessionStorage.getItem('activeProfile') || '';
+if (storedProfile && !sessionStorage.getItem('priceList')) sessionStorage.setItem('priceList', 'UVP');
 const state = {
-  screen: storedProfile ? (sessionStorage.getItem('priceList') ? 'menu' : 'prices') : 'profile',
+  screen: storedProfile ? 'menu' : 'profile',
   activeProfile: storedProfile,
-  priceList: sessionStorage.getItem('priceList') || '',
+  priceList: sessionStorage.getItem('priceList') || 'UVP',
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
   prices: {...DEFAULT_PRICES, ...JSON.parse(localStorage.getItem('prices') || '{}')},
@@ -1316,7 +1317,13 @@ function perUnitCalc(product, size) {
 function escapeHtml(text) { return String(text).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
 function bind() {
-  document.querySelectorAll('[data-profile]').forEach(button => button.onclick = () => { state.activeProfile=button.dataset.profile; sessionStorage.setItem('activeProfile',state.activeProfile); state.screen=sessionStorage.getItem('priceList')?'menu':'prices'; render(); });
+  document.querySelectorAll('[data-profile]').forEach(button => button.onclick = () => {
+    state.activeProfile=button.dataset.profile;
+    sessionStorage.setItem('activeProfile',state.activeProfile);
+    if (!sessionStorage.getItem('priceList')) { state.priceList='UVP'; sessionStorage.setItem('priceList','UVP'); }
+    state.screen='menu';
+    render();
+  });
   document.querySelectorAll('[data-action="profile"]').forEach(button => button.onclick = () => { state.screen='profile'; render(); });
   document.querySelectorAll('[data-price]').forEach(button => button.onclick = () => {
     state.priceList = button.dataset.price;
