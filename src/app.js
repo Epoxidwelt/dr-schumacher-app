@@ -125,6 +125,15 @@ const OFFICIAL = {
 
 const PRICE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1z_FuQiBslt71eLzNA-6cstToQp86PKud_7HXY8JK0eQ/export?format=csv&gid=1904728001';
 
+const REGIONS = [
+  {key:'nord', label:'Nord', email:'teamnord@schumacher-online.com'},
+  {key:'sued', label:'Süd', email:'teamsued@schumacher-online.com'},
+  {key:'ost', label:'Ost', email:'teamost@schumacher-online.com'},
+  {key:'west', label:'West', email:'teamwest@schumacher-online.com'}
+];
+function regionLabel(key) { return (REGIONS.find(r => r.key === key) || {}).label || ''; }
+function innendienstEmail() { return (REGIONS.find(r => r.key === state.region) || {}).email || ''; }
+
 const PRODUCT_DOCS = {
   'descosept-spezial': {pif:'https://www.schumacher-online.com/products/pif/P_100000_PIF_00208-Descosept-Spezial-DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/SDB-00208_DESCOSEPT_SPEZIAL_VAR_DE_WEB.pdf',ba:'https://www.schumacher-online.com/products/ba/BA-00208_DESCOSEPT_SPEZIAL_VAR_DE_WEB.pdf'},
   'descosept-sensitive': {pif:'https://www.schumacher-online.com/products/pif/PF_100006_PIF_00323DS-DESCOSEPT%20SENSITIVE_DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/SDB-00323DS_DESCOSEPT_SENSITIVE_DE_WEB.pdf',ba:'https://www.schumacher-online.com/products/ba/BA-00323DS_DESCOSEPT_SENSITIVE_VAR_DE_WEB.pdf'},
@@ -352,6 +361,7 @@ if (storedProfile && !sessionStorage.getItem('priceList')) sessionStorage.setIte
 const state = {
   screen: storedProfile ? 'menu' : 'profile',
   activeProfile: storedProfile,
+  region: localStorage.getItem('region') || '',
   priceList: sessionStorage.getItem('priceList') || 'UVP',
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
@@ -452,6 +462,7 @@ function render() {
   let html = '';
   if (state.screen === 'profile') html = profileScreen();
   if (state.screen === 'prices') html = priceScreen();
+  if (state.screen === 'region') html = regionScreen();
   if (state.screen === 'menu') html = header() + menuScreen() + bottomNav('home');
   if (state.screen === 'products') html = header(true) + productsScreen() + bottomNav('search');
   if (state.screen === 'detail') html = header(true) + detailScreen() + bottomNav('search');
@@ -489,6 +500,19 @@ function profileScreen() {
     <p>Wählen Sie Ihre Rolle. Die Auswahl steuert die sichtbaren Funktionen auf diesem Gerät.</p>
     <div class="profile-options">${USER_PROFILES.map(profile=>`<button class="profile-option ${state.activeProfile===profile.id?'selected':''}" data-profile="${profile.id}"><span class="profile-avatar">${profile.id==='sales'?'AD':profile.id==='inside'?'ID':'A'}</span><span><strong>${profile.name}</strong><small>${profile.description}</small></span><b>›</b></button>`).join('')}</div>
   </section></main>`;
+}
+
+function regionScreen() {
+  return `<main class="price-shell">
+    <section class="price-panel">
+      <img class="welcome-logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher">
+      <span class="eyebrow">Außendienst</span>
+      <h1>Welchem Team gehören Sie an?</h1>
+      <p>Die Auswahl legt fest, an welches Innendienst-Team interne E-Mails automatisch adressiert werden. Kann später jederzeit geändert werden.</p>
+      <div class="price-options">${REGIONS.map(r => `<button class="price-option ${state.region===r.key?'selected':''}" data-region="${r.key}"><span>${r.label}</span><small>Team ${r.label}</small></button>`).join('')}</div>
+      <p class="privacy-note">Die Zuordnung bleibt lokal auf diesem Gerät gespeichert.</p>
+    </section>
+  </main>`;
 }
 
 function priceScreen() {
@@ -666,9 +690,9 @@ function buildStarredProductsEmail() {
   return { subject, body: lines.join('\n') };
 }
 
-function openMailto(subject, body) {
+function openMailto(subject, body, to='') {
   const a = document.createElement('a');
-  a.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  a.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
@@ -678,7 +702,7 @@ function openMailto(subject, body) {
 function sendStarredProductsEmail() {
   if (!state.favorites.length) return;
   const {subject, body} = buildStarredProductsEmail();
-  openMailto(subject, body);
+  openMailto(subject, body, innendienstEmail());
 }
 
 async function copyEmailText(subject, body, button) {
@@ -1217,7 +1241,7 @@ function buildOfferEmail() {
 
 function sendOfferEmail() {
   const { subject, body } = buildOfferEmail();
-  openMailto(subject, body);
+  openMailto(subject, body, innendienstEmail());
 }
 
 function copyOfferEmail(button) {
@@ -1235,7 +1259,7 @@ function settingsScreen() {
   const isLive = meta.source === 'sheet';
   const metaText = meta.date ? `Zuletzt aktualisiert: ${escapeHtml(meta.date)} · ${meta.rows || 0} Produkte` : 'Noch nicht synchronisiert';
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
-    <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
+    <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${state.activeProfile==='sales'?`<button data-action="region"><span><strong>Team-Region wechseln</strong><small>${state.region?'Aktuell: Team '+regionLabel(state.region):'Noch nicht gewählt'}</small></span><b>›</b></button>`:''}${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
     <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf zurücksetzen</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Favoriten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
     <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
@@ -1305,7 +1329,15 @@ function bind() {
     state.activeProfile=button.dataset.profile;
     sessionStorage.setItem('activeProfile',state.activeProfile);
     if (!sessionStorage.getItem('priceList')) { state.priceList='UVP'; sessionStorage.setItem('priceList','UVP'); }
-    state.screen='menu';
+    state.screen = (state.activeProfile==='sales' && !state.region) ? 'region' : 'menu';
+    render();
+  });
+  document.querySelectorAll('[data-region]').forEach(button => button.onclick = () => {
+    state.region = button.dataset.region;
+    localStorage.setItem('region', state.region);
+    const returnTo = state.previousScreen;
+    state.previousScreen = null;
+    state.screen = (returnTo && returnTo !== 'region' && returnTo !== 'profile') ? returnTo : 'menu';
     render();
   });
   document.querySelectorAll('[data-action="profile"]').forEach(button => button.onclick = () => { state.screen='profile'; render(); });
@@ -1318,6 +1350,7 @@ function bind() {
     render();
   });
   document.querySelectorAll('[data-action="prices"]').forEach(button => button.onclick = () => { state.previousScreen = state.screen; state.screen='prices'; render(); });
+  document.querySelectorAll('[data-action="region"]').forEach(button => button.onclick = () => { state.previousScreen = state.screen; state.screen='region'; render(); });
   document.querySelectorAll('[data-action="price-list-inline"]').forEach(select => select.onchange = () => { state.priceList = select.value; sessionStorage.setItem('priceList', state.priceList); render(); });
   $('[data-action="back"]')?.addEventListener('click', () => { state.screen = state.screen==='detail' ? 'products' : 'menu'; render(); });
   document.querySelectorAll('[data-action="home"]').forEach(el => el.addEventListener('click', () => { state.screen='menu'; render(); }));
@@ -1439,7 +1472,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory'
+  'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory','region'
 ];
 
 function exportDeviceBackup() {
