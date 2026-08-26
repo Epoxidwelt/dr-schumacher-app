@@ -149,3 +149,8 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 - Wiederherstellung von Preisen, Favoriten, Merklisten, Angebotsdaten, Besuchsberichten und Einstellungen
 - Sicherungsdateien werden nicht hochgeladen und verlassen das Gerät nur über den vom Benutzer ausgelösten Download
 - Prüfung des Sicherungsformats und Bestätigung vor dem Überschreiben lokaler Daten
+
+## Neu in Version 2.4
+
+- Benutzerrolle und Preisliste werden dauerhaft auf dem Gerät gespeichert und nach einem Neustart automatisch übernommen (vorher: erneute Abfrage bei jeder neuen Browsersitzung)
+- Außendienst wählt einmalig die Team-Region (Nord/Süd/Ost/West); interne E-Mails werden automatisch an das passende Innendienst-Team adressiert

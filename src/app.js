@@ -356,13 +356,13 @@ function migrateFavorites(raw) {
   return arr.filter(f => f && f.id && f.size);
 }
 
-const storedProfile = sessionStorage.getItem('activeProfile') || '';
-if (storedProfile && !sessionStorage.getItem('priceList')) sessionStorage.setItem('priceList', 'UVP');
+const storedProfile = localStorage.getItem('activeProfile') || '';
+if (storedProfile && !localStorage.getItem('priceList')) localStorage.setItem('priceList', 'UVP');
 const state = {
   screen: storedProfile ? 'menu' : 'profile',
   activeProfile: storedProfile,
   region: localStorage.getItem('region') || '',
-  priceList: sessionStorage.getItem('priceList') || 'UVP',
+  priceList: localStorage.getItem('priceList') || 'UVP',
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
   prices: {...DEFAULT_PRICES, ...JSON.parse(localStorage.getItem('prices') || '{}')},
@@ -1327,8 +1327,8 @@ function escapeHtml(text) { return String(text).replace(/[&<>'"]/g, c => ({'&':'
 function bind() {
   document.querySelectorAll('[data-profile]').forEach(button => button.onclick = () => {
     state.activeProfile=button.dataset.profile;
-    sessionStorage.setItem('activeProfile',state.activeProfile);
-    if (!sessionStorage.getItem('priceList')) { state.priceList='UVP'; sessionStorage.setItem('priceList','UVP'); }
+    localStorage.setItem('activeProfile',state.activeProfile);
+    if (!localStorage.getItem('priceList')) { state.priceList='UVP'; localStorage.setItem('priceList','UVP'); }
     state.screen = (state.activeProfile==='sales' && !state.region) ? 'region' : 'menu';
     render();
   });
@@ -1343,7 +1343,7 @@ function bind() {
   document.querySelectorAll('[data-action="profile"]').forEach(button => button.onclick = () => { state.screen='profile'; render(); });
   document.querySelectorAll('[data-price]').forEach(button => button.onclick = () => {
     state.priceList = button.dataset.price;
-    sessionStorage.setItem('priceList', state.priceList);
+    localStorage.setItem('priceList', state.priceList);
     const returnTo = state.previousScreen;
     state.previousScreen = null;
     state.screen = (returnTo && returnTo !== 'prices' && returnTo !== 'profile') ? returnTo : 'menu';
@@ -1351,7 +1351,7 @@ function bind() {
   });
   document.querySelectorAll('[data-action="prices"]').forEach(button => button.onclick = () => { state.previousScreen = state.screen; state.screen='prices'; render(); });
   document.querySelectorAll('[data-action="region"]').forEach(button => button.onclick = () => { state.previousScreen = state.screen; state.screen='region'; render(); });
-  document.querySelectorAll('[data-action="price-list-inline"]').forEach(select => select.onchange = () => { state.priceList = select.value; sessionStorage.setItem('priceList', state.priceList); render(); });
+  document.querySelectorAll('[data-action="price-list-inline"]').forEach(select => select.onchange = () => { state.priceList = select.value; localStorage.setItem('priceList', state.priceList); render(); });
   $('[data-action="back"]')?.addEventListener('click', () => { state.screen = state.screen==='detail' ? 'products' : 'menu'; render(); });
   document.querySelectorAll('[data-action="home"]').forEach(el => el.addEventListener('click', () => { state.screen='menu'; render(); }));
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
@@ -1472,7 +1472,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory','region'
+  'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList'
 ];
 
 function exportDeviceBackup() {
@@ -1482,8 +1482,6 @@ function exportDeviceBackup() {
     if (value !== null) localData[key] = value;
   });
   const sessionData = {
-    activeProfile: sessionStorage.getItem('activeProfile') || '',
-    priceList: sessionStorage.getItem('priceList') || '',
     customerMode: sessionStorage.getItem('customerMode') || 'false'
   };
   const payload = {
@@ -1519,7 +1517,7 @@ async function importDeviceBackup(event) {
       if (BACKUP_KEYS.includes(key) && typeof value === 'string') localStorage.setItem(key, value);
     });
     if (payload.sessionData) {
-      ['activeProfile','priceList','customerMode'].forEach(key => {
+      ['customerMode'].forEach(key => {
         if (typeof payload.sessionData[key] === 'string') sessionStorage.setItem(key, payload.sessionData[key]);
       });
     }
