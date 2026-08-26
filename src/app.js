@@ -436,7 +436,7 @@ function header(back=false) {
     <img class="logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher" data-action="home" role="button" tabindex="0">
     <div class="grow"></div>
     <button class="profile-pill" data-action="profile"><span>Benutzerrolle</span><strong>${profile.name}</strong></button>
-    <button class="price-pill" data-action="prices"><span>Aktive Preisliste</span><strong>${state.priceList || 'wählen'}</strong></button>
+    <button class="price-pill" data-action="prices"><span>Aktive Preisliste</span><strong>${state.customerMode?'Preise ausgeblendet':(state.priceList || 'wählen')}</strong></button>
   </header>`;
 }
 
@@ -523,7 +523,10 @@ function priceScreen() {
       <span class="eyebrow">Interner Produktberater</span>
       <h1>Welche Preisliste möchten Sie verwenden?</h1>
       <p>Die Auswahl gilt für die gesamte Sitzung. Sie kann später jederzeit geändert werden.</p>
-      <div class="price-options">${options.map(option => `<button class="price-option ${state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}</div>
+      <div class="price-options">
+        <button class="price-option hide-prices-option ${state.customerMode?'selected':''}" data-price="hide"><span class="price-option-strike">UVP</span><small>Keine Preise anzeigen</small></button>
+        ${options.map(option => `<button class="price-option ${!state.customerMode && state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}
+      </div>
       <p class="privacy-note">Preise bleiben lokal auf diesem Gerät und werden nicht in eine Cloud übertragen.</p>
     </section>
   </main>`;
@@ -557,7 +560,7 @@ function menuScreen() {
   const recentProducts = state.recent.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean).slice(0,4);
   const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => `${p.name} ${p.kind} ${p.sku} ${p.summary}`.toLowerCase().includes(state.globalQuery.toLowerCase())).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
-    <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.priceList}</h1></div>${state.customerMode?'<div class="status-card"><span>Kundenmodus</span><strong>Preise verborgen</strong></div>':''}</section>
+    <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.customerMode?'Preise ausgeblendet':state.priceList}</h1></div></section>
     <div class="category-grid">${coreCards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>
     <label class="global-search">${icon('search')}<input id="globalSearch" value="${escapeHtml(state.globalQuery)}" placeholder="Produkt, Artikelnummer oder Anwendung suchen"><span>⌘ K</span></label>
     ${state.globalQuery.trim() ? `<section class="cockpit-search-results"><div class="section-heading"><div><span class="eyebrow">Sofortsuche</span><h2>${searchResults.length} Treffer</h2></div><button class="secondary-button" data-action="clear-global-search">Suche löschen</button></div><div class="product-list">${searchResults.map(productCard).join('') || '<div class="empty-state"><h2>Kein Produkt gefunden</h2><p>Versuchen Sie einen anderen Suchbegriff.</p></div>'}</div></section>` : ''}
@@ -1347,8 +1350,15 @@ function bind() {
   });
   document.querySelectorAll('[data-action="profile"]').forEach(button => button.onclick = () => { state.screen='profile'; render(); });
   document.querySelectorAll('[data-price]').forEach(button => button.onclick = () => {
-    state.priceList = button.dataset.price;
-    localStorage.setItem('priceList', state.priceList);
+    if (button.dataset.price === 'hide') {
+      state.customerMode = true;
+      sessionStorage.setItem('customerMode', 'true');
+    } else {
+      state.customerMode = false;
+      sessionStorage.setItem('customerMode', 'false');
+      state.priceList = button.dataset.price;
+      localStorage.setItem('priceList', state.priceList);
+    }
     const returnTo = state.previousScreen;
     state.previousScreen = null;
     state.screen = (returnTo && returnTo !== 'prices' && returnTo !== 'profile') ? returnTo : 'menu';
