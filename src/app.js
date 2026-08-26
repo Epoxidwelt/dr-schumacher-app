@@ -436,7 +436,6 @@ function header(back=false) {
     <img class="logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher" data-action="home" role="button" tabindex="0">
     <div class="grow"></div>
     <button class="profile-pill" data-action="profile"><span>Benutzerrolle</span><strong>${profile.name}</strong></button>
-    <button class="customer-mode-pill ${state.customerMode?'active':''}" data-action="customer-mode"><span>${state.customerMode?'Kundenmodus':'Interner Modus'}</span><strong>${state.customerMode?'Preise verborgen':'Preise sichtbar'}</strong></button>
     <button class="price-pill" data-action="prices"><span>Aktive Preisliste</span><strong>${state.priceList || 'wählen'}</strong></button>
   </header>`;
 }
@@ -634,7 +633,7 @@ function detailScreen() {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
         return `<button class="${active?'active':''}" data-size="${size}" ${isMulti?`data-size-favorite="${p.id}"`:''}>${escapeHtml(size)}</button>`;
-      }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${state.customerMode?'<button data-action="customer-mode">Internen Modus aktivieren</button>':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
+      }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div><div class="price-display-actions">${state.customerMode?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}<button class="price-visibility-toggle ${state.customerMode?'active':''}" data-action="customer-mode" aria-label="${state.customerMode?'Preise wieder einblenden':'Preise ausblenden'}" title="${state.customerMode?'Preise wieder einblenden':'Preise ausblenden'}"><span class="price-visibility-icon">UVP</span></button></div></div>
         ${state.customerMode ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
