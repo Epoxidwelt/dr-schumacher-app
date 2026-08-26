@@ -986,18 +986,24 @@ function buildCustomerSummaryEmail(){
   const entries=favoriteEntries();
   const salutation=state.summaryCustomer.trim()||'Sehr geehrte Damen und Herren';
   const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
-  const lines=[`${salutation},`,``,`vielen Dank für ${occasion}. Wie besprochen fassen wir Ihnen nachfolgend die passenden Produkte und deren Vorteile zusammen:`,``];
+  const lines=[
+    `${salutation},`,
+    ``,
+    `vielen Dank für ${occasion}. Es freut uns, Ihnen im Anschluss die folgenden Informationen zu den besprochenen Produkten zukommen zu lassen – mit den Eigenschaften, die für Sie den größten Mehrwert bieten:`,
+    ``
+  ];
   const showPrices = state.summaryIncludePrices && !state.customerMode;
   entries.forEach(({product: p, size})=>{
-    lines.push(`${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
+    lines.push(`${p.name.toUpperCase()}${size ? ' – ' + size : ''}`, p.kind);
     if (showPrices) {
       const price = resolvePrice(p, size);
       if (price !== undefined && price !== null && price !== '') lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
     }
-    p.facts.slice(0,3).forEach(f=>lines.push(`- ${f}`));
+    lines.push('Ihre Vorteile auf einen Blick:');
+    p.facts.forEach(f=>lines.push(`✓ ${f}`));
     lines.push('');
   });
-  lines.push('Bei Fragen sprechen Sie uns gerne jederzeit an.','','Mit freundlichen Grüßen');
+  lines.push('Für Rückfragen stehen wir Ihnen jederzeit gerne zur Verfügung.','','Mit freundlichen Grüßen');
   return {subject:`Zusammenfassung unseres Gesprächs – Dr. Schumacher`, body:lines.join('\n')};
 }
 function sendCustomerSummaryEmail(){
