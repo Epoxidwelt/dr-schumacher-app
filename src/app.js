@@ -605,11 +605,10 @@ function detailScreen() {
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2><ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
-      <div class="price-card-detail"><span>Gebinde auswählen${p.sizes.length>1?' · ★ zum Markieren mehrerer Varianten':''}</span><div class="size-selector">${p.sizes.map(size => {
-        const sizeFav = state.favorites.some(f=>f.id===p.id && f.size===size);
-        return p.sizes.length>1
-          ? `<span class="size-chip ${state.size===size?'active':''}"><button class="size-chip-label" data-size="${size}">${size}</button><button class="size-chip-star ${sizeFav?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(size)}" aria-label="Favorit ${escapeHtml(size)}">${icon('star')}</button></span>`
-          : `<button class="${state.size===size?'active':''}" data-size="${size}">${size}</button>`;
+      <div class="price-card-detail"><span>Gebinde auswählen${p.sizes.length>1?' · anklicken markiert die Variante als Favorit':''}</span><div class="size-selector">${p.sizes.map(size => {
+        const isMulti = p.sizes.length > 1;
+        const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
+        return `<button class="${active?'active':''}" data-size="${size}" ${isMulti?`data-size-favorite="${p.id}"`:''}>${escapeHtml(size)}</button>`;
       }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${state.customerMode?'<button data-action="customer-mode">Internen Modus aktivieren</button>':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
         ${state.customerMode ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
@@ -1329,7 +1328,7 @@ function bind() {
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
-  document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => { state.size=button.dataset.size; render(); });
+  document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => { state.size=button.dataset.size; if (button.dataset.sizeFavorite) toggleFavorite(button.dataset.sizeFavorite, button.dataset.size); render(); });
   document.querySelectorAll('[data-email-toggle]').forEach(button => button.onclick = () => { const key=button.dataset.emailToggle; state.emailInclude[key]=!state.emailInclude[key]; render(); });
   document.querySelectorAll('[data-action="send-email"]').forEach(button => button.onclick = () => sendStarredProductsEmail());
   $('#search')?.addEventListener('input', event => { state.query=event.target.value; render(); });
