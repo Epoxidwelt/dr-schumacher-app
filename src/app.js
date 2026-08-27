@@ -550,6 +550,15 @@ function priceScreen() {
   </main>`;
 }
 
+function coreCategoryGrid() {
+  const coreCards = [
+    ['surface','Fläche','Desinfektion & Reinigung'],
+    ['hands','Hände & Haut','Händedesinfektion & Pflege'],
+    ['instruments','Instrumente','Aufbereitung & Desinfektion'],
+    ['application','Applikation','Spendersysteme & Zubehör']
+  ];
+  return `<div class="category-grid">${coreCards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>`;
+}
 function menuScreen() {
   let cards = [
     ['surface','Fläche','Desinfektion & Reinigung'],
@@ -570,7 +579,6 @@ function menuScreen() {
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
   if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
-  const coreCards = cards.filter(c => coreKeys.includes(c[0]));
   const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
   const today = new Date().toISOString().slice(0,10);
   const openReports = state.savedReports.filter(r => (r.taskStatus || 'Offen') !== 'Erledigt');
@@ -580,7 +588,7 @@ function menuScreen() {
   const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => `${p.name} ${p.kind} ${p.sku} ${p.summary}`.toLowerCase().includes(state.globalQuery.toLowerCase())).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
     <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.customerMode?'Preise ausgeblendet':state.priceList}</h1></div></section>
-    <div class="category-grid">${coreCards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>
+    ${coreCategoryGrid()}
     <label class="global-search">${icon('search')}<input id="globalSearch" value="${escapeHtml(state.globalQuery)}" placeholder="Produkt, Artikelnummer oder Anwendung suchen"><span>⌘ K</span></label>
     ${state.globalQuery.trim() ? `<section class="cockpit-search-results"><div class="section-heading"><div><span class="eyebrow">Sofortsuche</span><h2>${searchResults.length} Treffer</h2></div><button class="secondary-button" data-action="clear-global-search">Suche löschen</button></div><div class="product-list">${searchResults.map(productCard).join('') || '<div class="empty-state"><h2>Kein Produkt gefunden</h2><p>Versuchen Sie einen anderen Suchbegriff.</p></div>'}</div></section>` : ''}
     <section class="cockpit-columns">
@@ -1175,7 +1183,14 @@ function messeScreen() {
   const pickable = query ? PRODUCTS.filter(p => `${p.name} ${p.kind}`.toLowerCase().includes(query)) : PRODUCTS;
   const canSend = state.messeName.trim() && (state.messeConsent || state.messeSignatureData);
   return `<main class="page report-page messe-page">
-    <div class="section-heading no-print"><div><span class="eyebrow">Vor Ort erfassen</span><h1>Messe</h1><p>Kontakt direkt mit dem Kunden am Stand ausfüllen und sofort an den zuständigen Innendienst senden. Die Angaben bleiben zusätzlich lokal auf diesem Gerät.</p></div><button class="secondary-button" data-action="new-messe">Neue Erfassung</button></div>
+    <div class="section-heading no-print"><div><span class="eyebrow">Vor Ort erfassen</span><h1>Messe</h1><p>1. Produkte auswählen, die Sie besprochen haben – 2. Kundendaten eintragen – 3. direkt an den Innendienst senden. Alles bleibt zusätzlich lokal auf diesem Gerät.</p></div><button class="secondary-button" data-action="new-messe">Neue Erfassung</button></div>
+    <h2 class="messe-step no-print">1. Besprochene Produkte auswählen</h2>
+    ${coreCategoryGrid()}
+    <section class="list-builder no-print">
+      <div><h2>Besprochene Produkte (${chosen.length})</h2><div class="product-list">${chosen.map(e => summaryChosenCard(e)).join('') || '<div class="empty-state"><h2>Noch keine Produkte markiert</h2><p>Wählen Sie oben eine Kategorie und markieren Sie 1–2 Produkte mit dem Stern, oder wählen Sie rechts direkt aus.</p></div>'}</div></div>
+      <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="messeSearch" value="${escapeHtml(state.messeQuery || '')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p => summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
+    </section>
+    <h2 class="messe-step no-print">2. Kundendaten erfassen</h2>
     <section class="report-form no-print">
       <label>Name / Firma<input data-messe-field="messeName" value="${escapeHtml(state.messeName)}" placeholder="z. B. Klinikum Musterstadt"></label>
       <label class="wide">Adresse<input data-messe-field="messeAdresse" value="${escapeHtml(state.messeAdresse)}" placeholder="Straße, PLZ, Ort"></label>
@@ -1190,10 +1205,6 @@ function messeScreen() {
       <button class="filter-chip ${state.messeBemusterung ? 'active' : ''}" data-messe-toggle="messeBemusterung">Bemusterung gewünscht</button>
       <button class="filter-chip ${state.messeNewsletter ? 'active' : ''}" data-messe-toggle="messeNewsletter">Newsletter postalisch gewünscht</button>
     </section>
-    <section class="list-builder no-print">
-      <div><h2>Besprochene Produkte (${chosen.length})</h2><div class="product-list">${chosen.map(e => summaryChosenCard(e)).join('') || '<div class="empty-state"><h2>Noch keine Produkte markiert</h2><p>Markieren Sie im Gespräch 1–2 Produkte mit dem Stern, oder wählen Sie rechts direkt aus.</p></div>'}</div></div>
-      <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="messeSearch" value="${escapeHtml(state.messeQuery || '')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p => summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
-    </section>
     <section class="messe-consent no-print">
       <h2>Einwilligung des Kunden</h2>
       <label class="consent-check"><input type="checkbox" id="messeConsent" ${state.messeConsent ? 'checked' : ''}><span>Der Kunde ist damit einverstanden, dass die oben angegebenen Daten zur Kontaktaufnahme und ggf. Zusendung von Informationsmaterial an Dr. Schumacher übermittelt werden.</span></label>
@@ -1203,6 +1214,7 @@ function messeScreen() {
         <button class="secondary-button" data-action="clear-signature">Unterschrift löschen</button>
       </div>
     </section>
+    <h2 class="messe-step no-print">3. Abschließen</h2>
     <div class="offer-actions wide no-print"><button class="primary-button compact" data-action="send-messe" ${canSend ? '' : 'disabled'}>${icon('talk')}<span>An Innendienst senden${state.region ? ` (Team ${regionLabel(state.region)})` : ''}</span></button></div>
     ${!innendienstEmail() ? '<small class="muted-copy no-print">Bitte zuerst in den Einstellungen Ihre Team-Region wählen, damit die E-Mail an das richtige Innendienst-Team geht.</small>' : ''}
   </main>`;
@@ -1500,12 +1512,17 @@ function bind() {
   document.querySelectorAll('[data-action="prices"]').forEach(button => button.onclick = () => { state.previousScreen = state.screen; state.screen='prices'; render(); });
   document.querySelectorAll('[data-action="region"]').forEach(button => button.onclick = () => { state.previousScreen = state.screen; state.screen='region'; render(); });
   document.querySelectorAll('[data-action="price-list-inline"]').forEach(select => select.onchange = () => { state.priceList = select.value; localStorage.setItem('priceList', state.priceList); render(); });
-  $('[data-action="back"]')?.addEventListener('click', () => { state.screen = state.screen==='detail' ? 'products' : 'menu'; render(); });
+  $('[data-action="back"]')?.addEventListener('click', () => {
+    if (state.screen === 'detail') { state.screen = 'products'; render(); return; }
+    if (state.screen === 'products' && state.previousScreen === 'messe') { state.previousScreen = null; state.screen = 'messe'; render(); return; }
+    state.screen = 'menu';
+    render();
+  });
   document.querySelectorAll('[data-action="home"]').forEach(el => el.addEventListener('click', () => { state.screen='menu'; render(); }));
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard','messe'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard','messe'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
@@ -1573,7 +1590,7 @@ function bind() {
   document.querySelectorAll('[data-nav]').forEach(button => button.onclick = () => {
     const nav = button.dataset.nav;
     if (nav==='home') state.screen='menu';
-    if (nav==='search') { state.screen='products'; state.category='all'; }
+    if (nav==='search') { state.previousScreen = null; state.screen='products'; state.category='all'; }
     if (nav==='favorites') state.screen='favorites';
     if (nav==='settings') state.screen='settings';
     render();
