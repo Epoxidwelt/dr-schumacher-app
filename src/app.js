@@ -391,7 +391,20 @@ const state = {
   visitReport: JSON.parse(localStorage.getItem('visitReport') || '{}'),
   savedReports: JSON.parse(localStorage.getItem('savedVisitReports') || '[]'),
   customerHistory: JSON.parse(localStorage.getItem('customerHistory') || '[]'),
-  globalQuery: ''
+  globalQuery: '',
+  messeName: localStorage.getItem('messeName') || '',
+  messeAdresse: localStorage.getItem('messeAdresse') || '',
+  messeAnsprechpartner: localStorage.getItem('messeAnsprechpartner') || '',
+  messeDatum: localStorage.getItem('messeDatum') || new Date().toISOString().slice(0,10),
+  messeAusgefuelltVon: localStorage.getItem('messeAusgefuelltVon') || '',
+  messeGespraechsinhalt: localStorage.getItem('messeGespraechsinhalt') || '',
+  messeMuster: localStorage.getItem('messeMuster') || '',
+  messeKontaktaufnahme: localStorage.getItem('messeKontaktaufnahme') === 'true',
+  messeBemusterung: localStorage.getItem('messeBemusterung') === 'true',
+  messeNewsletter: localStorage.getItem('messeNewsletter') === 'true',
+  messeConsent: false,
+  messeSignatureData: '',
+  messeQuery: ''
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -423,7 +436,8 @@ function icon(name) {
     summary:'<svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="m8.5 9 2 2 4-4M8 15h8"/></svg>',
     report:'<svg viewBox="0 0 24 24"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="m15 16 2 2 3-4"/></svg>',
     dashboard:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 18h7M17.5 14.5V21"/></svg>',
-    copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>'
+    copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
+    messe:'<svg viewBox="0 0 24 24"><path d="M6 21V4m0 1 13-1-3.5 5L19 14 6 15"/></svg>'
   };
   return icons[name] || '';
 }
@@ -480,8 +494,10 @@ function render() {
   if (state.screen === 'summary') html = header(true) + summaryScreen() + bottomNav('home');
   if (state.screen === 'report') html = header(true) + reportScreen() + bottomNav('home');
   if (state.screen === 'dashboard') html = header(true) + dashboardScreen() + bottomNav('home');
+  if (state.screen === 'messe') html = header(true) + messeScreen() + bottomNav('home');
   app.innerHTML = html;
   bind();
+  if (state.screen === 'messe') initSignaturePad();
   if (focusState) {
     const el = document.getElementById(focusState.id);
     if (el) {
@@ -547,6 +563,7 @@ function menuScreen() {
     ['summary','Kundenzusammenfassung','Mit ★ markierte Produkte per E-Mail an den Kunden'],
     ['report','Besuchsbericht','CRM-Zusammenfassung und Follow-up'],
     ['dashboard','Follow-up Dashboard','Offene Termine und Aufgaben im Blick'],
+    ['messe','Messe','Kontakt live erfassen und an den Innendienst senden'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
@@ -1152,6 +1169,114 @@ function deleteSavedReport(index) {
   render();
 }
 
+function messeScreen() {
+  const chosen = favoriteEntries();
+  const query = (state.messeQuery || '').toLowerCase();
+  const pickable = query ? PRODUCTS.filter(p => `${p.name} ${p.kind}`.toLowerCase().includes(query)) : PRODUCTS;
+  const canSend = state.messeName.trim() && (state.messeConsent || state.messeSignatureData);
+  return `<main class="page report-page messe-page">
+    <div class="section-heading no-print"><div><span class="eyebrow">Vor Ort erfassen</span><h1>Messe</h1><p>Kontakt direkt mit dem Kunden am Stand ausfüllen und sofort an den zuständigen Innendienst senden. Die Angaben bleiben zusätzlich lokal auf diesem Gerät.</p></div><button class="secondary-button" data-action="new-messe">Neue Erfassung</button></div>
+    <section class="report-form no-print">
+      <label>Name / Firma<input data-messe-field="messeName" value="${escapeHtml(state.messeName)}" placeholder="z. B. Klinikum Musterstadt"></label>
+      <label class="wide">Adresse<input data-messe-field="messeAdresse" value="${escapeHtml(state.messeAdresse)}" placeholder="Straße, PLZ, Ort"></label>
+      <label>Ansprechpartner<input data-messe-field="messeAnsprechpartner" value="${escapeHtml(state.messeAnsprechpartner)}" placeholder="Name und Funktion"></label>
+      <label>Datum<input data-messe-field="messeDatum" type="date" value="${escapeHtml(state.messeDatum)}"></label>
+      <label>Ausgefüllt von<input data-messe-field="messeAusgefuelltVon" value="${escapeHtml(state.messeAusgefuelltVon)}" placeholder="Ihr Name"></label>
+      <label class="wide">Gesprächsinhalt<textarea data-messe-field="messeGespraechsinhalt" placeholder="Worum ging es im Gespräch?">${escapeHtml(state.messeGespraechsinhalt)}</textarea></label>
+      <label class="wide">Muster / Materialien für den Versand<textarea data-messe-field="messeMuster" placeholder="Welche Muster oder Unterlagen sollen zugesandt werden?">${escapeHtml(state.messeMuster)}</textarea></label>
+    </section>
+    <section class="messe-toggles no-print">
+      <button class="filter-chip ${state.messeKontaktaufnahme ? 'active' : ''}" data-messe-toggle="messeKontaktaufnahme">Kontaktaufnahme gewünscht</button>
+      <button class="filter-chip ${state.messeBemusterung ? 'active' : ''}" data-messe-toggle="messeBemusterung">Bemusterung gewünscht</button>
+      <button class="filter-chip ${state.messeNewsletter ? 'active' : ''}" data-messe-toggle="messeNewsletter">Newsletter postalisch gewünscht</button>
+    </section>
+    <section class="list-builder no-print">
+      <div><h2>Besprochene Produkte (${chosen.length})</h2><div class="product-list">${chosen.map(e => summaryChosenCard(e)).join('') || '<div class="empty-state"><h2>Noch keine Produkte markiert</h2><p>Markieren Sie im Gespräch 1–2 Produkte mit dem Stern, oder wählen Sie rechts direkt aus.</p></div>'}</div></div>
+      <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="messeSearch" value="${escapeHtml(state.messeQuery || '')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p => summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
+    </section>
+    <section class="messe-consent no-print">
+      <h2>Einwilligung des Kunden</h2>
+      <label class="consent-check"><input type="checkbox" id="messeConsent" ${state.messeConsent ? 'checked' : ''}><span>Der Kunde ist damit einverstanden, dass die oben angegebenen Daten zur Kontaktaufnahme und ggf. Zusendung von Informationsmaterial an Dr. Schumacher übermittelt werden.</span></label>
+      <div class="signature-pad-wrap">
+        <span>Unterschrift des Kunden (optional)</span>
+        <canvas id="messeSignature" class="signature-pad" width="600" height="180"></canvas>
+        <button class="secondary-button" data-action="clear-signature">Unterschrift löschen</button>
+      </div>
+    </section>
+    <div class="offer-actions wide no-print"><button class="primary-button compact" data-action="send-messe" ${canSend ? '' : 'disabled'}>${icon('talk')}<span>An Innendienst senden${state.region ? ` (Team ${regionLabel(state.region)})` : ''}</span></button></div>
+    ${!innendienstEmail() ? '<small class="muted-copy no-print">Bitte zuerst in den Einstellungen Ihre Team-Region wählen, damit die E-Mail an das richtige Innendienst-Team geht.</small>' : ''}
+  </main>`;
+}
+function initSignaturePad() {
+  const canvas = document.getElementById('messeSignature');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#173d65';
+  if (state.messeSignatureData) {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    img.src = state.messeSignatureData;
+  }
+  let drawing = false;
+  const pos = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+  };
+  canvas.onpointerdown = (e) => { drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); };
+  canvas.onpointermove = (e) => { if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); };
+  const stop = () => { if (!drawing) return; drawing = false; state.messeSignatureData = canvas.toDataURL('image/png'); };
+  canvas.onpointerup = stop;
+  canvas.onpointerleave = stop;
+}
+function buildMesseEmail() {
+  const entries = favoriteEntries();
+  const dateLabel = state.messeDatum ? new Date(state.messeDatum + 'T12:00:00').toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE');
+  const lines = [
+    `Hallo Team,`, ``,
+    `bei einer Messe wurde folgender Kontakt aufgenommen:`, ``,
+    `Name / Firma: ${state.messeName || '-'}`,
+    `Adresse: ${state.messeAdresse || '-'}`,
+    `Ansprechpartner: ${state.messeAnsprechpartner || '-'}`,
+    `Datum: ${dateLabel}`,
+    `Ausgefüllt von: ${state.messeAusgefuelltVon || '-'}`, ``,
+    `Gesprächsinhalt:`,
+    state.messeGespraechsinhalt || '-', ``
+  ];
+  lines.push('Besprochene Produkte:');
+  if (entries.length) {
+    entries.forEach(({product: p, size}) => lines.push(`- ${p.name}${size ? ' – ' + size : ''}`));
+  } else {
+    lines.push('-');
+  }
+  lines.push('');
+  if (state.messeMuster.trim()) lines.push('Gewünschte Muster / Materialien:', state.messeMuster.trim(), '');
+  lines.push(
+    `Kontaktaufnahme gewünscht: ${state.messeKontaktaufnahme ? 'Ja' : 'Nein'}`,
+    `Bemusterung gewünscht: ${state.messeBemusterung ? 'Ja' : 'Nein'}`,
+    `Newsletter postalisch gewünscht: ${state.messeNewsletter ? 'Ja' : 'Nein'}`, ``,
+    `Datenschutz-Einwilligung: ${(state.messeConsent || state.messeSignatureData) ? `Ja, digital bestätigt${state.messeSignatureData ? ' mit Unterschrift' : ''} am ${dateLabel}` : 'Nein'}`, ``,
+    `Viele Grüße`
+  );
+  return { subject: `Neuer Messekontakt – ${state.messeName || 'ohne Namen'} – Dr. Schumacher`, body: lines.join('\n') };
+}
+function sendMesseEmail() {
+  if (!state.messeName.trim() || !(state.messeConsent || state.messeSignatureData)) return;
+  const { subject, body } = buildMesseEmail();
+  openMailto(subject, body, innendienstEmail());
+}
+function resetMesseForm() {
+  ['messeName','messeAdresse','messeAnsprechpartner','messeGespraechsinhalt','messeMuster'].forEach(key => { state[key] = ''; localStorage.removeItem(key); });
+  state.messeDatum = new Date().toISOString().slice(0,10);
+  localStorage.setItem('messeDatum', state.messeDatum);
+  ['messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => { state[key] = false; localStorage.removeItem(key); });
+  state.messeConsent = false;
+  state.messeSignatureData = '';
+  state.messeQuery = '';
+  render();
+}
+
 function buildCrmSummary(report = state.visitReport) {
   const date = report.date ? new Date(report.date+'T12:00:00').toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE');
   const parts = [
@@ -1271,7 +1396,7 @@ function settingsScreen() {
   const metaText = meta.date ? `Zuletzt aktualisiert: ${escapeHtml(meta.date)} · ${meta.rows || 0} Produkte` : 'Noch nicht synchronisiert';
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
     <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${state.activeProfile==='sales'?`<button data-action="region"><span><strong>Team-Region wechseln</strong><small>${state.region?'Aktuell: Team '+regionLabel(state.region):'Noch nicht gewählt'}</small></span><b>›</b></button>`:''}${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
-    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf zurücksetzen</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
+    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht- und Messe-Entwurf zurücksetzen</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Favoriten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
     <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
     <p class="version">Interner Produktberater · Version 2.2</p>
@@ -1380,7 +1505,7 @@ function bind() {
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard','messe'].includes(key)){state.screen=key; render(); return;} state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
@@ -1403,6 +1528,13 @@ function bind() {
   document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
   $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
+  document.querySelectorAll('[data-messe-field]').forEach(input => { const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (input.type === 'date') render(); }; input.addEventListener(input.type === 'date' ? 'change' : 'input', handler); });
+  document.querySelectorAll('[data-messe-toggle]').forEach(button => button.onclick = () => { const key = button.dataset.messeToggle; state[key] = !state[key]; localStorage.setItem(key, String(state[key])); render(); });
+  $('#messeConsent')?.addEventListener('change', e => { state.messeConsent = e.target.checked; render(); });
+  $('#messeSearch')?.addEventListener('input', e => { state.messeQuery = e.target.value; render(); });
+  $('[data-action="new-messe"]')?.addEventListener('click', () => { if (confirm('Neue Messe-Erfassung starten? Name, Adresse, Gesprächsinhalt und Unterschrift werden dabei gelöscht.')) resetMesseForm(); });
+  $('[data-action="clear-signature"]')?.addEventListener('click', () => { state.messeSignatureData=''; const c=document.getElementById('messeSignature'); if (c) c.getContext('2d').clearRect(0,0,c.width,c.height); render(); });
+  $('[data-action="send-messe"]')?.addEventListener('click', sendMesseEmail);
   $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); saveVsCompare({productId:e.target.value, size:p?p.sizes[0]:''}); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
   $('#vsCompetitorName')?.addEventListener('input', e => { saveVsCompare({competitorName:e.target.value}); render(); });
@@ -1495,7 +1627,9 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList'
+  'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
+  'messeName','messeAdresse','messeAnsprechpartner','messeDatum','messeAusgefuelltVon','messeGespraechsinhalt','messeMuster',
+  'messeKontaktaufnahme','messeBemusterung','messeNewsletter'
 ];
 
 function exportDeviceBackup() {
@@ -1583,9 +1717,9 @@ function customerHistoryScreen() {
 }
 
 function resetCustomerData() {
-  if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf und Besuchsbericht-Entwurf werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
+  if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf und Messe-Erfassung werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
   state.summaryOccasion = 'unser heutiges Gespräch';
@@ -1596,6 +1730,18 @@ function resetCustomerData() {
   state.quoteValidUntil = '';
   state.quoteItems = {};
   state.visitReport = {};
+  state.messeName = '';
+  state.messeAdresse = '';
+  state.messeAnsprechpartner = '';
+  state.messeGespraechsinhalt = '';
+  state.messeMuster = '';
+  state.messeKontaktaufnahme = false;
+  state.messeBemusterung = false;
+  state.messeNewsletter = false;
+  state.messeConsent = false;
+  state.messeSignatureData = '';
+  state.messeDatum = new Date().toISOString().slice(0,10);
+  localStorage.setItem('messeDatum', state.messeDatum);
   alert('Kundendaten wurden zurückgesetzt. Bereit für den nächsten Termin.');
   state.screen = 'menu';
   render();
