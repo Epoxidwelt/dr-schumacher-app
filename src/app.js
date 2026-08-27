@@ -395,6 +395,7 @@ const state = {
   messeName: localStorage.getItem('messeName') || '',
   messeAdresse: localStorage.getItem('messeAdresse') || '',
   messeAnsprechpartner: localStorage.getItem('messeAnsprechpartner') || '',
+  messeEinrichtungstyp: localStorage.getItem('messeEinrichtungstyp') || '',
   messeDatum: localStorage.getItem('messeDatum') || new Date().toISOString().slice(0,10),
   messeAusgefuelltVon: localStorage.getItem('messeAusgefuelltVon') || '',
   messeGespraechsinhalt: localStorage.getItem('messeGespraechsinhalt') || '',
@@ -445,6 +446,9 @@ function icon(name) {
 function currentProfile() { return USER_PROFILES.find(p => p.id === state.activeProfile) || USER_PROFILES[0]; }
 function can(permission) { return currentProfile().permissions.includes(permission); }
 
+function inMesseContext() {
+  return state.screen === 'messe' || (state.previousScreen === 'messe' && (state.screen === 'products' || state.screen === 'detail'));
+}
 function header(back=false) {
   const profile=currentProfile();
   return `<header class="topbar">
@@ -452,7 +456,7 @@ function header(back=false) {
     <img class="logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher" data-action="home" role="button" tabindex="0">
     <div class="grow"></div>
     <button class="profile-pill" data-action="profile"><span>Benutzerrolle</span><strong>${profile.name}</strong></button>
-    <button class="price-pill" data-action="prices"><span>Aktive Preisliste</span><strong>${state.customerMode?'Preise ausgeblendet':(state.priceList || 'wählen')}</strong></button>
+    ${inMesseContext() ? '' : `<button class="price-pill" data-action="prices"><span>Aktive Preisliste</span><strong>${state.customerMode?'Preise ausgeblendet':(state.priceList || 'wählen')}</strong></button>`}
   </header>`;
 }
 
@@ -639,7 +643,7 @@ function productCard(product, variantSize) {
   return `<article class="product-row" data-product="${product.id}">
     <div class="product-image" style="--product-color:${product.color}">${product.photo?`<img src="${product.photo}" alt="${escapeHtml(product.name)}">`:`<span>${product.category==='hands'?'✋':product.category==='surface'?'▦':product.category==='instruments'?'✂':'▣'}</span>`}</div>
     <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}</div><p>Art.-Nr. ${resolveArtNr(product, refSize)} · ${refSize}</p></div>
-    <div class="row-price">${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong>':`<strong>${money(price)}</strong><small>${perUnit || state.priceList}</small>`}</div>
+    <div class="row-price">${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<strong>${money(price)}</strong><small>${perUnit || state.priceList}</small>`}</div>
     <button class="favorite-button ${favorite?'active':''}" data-favorite="${product.id}" ${hasVariant?`data-favorite-size="${escapeHtml(refSize)}"`:''} aria-label="Favorit">${icon('star')}</button>
     <span class="chevron">›</span>
   </article>`;
@@ -663,8 +667,8 @@ function detailScreen() {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
         return `<button class="${active?'active':''}" data-size="${size}" ${isMulti?`data-size-favorite="${p.id}"`:''}>${escapeHtml(size)}</button>`;
-      }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${state.customerMode?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${state.customerMode?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
-        ${state.customerMode ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
+      }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${(state.customerMode||inMesseContext())?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
+        ${(state.customerMode||inMesseContext()) ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
     </section>
@@ -680,7 +684,7 @@ function detailScreen() {
 
 function emailCard(p) {
   const chips = [
-    ['price','Preis', !state.customerMode],
+    ['price','Preis', !state.customerMode && !inMesseContext()],
     ['sheet','Produktdatenblatt', true],
     ['safety','Sicherheitsdatenblatt', true],
     ['ba','Betriebsanweisung', true]
@@ -705,7 +709,7 @@ function buildStarredProductsEmail() {
   entries.forEach(({product: p, size}) => {
     const price = resolvePrice(p, size);
     lines.push(`PRODUKT: ${p.name}`, `Artikelnummer: ${resolveArtNr(p, size)}`, `Gebinde: ${size}`);
-    if (inc.price && !state.customerMode && price !== undefined && price !== null && price !== '') {
+    if (inc.price && !state.customerMode && !inMesseContext() && price !== undefined && price !== null && price !== '') {
       lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
       const per = perUnitLabel(p, size);
       if (per) lines.push(`Umgerechnet: ${per}`);
@@ -1195,6 +1199,7 @@ function messeScreen() {
       <label>Name / Firma<input data-messe-field="messeName" value="${escapeHtml(state.messeName)}" placeholder="z. B. Klinikum Musterstadt"></label>
       <label class="wide">Adresse<input data-messe-field="messeAdresse" value="${escapeHtml(state.messeAdresse)}" placeholder="Straße, PLZ, Ort"></label>
       <label>Ansprechpartner<input data-messe-field="messeAnsprechpartner" value="${escapeHtml(state.messeAnsprechpartner)}" placeholder="Name und Funktion"></label>
+      <label>Einrichtungstyp<select data-messe-field="messeEinrichtungstyp">${['','Krankenhaus','Seniorenheim','Pflegeeinrichtung','Rettungsdienst','Sonstiges'].map(o=>`<option value="${o}" ${state.messeEinrichtungstyp===o?'selected':''}>${o||'Bitte wählen…'}</option>`).join('')}</select></label>
       <label>Datum<input data-messe-field="messeDatum" type="date" value="${escapeHtml(state.messeDatum)}"></label>
       <label>Ausgefüllt von<input data-messe-field="messeAusgefuelltVon" value="${escapeHtml(state.messeAusgefuelltVon)}" placeholder="Ihr Name"></label>
       <label class="wide">Gesprächsinhalt<textarea data-messe-field="messeGespraechsinhalt" placeholder="Worum ging es im Gespräch?">${escapeHtml(state.messeGespraechsinhalt)}</textarea></label>
@@ -1251,6 +1256,7 @@ function buildMesseEmail() {
     `Name / Firma: ${state.messeName || '-'}`,
     `Adresse: ${state.messeAdresse || '-'}`,
     `Ansprechpartner: ${state.messeAnsprechpartner || '-'}`,
+    `Einrichtungstyp: ${state.messeEinrichtungstyp || '-'}`,
     `Datum: ${dateLabel}`,
     `Ausgefüllt von: ${state.messeAusgefuelltVon || '-'}`, ``,
     `Gesprächsinhalt:`,
@@ -1279,7 +1285,7 @@ function sendMesseEmail() {
   openMailto(subject, body, innendienstEmail());
 }
 function resetMesseForm() {
-  ['messeName','messeAdresse','messeAnsprechpartner','messeGespraechsinhalt','messeMuster'].forEach(key => { state[key] = ''; localStorage.removeItem(key); });
+  ['messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster'].forEach(key => { state[key] = ''; localStorage.removeItem(key); });
   state.messeDatum = new Date().toISOString().slice(0,10);
   localStorage.setItem('messeDatum', state.messeDatum);
   ['messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => { state[key] = false; localStorage.removeItem(key); });
@@ -1545,7 +1551,7 @@ function bind() {
   document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
   $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
-  document.querySelectorAll('[data-messe-field]').forEach(input => { const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (input.type === 'date') render(); }; input.addEventListener(input.type === 'date' ? 'change' : 'input', handler); });
+  document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
   document.querySelectorAll('[data-messe-toggle]').forEach(button => button.onclick = () => { const key = button.dataset.messeToggle; state[key] = !state[key]; localStorage.setItem(key, String(state[key])); render(); });
   $('#messeConsent')?.addEventListener('change', e => { state.messeConsent = e.target.checked; render(); });
   $('#messeSearch')?.addEventListener('input', e => { state.messeQuery = e.target.value; render(); });
@@ -1645,7 +1651,7 @@ const BACKUP_KEYS = [
   'prices','priceImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
   'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
-  'messeName','messeAdresse','messeAnsprechpartner','messeDatum','messeAusgefuelltVon','messeGespraechsinhalt','messeMuster',
+  'messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeDatum','messeAusgefuelltVon','messeGespraechsinhalt','messeMuster',
   'messeKontaktaufnahme','messeBemusterung','messeNewsletter'
 ];
 
@@ -1736,7 +1742,7 @@ function customerHistoryScreen() {
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf und Messe-Erfassung werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
   state.summaryOccasion = 'unser heutiges Gespräch';
@@ -1750,6 +1756,7 @@ function resetCustomerData() {
   state.messeName = '';
   state.messeAdresse = '';
   state.messeAnsprechpartner = '';
+  state.messeEinrichtungstyp = '';
   state.messeGespraechsinhalt = '';
   state.messeMuster = '';
   state.messeKontaktaufnahme = false;
