@@ -1040,8 +1040,8 @@ function competitionScreen(){
       <label>Unser Produkt<select id="vsProduct"><option value="">Bitte wählen…</option>${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===v.productId?'selected':''}>${p.name}</option>`).join('')}</select></label>
       ${calc.product ? `<label>Gebinde<select id="vsSize">${calc.product.sizes.map(s=>`<option ${s===calc.size?'selected':''}>${s}</option>`).join('')}</select></label>` : '<div></div>'}
       <label>Wettbewerber<input id="vsCompetitorName" value="${escapeHtml(v.competitorName)}" placeholder="Hersteller / Produktname"></label>
-      <label>Kundenpreis (${escapeHtml(calc.size || 'gleiches Gebinde')})<input id="vsCompetitorPrice" type="number" min="0" step="0.01" value="${escapeHtml(v.competitorPrice)}" placeholder="z. B. 9,45"></label>
-      <label class="wide">${consumptionLabel}<input id="vsAnnualUnits" type="number" min="0" step="1" value="${escapeHtml(v.annualUnits)}" placeholder="z. B. 10000"></label>
+      <label>Kundenpreis (${escapeHtml(calc.size || 'gleiches Gebinde')})<input id="vsCompetitorPrice" type="text" inputmode="decimal" value="${escapeHtml(v.competitorPrice)}" placeholder="z. B. 9,45"></label>
+      <label class="wide">${consumptionLabel}<input id="vsAnnualUnits" type="text" inputmode="numeric" value="${escapeHtml(v.annualUnits)}" placeholder="z. B. 10000"></label>
     </section>
     ${!calc.product ? '<div class="empty-state no-print"><h2>Produkt wählen, um zu starten</h2><p>Wählen Sie oben unser Produkt, tragen Sie den Kundenpreis des Wettbewerbers ein und ergänzen Sie den Jahresverbrauch.</p></div>' : `
     <section class="vs-sheet">
@@ -1085,8 +1085,8 @@ function offerScreen() {
     if (lineTotal != null) subtotal += lineTotal;
     return `<tr>
       <td><strong>${p.name}</strong><small>${p.kind}<br>Art.-Nr. ${resolveArtNr(p, size)} · ${escapeHtml(size)}</small></td>
-      <td><input class="offer-input quantity" data-quote-item="${key}" data-field="quantity" type="number" min="1" step="1" value="${quantity}"></td>
-      <td><input class="offer-input discount" data-quote-item="${key}" data-field="discount" type="number" min="0" max="100" step="0.1" value="${discount}"><span class="unit">%</span></td>
+      <td><input class="offer-input quantity" data-quote-item="${key}" data-field="quantity" type="text" inputmode="numeric" value="${quantity}"></td>
+      <td><input class="offer-input discount" data-quote-item="${key}" data-field="discount" type="text" inputmode="decimal" value="${discount}"><span class="unit">%</span></td>
       <td class="offer-price">${state.customerMode ? 'ausgeblendet' : money(unitPrice)}</td>
       <td class="offer-price line-total">${state.customerMode ? 'ausgeblendet' : money(lineTotal)}</td>
     </tr>`;
