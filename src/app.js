@@ -1055,6 +1055,7 @@ function competitionScreen(){
       <label>Unser Produkt<select id="vsProduct"><option value="">Bitte wählen…</option>${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===v.productId?'selected':''}>${p.name}</option>`).join('')}</select></label>
       ${calc.product ? `<label>Gebinde<select id="vsSize">${calc.product.sizes.map(s=>`<option ${s===calc.size?'selected':''}>${s}</option>`).join('')}</select></label>` : '<div></div>'}
       <label>Wettbewerber<input id="vsCompetitorName" value="${escapeHtml(v.competitorName)}" placeholder="Hersteller / Produktname"></label>
+      ${calc.product && competitorSuggestions(calc.product.kind).length ? `<small class="muted-copy wide vs-competitor-hint">Übliche Wettbewerber für „${escapeHtml(calc.product.kind)}“: ${competitorSuggestions(calc.product.kind).map(escapeHtml).join(' · ')}</small>` : ''}
       <label>Kundenpreis (${escapeHtml(calc.size || 'gleiches Gebinde')})<input id="vsCompetitorPrice" type="text" inputmode="decimal" value="${escapeHtml(v.competitorPrice)}" placeholder="z. B. 9,45"></label>
       <label class="wide">${consumptionLabel}<input id="vsAnnualUnits" type="text" inputmode="numeric" value="${escapeHtml(v.annualUnits)}" placeholder="z. B. 10000"></label>
     </section>
@@ -1182,6 +1183,36 @@ function deleteSavedReport(index) {
   state.savedReports.splice(index, 1);
   localStorage.setItem('savedVisitReports', JSON.stringify(state.savedReports));
   render();
+}
+
+const COMPETITOR_BY_KIND = {
+  'Alkoholfreie Flächendesinfektion': ['Schülke – mikrozid sensitive liquid', 'Dr. Weigert – neodisher septo AF', 'Antiseptica – aseptisol'],
+  'Alkoholisches Hautdesinfektionsmittel': ['Schülke – Kodan', 'Bode/Hartmann – Cutasept F', 'B. Braun – Softasept N'],
+  'Desinfektionsmittel-Konzentrat': ['Schülke – mikrobac forte', 'Bode/Hartmann – Kohrsolin extra', 'B. Braun – Melsept SF'],
+  'Desinfektionsmittelkonzentrate': ['Schülke – mikrobac forte', 'Bode/Hartmann – Kohrsolin extra', 'B. Braun – Melsept SF'],
+  'Gebrauchsfertige Desinfektionsmittel': ['Schülke – mikrozid universal', 'Bode/Hartmann – Bacillol 30 Foam', 'Ecolab – Incidin'],
+  'Gebrauchsfertige Desinfektionstücher': ['Schülke – mikrozid AF wipes', 'Bode/Hartmann – Bacillol AF Tissues', 'Dr. Weigert – neodisher septo AF wipes'],
+  'Gebrauchsfertige Flächendesinfektion': ['Schülke – mikrozid AF', 'Bode/Hartmann – Bacillol AF', 'Dr. Weigert – neodisher septo DA'],
+  'Halter, Dosierhilfen & Zubehör': ['OPHARDT Hygiene – ingo-man', 'Bode-Eurospender', 'CWS'],
+  'Hautdesinfektion': ['Schülke – Kodan', 'Bode/Hartmann – Cutasept', 'B. Braun – Softasept N'],
+  'Hautschutz, Hände- und Hautpflege / Haut- und Körperpflege': ['Peter Greven – Physioderm-Reihe', 'Bode/Hartmann – Baktolan/Stephalen', 'Schülke – manoderm'],
+  'Händedesinfektion': ['Bode/Hartmann – Sterillium', 'Schülke – Desderman N', 'B. Braun – Softa-Man'],
+  'Händedesinfektionsgel': ['Bode/Hartmann – Sterillium Gel', 'Schülke – Desderman Gel', 'B. Braun – Softa-Man Gel'],
+  'Händedesinfektionsmittel': ['Bode/Hartmann – Sterillium', 'Schülke – Desderman N', 'B. Braun – Softa-Man'],
+  'Instrumentendesinfektion': ['Bode/Hartmann – Korsolex extra', 'Schülke – gigasept FF neu', 'B. Braun – Stabimed'],
+  'Manuelle Aufbereitung': ['Schülke – gigazyme', 'Bode/Hartmann – Korsolex', 'Dr. Weigert – neodisher MediClean'],
+  'Manuelle Instrumentenaufbereitung': ['Schülke – gigazyme', 'Bode/Hartmann – Korsolex', 'Dr. Weigert – neodisher MediClean'],
+  'Maschinelle Aufbereitung': ['Dr. Weigert – neodisher FA/MediClean forte', 'Schülke – thermosept', 'Ecolab'],
+  'Mildalkalisch-enzymatischer Reiniger zur maschinellen Aufbereitung': ['Dr. Weigert – neodisher MediZym', 'Schülke – thermosept RKD-Forte', 'Ecolab'],
+  'Reinigungs- und Desinfektionstücher': ['Schülke – mikrozid AF wipes', 'Bode/Hartmann – Bacillol AF Tissues', 'Dr. Weigert – neodisher septo AF wipes'],
+  'Sanierung': ['Dr. Weigert', 'Antiseptica', 'Ecolab'],
+  'Spender und Applikation': ['OPHARDT Hygiene – ingo-man', 'Bode-Eurospender', 'B. Braun Universal-Spender'],
+  'Vliestuchspender & Deckel': ['Bode – Cleansafe Wipes System', 'Schülke – System-Eimer', 'Diversey'],
+  'Vliestuchspendersysteme': ['Bode – Cleansafe Wipes System', 'Schülke – System-Eimer', 'Diversey'],
+  'Wandspender & Zubehör': ['OPHARDT Hygiene', 'CWS', 'Deb Stoko']
+};
+function competitorSuggestions(kind) {
+  return COMPETITOR_BY_KIND[kind] || [];
 }
 
 const PRODUCT_MANAGERS = [
@@ -1582,7 +1613,7 @@ function bind() {
   $('[data-action="new-messe"]')?.addEventListener('click', () => { if (confirm('Neue Messe-Erfassung starten? Name, Adresse, Gesprächsinhalt und Unterschrift werden dabei gelöscht.')) resetMesseForm(); });
   $('[data-action="clear-signature"]')?.addEventListener('click', () => { state.messeSignatureData=''; const c=document.getElementById('messeSignature'); if (c) c.getContext('2d').clearRect(0,0,c.width,c.height); render(); });
   $('[data-action="send-messe"]')?.addEventListener('click', sendMesseEmail);
-  $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); saveVsCompare({productId:e.target.value, size:p?p.sizes[0]:''}); render(); });
+  $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); const patch={productId:e.target.value, size:p?p.sizes[0]:''}; if (p && !state.vsCompare.competitorName.trim()) { const suggestions=competitorSuggestions(p.kind); if (suggestions.length) patch.competitorName=suggestions[0]; } saveVsCompare(patch); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
   $('#vsCompetitorName')?.addEventListener('input', e => { saveVsCompare({competitorName:e.target.value}); render(); });
   $('#vsCompetitorPrice')?.addEventListener('input', e => { saveVsCompare({competitorPrice:e.target.value}); render(); });
