@@ -438,7 +438,8 @@ function icon(name) {
     report:'<svg viewBox="0 0 24 24"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="m15 16 2 2 3-4"/></svg>',
     dashboard:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 18h7M17.5 14.5V21"/></svg>',
     copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
-    messe:'<svg viewBox="0 0 24 24"><path d="M6 21V4m0 1 13-1-3.5 5L19 14 6 15"/></svg>'
+    messe:'<svg viewBox="0 0 24 24"><path d="M6 21V4m0 1 13-1-3.5 5L19 14 6 15"/></svg>',
+    pm:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M15 15c2.5 0 5 1.5 5 4"/></svg>'
   };
   return icons[name] || '';
 }
@@ -499,6 +500,7 @@ function render() {
   if (state.screen === 'report') html = header(true) + reportScreen() + bottomNav('home');
   if (state.screen === 'dashboard') html = header(true) + dashboardScreen() + bottomNav('home');
   if (state.screen === 'messe') html = header(true) + messeScreen() + bottomNav('home');
+  if (state.screen === 'pm') html = header(true) + productManagementScreen() + bottomNav('home');
   app.innerHTML = html;
   bind();
   if (state.screen === 'messe') initSignaturePad();
@@ -577,6 +579,7 @@ function menuScreen() {
     ['report','Besuchsbericht','CRM-Zusammenfassung und Follow-up'],
     ['dashboard','Follow-up Dashboard','Offene Termine und Aufgaben im Blick'],
     ['messe','Messe','Kontakt live erfassen und an den Innendienst senden'],
+    ['pm','Produktmanagement','Zuständigkeiten und Kontakte der Produktmanager'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
@@ -1181,6 +1184,27 @@ function deleteSavedReport(index) {
   render();
 }
 
+const PRODUCT_MANAGERS = [
+  {area: 'Hände & Haut / Applikationshilfen', members: ['Nina Holzapfel', 'Luisa Stransky']},
+  {area: 'Fläche – Wipes/Tücher', members: ['Marvin Sauber', 'Lukas Weisel', 'Nico Herwig']},
+  {area: 'Dentalinstrumente', members: ['Franziska Schneider', 'Alexandra Koch']},
+  {area: 'Fläche – Flüssig (GVS, Professional for You)', members: ['Selina Schäfer', 'Cornelia Kolle', 'Alicia Wagner']}
+];
+function pmEmail(name) {
+  const norm = s => s.toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss');
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0];
+  const last = parts.slice(1).join('-');
+  return `${norm(first)}.${norm(last)}@schumacher-online.com`;
+}
+function productManagementScreen() {
+  return `<main class="page report-page">
+    <div class="section-heading no-print"><div><span class="eyebrow">Intern</span><h1>Produktmanagement</h1><p>Zuständigkeiten der Produktmanager im Haus – für schnelle Rückfragen direkt per E-Mail.</p></div></div>
+    <section class="pm-list">
+      ${PRODUCT_MANAGERS.map(team => `<div class="pm-team"><h2>${escapeHtml(team.area)}</h2><div class="pm-members">${team.members.map(name => `<div class="pm-member"><span>${escapeHtml(name)}</span><a class="secondary-button" href="mailto:${pmEmail(name)}">${icon('talk')}<span>E-Mail</span></a></div>`).join('')}</div></div>`).join('')}
+    </section>
+  </main>`;
+}
 function messeScreen() {
   const chosen = favoriteEntries();
   const query = (state.messeQuery || '').toLowerCase();
@@ -1528,7 +1552,7 @@ function bind() {
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard','messe'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard','messe','pm'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
