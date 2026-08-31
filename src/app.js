@@ -696,7 +696,8 @@ function emailCard(p) {
   return `<div class="email-card">
     <span>Kundeninfo per E-Mail${count ? ` · ${count} mit ★ markiert` : ''}</span>
     <div class="email-chips">${chips.map(([key,label,available]) => available ? `<button class="filter-chip email-chip ${state.emailInclude[key]?'active':''}" data-email-toggle="${key}">${label}</button>` : '').join('')}</div>
-    <button class="primary-button compact" data-action="send-email" ${count?'':'disabled'}>${icon('talk')}<span>Info per E-Mail senden${count>1?` (${count} Produkte)`:''}</span></button>
+    <button class="primary-button compact" data-action="send-email" ${count?'':'disabled'}>${icon('talk')}<span>Info an Innendienst${count>1?` (${count} Produkte)`:''}</span></button>
+    <button class="secondary-button compact" data-action="send-summary" ${count?'':'disabled'}>${icon('talk')}<span>Kundenzusammenfassung</span></button>
     ${count===0 ? '<small class="muted-copy">Markieren Sie zuerst mindestens ein Produkt mit dem Stern (★).</small>' : ''}
   </div>`;
 }
