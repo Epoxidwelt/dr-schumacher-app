@@ -138,8 +138,8 @@ function regionLabel(key) { return (REGIONS.find(r => r.key === key) || {}).labe
 function innendienstEmail() { return (REGIONS.find(r => r.key === state.region) || {}).email || ''; }
 
 const SUMMARY_OCCASIONS = [
-  {value:'das freundliche Telefonat', label:'Telefonat – „vielen Dank für das freundliche Telefonat"'},
-  {value:'den Termin', label:'Vor Ort – „vielen Dank für den Termin"'}
+  {value:'das freundliche Telefonat', label:'Telefonat – „vielen Dank für das freundliche Telefonat"', short:'Telefonat', icon:'phone'},
+  {value:'den Termin', label:'Vor Ort – „vielen Dank für den Termin"', short:'Vor Ort / Termin', icon:'pin'}
 ];
 
 const PRODUCT_DOCS = {
@@ -416,7 +416,8 @@ const state = {
   messeSignatureData: '',
   messeQuery: '',
   messeScanStatus: '',
-  messeScanPreview: null
+  messeScanPreview: null,
+  showOccasionPrompt: false
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -451,7 +452,9 @@ function icon(name) {
     copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
     messe:'<svg viewBox="0 0 24 24"><path d="M6 21V4m0 1 13-1-3.5 5L19 14 6 15"/></svg>',
     pm:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M15 15c2.5 0 5 1.5 5 4"/></svg>',
-    camera:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13.5" r="3.5"/></svg>'
+    camera:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13.5" r="3.5"/></svg>',
+    phone:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/></svg>',
+    pin:'<svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>'
   };
   return icons[name] || '';
 }
@@ -527,6 +530,7 @@ function render() {
   if (state.screen === 'dashboard') html = header(true) + dashboardScreen() + bottomNav('home');
   if (state.screen === 'messe') html = header(true) + messeScreen() + bottomNav('home');
   if (state.screen === 'pm') html = header(true) + productManagementScreen() + bottomNav('home');
+  if (state.showOccasionPrompt) html += occasionPromptModal();
   app.innerHTML = html;
   bind();
   if (state.screen === 'messe') initSignaturePad();
@@ -1013,6 +1017,17 @@ function vsCalculation() {
   const savings = (ourAnnual != null && compAnnual != null && !isNaN(ourAnnual) && !isNaN(compAnnual)) ? compAnnual - ourAnnual : null;
   const ready = !!(product && ourPrice != null && compPrice != null && consumption != null);
   return {product, size, ourPrice, unitInfo, ourUnits, ourPerUnit, compPrice, compUnits, compPerUnit, consumption, ourAnnual, compAnnual, savings, ready};
+}
+
+function occasionPromptModal() {
+  return `<div class="modal-overlay">
+    <div class="modal-card">
+      <span class="eyebrow">Bevor es losgeht</span>
+      <h2>Telefonat oder Termin vor Ort?</h2>
+      <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt.</p>
+      <div class="modal-choices">${SUMMARY_OCCASIONS.map(o => `<button class="modal-choice" data-occasion-choice="${escapeHtml(o.value)}">${icon(o.icon)}<span>${escapeHtml(o.short)}</span></button>`).join('')}</div>
+    </div>
+  </div>`;
 }
 
 
@@ -1744,7 +1759,15 @@ function bind() {
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; debouncedRender(); });
   document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
-  $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
+  $('[data-action="send-summary"]')?.addEventListener('click', () => { state.showOccasionPrompt = true; render(); });
+  document.querySelectorAll('[data-occasion-choice]').forEach(button => button.addEventListener('click', () => {
+    const value = button.dataset.occasionChoice;
+    state.summaryOccasion = value;
+    localStorage.setItem('summaryOccasion', value);
+    state.showOccasionPrompt = false;
+    sendCustomerSummaryEmail();
+    render();
+  }));
   document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
   document.querySelectorAll('[data-messe-toggle]').forEach(button => button.onclick = () => { const key = button.dataset.messeToggle; state[key] = !state[key]; localStorage.setItem(key, String(state[key])); render(); });
   $('#messeConsent')?.addEventListener('change', e => { state.messeConsent = e.target.checked; render(); });
