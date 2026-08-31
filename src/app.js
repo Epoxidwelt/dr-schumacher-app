@@ -620,7 +620,7 @@ function menuScreen() {
   const due = openReports.filter(r => r.followUp && r.followUp <= today).length;
   const favoriteProducts = [...new Set(state.favorites.map(f => f.id))].map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean).slice(0,4);
   const recentProducts = state.recent.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean).slice(0,4);
-  const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => `${p.name} ${p.kind} ${p.sku} ${p.summary}`.toLowerCase().includes(state.globalQuery.toLowerCase())).slice(0,8) : [];
+  const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind} ${p.sku} ${p.summary}`, state.globalQuery)).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
     <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.customerMode?'Preise ausgeblendet':state.priceList}</h1></div></section>
     ${coreCategoryGrid()}
@@ -652,7 +652,7 @@ function productsScreen() {
   const spectra = ['all','begrenzt viruzid','begrenzt viruzid PLUS','viruzid','sporizid'];
   const list = PRODUCTS.filter(p =>
     (state.category === 'all' || p.category === state.category) &&
-    (!state.query || `${p.name} ${p.kind} ${p.sku}`.toLowerCase().includes(state.query.toLowerCase())) &&
+    matchesQuery(`${p.name} ${p.kind} ${p.sku}`, state.query) &&
     (state.spectrum === 'all' || p.spectrum.includes(state.spectrum))
   );
   return `<main class="page products-page">
@@ -1018,8 +1018,8 @@ function vsCalculation() {
 
 function summaryScreen(){
   const chosen=favoriteEntries();
-  const query=(state.summaryQuery||'').toLowerCase();
-  const pickable=query?PRODUCTS.filter(p=>`${p.name} ${p.kind}`.toLowerCase().includes(query)):PRODUCTS;
+  const query=state.summaryQuery||'';
+  const pickable=query?PRODUCTS.filter(p=>matchesQuery(`${p.name} ${p.kind}`, query)):PRODUCTS;
   return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Alle Produkte, die Sie unterwegs mit dem Stern (★) markiert haben, erscheinen automatisch hier – je Gebinde einzeln, falls Sie z. B. mehrere Packungsgrößen besprochen haben. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
   <section class="offer-config">
     <label>Anrede<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller"></label>
@@ -1275,8 +1275,8 @@ function productManagementScreen() {
 }
 function messeScreen() {
   const chosen = favoriteEntries();
-  const query = (state.messeQuery || '').toLowerCase();
-  const pickable = query ? PRODUCTS.filter(p => `${p.name} ${p.kind}`.toLowerCase().includes(query)) : PRODUCTS;
+  const query = state.messeQuery || '';
+  const pickable = query ? PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind}`, query)) : PRODUCTS;
   const canSend = state.messeName.trim() && (state.messeConsent || state.messeSignatureData);
   return `<main class="page report-page messe-page">
     <div class="section-heading no-print"><div><span class="eyebrow">Vor Ort erfassen</span><h1>Messe</h1><p>1. Produkte auswählen, die Sie besprochen haben – 2. Kundendaten eintragen – 3. direkt an den Innendienst senden. Alles bleibt zusätzlich lokal auf diesem Gerät.</p></div><button class="secondary-button" data-action="new-messe">Neue Erfassung</button></div>
@@ -1669,6 +1669,12 @@ function perUnitCalc(product, size) {
   return `${money(Number(price))} ÷ ${units} Tücher = ${moneyPerUnit(per)} / Tuch`;
 }
 function escapeHtml(text) { return String(text).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+function matchesQuery(haystack, query) {
+  const words = (query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const h = haystack.toLowerCase();
+  return words.every(w => h.includes(w));
+}
 
 function bind() {
   document.querySelectorAll('[data-profile]').forEach(button => button.onclick = () => {
