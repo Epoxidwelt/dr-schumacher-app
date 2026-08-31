@@ -418,7 +418,7 @@ const state = {
   messeQuery: '',
   messeScanStatus: '',
   messeScanPreview: null,
-  showOccasionPrompt: false
+  summaryStep: null
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -531,7 +531,7 @@ function render() {
   if (state.screen === 'dashboard') html = header(true) + dashboardScreen() + bottomNav('home');
   if (state.screen === 'messe') html = header(true) + messeScreen() + bottomNav('home');
   if (state.screen === 'pm') html = header(true) + productManagementScreen() + bottomNav('home');
-  if (state.showOccasionPrompt) html += occasionPromptModal();
+  if (state.summaryStep) html += occasionPromptModal();
   app.innerHTML = html;
   bind();
   if (state.screen === 'messe') initSignaturePad();
@@ -1037,9 +1037,23 @@ function vsCalculation() {
 }
 
 function occasionPromptModal() {
+  if (state.summaryStep === 'contact') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        <span class="eyebrow">Schritt 2 von 2</span>
+        <h2>Wer ist der Ansprechpartner?</h2>
+        <p>Der Name sorgt für die passende Anrede am Anfang der E-Mail.</p>
+        <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller" autofocus></label>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="occasion-back">Zurück</button>
+          <button class="primary-button compact" data-action="occasion-send">${icon('talk')}<span>E-Mail senden</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
   return `<div class="modal-overlay">
     <div class="modal-card">
-      <span class="eyebrow">Bevor es losgeht</span>
+      <span class="eyebrow">Schritt 1 von 2</span>
       <h2>Telefonat oder Termin vor Ort?</h2>
       <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt.</p>
       <div class="modal-choices">${SUMMARY_OCCASIONS.map(o => `<button class="modal-choice" data-occasion-choice="${escapeHtml(o.value)}">${icon(o.icon)}<span>${escapeHtml(o.short)}</span></button>`).join('')}</div>
@@ -1793,15 +1807,21 @@ function bind() {
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; debouncedRender(); });
   document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
-  $('[data-action="send-summary"]')?.addEventListener('click', () => { state.showOccasionPrompt = true; render(); });
+  $('[data-action="send-summary"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
   document.querySelectorAll('[data-occasion-choice]').forEach(button => button.addEventListener('click', () => {
     const value = button.dataset.occasionChoice;
     state.summaryOccasion = value;
     localStorage.setItem('summaryOccasion', value);
-    state.showOccasionPrompt = false;
-    sendCustomerSummaryEmail();
+    state.summaryStep = 'contact';
     render();
   }));
+  $('#occasionContact')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
+  $('[data-action="occasion-back"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
+  $('[data-action="occasion-send"]')?.addEventListener('click', () => {
+    state.summaryStep = null;
+    sendCustomerSummaryEmail();
+    render();
+  });
   document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
   document.querySelectorAll('[data-messe-toggle]').forEach(button => button.onclick = () => { const key = button.dataset.messeToggle; state[key] = !state[key]; localStorage.setItem(key, String(state[key])); render(); });
   $('#messeConsent')?.addEventListener('change', e => { state.messeConsent = e.target.checked; render(); });
