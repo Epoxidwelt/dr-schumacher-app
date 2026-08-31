@@ -2069,7 +2069,7 @@ function extractVE(row) {
   return '';
 }
 function extractPal(row) {
-  const palRaw = String(sheetCell(row, ['Pal', 'Pal.', 'Palette', 'Pal-Menge']) || '').trim();
+  const palRaw = String(sheetCell(row, ['Pal', 'PAL', 'Pal.', 'Palette', 'Pal-Menge']) || '').trim();
   return /^\d+([.,]\d+)?$/.test(palRaw) ? palRaw : '';
 }
 function resolveSizeLabel(product, baseSize, gebinde) {
