@@ -372,7 +372,7 @@ const state = {
   favorites: migrateFavorites(localStorage.getItem('favorites')),
   size: '',
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
-  emailInclude: {price:true, sheet:true, safety:true, ba:true},
+  emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
   vsCompare: JSON.parse(localStorage.getItem('vsCompare') || 'null') || {productId:'', size:'', competitorName:'', competitorPrice:'', annualUnits:''},
   advisor: {category:'', subtype:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
@@ -689,7 +689,8 @@ function emailCard(p) {
     ['price','Preis', !state.customerMode && !inMesseContext()],
     ['sheet','Produktdatenblatt', true],
     ['safety','Sicherheitsdatenblatt', true],
-    ['ba','Betriebsanweisung', true]
+    ['ba','Betriebsanweisung', true],
+    ['muster','Muster', true]
   ];
   const count = state.favorites.length;
   return `<div class="email-card">
@@ -707,7 +708,7 @@ function favoriteEntries() {
 function buildStarredProductsEmail() {
   const entries = favoriteEntries();
   const inc = state.emailInclude;
-  const lines = [`Hallo Team,`, ``, `bitte nachstehende Informationen an den Kunden senden:`, ``];
+  const lines = [`Hallo Team,`, ``, `bitte nachstehende Informationen${inc.muster ? ' an den Kunden senden und die vermerkten Muster bereitstellen' : ' an den Kunden senden'}:`, ``];
   entries.forEach(({product: p, size}) => {
     const price = resolvePrice(p, size);
     lines.push(`PRODUKT: ${p.name}`, `Artikelnummer: ${resolveArtNr(p, size)}`, `Gebinde: ${size}`);
@@ -719,10 +720,11 @@ function buildStarredProductsEmail() {
     if (inc.sheet) lines.push(`PRODUKTDATENBLATT (PIF): ${productDocUrl(p,'pif')}`);
     if (inc.safety) lines.push(`SICHERHEITSDATENBLATT: ${productDocUrl(p,'sdb')}`);
     if (inc.ba) lines.push(`BETRIEBSANWEISUNG (BA): ${productDocUrl(p,'ba')}`);
+    if (inc.muster) lines.push(`MUSTER: bitte ein Muster (${size}) an den Kunden senden`);
     lines.push('');
   });
   lines.push('Danke und Grüße');
-  const subject = entries.length === 1 ? `Produktinformation ${entries[0].product.name} – Dr. Schumacher` : `Produktinformationen (${entries.length} Produkte) – Dr. Schumacher`;
+  const subject = entries.length === 1 ? `Produktinformation${inc.muster ? ' & Musteranfrage' : ''} ${entries[0].product.name} – Dr. Schumacher` : `Produktinformationen${inc.muster ? ' & Musteranfrage' : ''} (${entries.length} Produkte) – Dr. Schumacher`;
   return { subject, body: lines.join('\n') };
 }
 
