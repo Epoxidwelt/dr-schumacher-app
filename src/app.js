@@ -482,6 +482,17 @@ function bottomNav(active='home') {
   </nav>`;
 }
 
+function debounce(fn, wait) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+}
+const debouncedRender = debounce(render, 150);
+
+let lastViewKey = null;
+function currentViewKey() {
+  return [state.screen, state.category, state.selected].join(':');
+}
+
 function render() {
   const app = $('#app');
   const active = document.activeElement;
@@ -492,6 +503,9 @@ function render() {
     selEnd: 'selectionEnd' in active ? active.selectionEnd : null,
     scrollY: window.scrollY
   } : null;
+  const viewKey = currentViewKey();
+  const viewChanged = viewKey !== lastViewKey;
+  lastViewKey = viewKey;
   let html = '';
   if (state.screen === 'profile') html = profileScreen();
   if (state.screen === 'prices') html = priceScreen();
@@ -525,6 +539,8 @@ function render() {
       }
       window.scrollTo(0, focusState.scrollY);
     }
+  } else if (viewChanged) {
+    window.scrollTo(0, 0);
   }
 }
 
@@ -1707,8 +1723,8 @@ function bind() {
   document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => { state.size=button.dataset.size; if (button.dataset.sizeFavorite) toggleFavorite(button.dataset.sizeFavorite, button.dataset.size); render(); });
   document.querySelectorAll('[data-email-toggle]').forEach(button => button.onclick = () => { const key=button.dataset.emailToggle; state.emailInclude[key]=!state.emailInclude[key]; render(); });
   document.querySelectorAll('[data-action="send-email"]').forEach(button => button.onclick = () => sendStarredProductsEmail());
-  $('#search')?.addEventListener('input', event => { state.query=event.target.value; render(); });
-  $('#globalSearch')?.addEventListener('input', event => { state.globalQuery=event.target.value; render(); });
+  $('#search')?.addEventListener('input', event => { state.query=event.target.value; debouncedRender(); });
+  $('#globalSearch')?.addEventListener('input', event => { state.globalQuery=event.target.value; debouncedRender(); });
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
   $('#excel')?.addEventListener('change', importExcel);
   document.querySelectorAll('[data-advisor]').forEach(button => button.onclick = () => { state.advisor[button.dataset.advisor]=button.dataset.value; render(); });
@@ -1719,14 +1735,14 @@ function bind() {
   $('[data-action="copy-pitch"]')?.addEventListener('click', async () => { const text=comparisonPitch(state.compareIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean)); try { await navigator.clipboard.writeText(text); alert('Text wurde kopiert.'); } catch { alert(text); } });
   $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#summaryOccasion')?.addEventListener('change', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
-  $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; render(); });
+  $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; debouncedRender(); });
   document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
   $('[data-action="send-summary"]')?.addEventListener('click', sendCustomerSummaryEmail);
   document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
   document.querySelectorAll('[data-messe-toggle]').forEach(button => button.onclick = () => { const key = button.dataset.messeToggle; state[key] = !state[key]; localStorage.setItem(key, String(state[key])); render(); });
   $('#messeConsent')?.addEventListener('change', e => { state.messeConsent = e.target.checked; render(); });
-  $('#messeSearch')?.addEventListener('input', e => { state.messeQuery = e.target.value; render(); });
+  $('#messeSearch')?.addEventListener('input', e => { state.messeQuery = e.target.value; debouncedRender(); });
   $('[data-action="new-messe"]')?.addEventListener('click', () => { if (confirm('Neue Messe-Erfassung starten? Name, Adresse, Gesprächsinhalt und Unterschrift werden dabei gelöscht.')) resetMesseForm(); });
   $('[data-action="clear-signature"]')?.addEventListener('click', () => { state.messeSignatureData=''; const c=document.getElementById('messeSignature'); if (c) c.getContext('2d').clearRect(0,0,c.width,c.height); render(); });
   $('[data-action="send-messe"]')?.addEventListener('click', sendMesseEmail);
