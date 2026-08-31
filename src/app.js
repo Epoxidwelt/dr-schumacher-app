@@ -1056,7 +1056,7 @@ function buildCustomerSummaryEmail(){
 function sendCustomerSummaryEmail(){
   if(!state.favorites.length)return;
   const {subject,body}=buildCustomerSummaryEmail();
-  openMailto(subject,body);
+  openMailto(subject,body,'gerald.gampp@schumacher-online.com');
 }
 
 function competitionScreen(){
