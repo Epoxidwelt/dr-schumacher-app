@@ -123,7 +123,7 @@ const OFFICIAL = {
   disinfectionPlans: 'https://www.eqmed.de/'
 };
 
-const PRICE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1z_FuQiBslt71eLzNA-6cstToQp86PKud_7HXY8JK0eQ/export?format=csv&gid=1904728001';
+const PRICE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1z_FuQiBslt71eLzNA-6cstToQp86PKud_7HXY8JK0eQ/export?format=csv&gid=1702267749';
 // Neues Tabellenblatt in derselben (oder einer eigenen) Google-Tabelle: Spalten "Art. Nr.", "Vorteil 1".."Vorteil 5".
 // Sobald das Blatt veröffentlicht ist (Datei > Freigeben > Im Web veröffentlichen > CSV), hier die Export-URL eintragen.
 const FACTS_SHEET_CSV_URL = '';
