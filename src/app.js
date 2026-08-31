@@ -1042,24 +1042,34 @@ function salutationChips() {
 }
 
 function occasionPromptModal() {
-  if (state.summaryStep === 'contact') {
+  if (state.summaryStep === 'name') {
     return `<div class="modal-overlay">
       <div class="modal-card">
-        <span class="eyebrow">Schritt 2 von 2</span>
-        <h2>Wer ist der Ansprechpartner?</h2>
+        <span class="eyebrow">Schritt 3 von 3</span>
+        <h2>Wie heißt der Ansprechpartner?</h2>
         <p>Die E-Mail beginnt damit automatisch mit „Hallo ${state.summarySalutation} ${state.summaryCustomer.trim() || 'Name'}".</p>
-        <div class="modal-field">${salutationChips()}</div>
         <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller" autofocus></label>
         <div class="modal-actions">
-          <button class="secondary-button compact" data-action="occasion-back">Zurück</button>
+          <button class="secondary-button compact" data-action="occasion-back-name">Zurück</button>
           <button class="primary-button compact" data-action="occasion-send">${icon('talk')}<span>E-Mail senden</span></button>
         </div>
       </div>
     </div>`;
   }
+  if (state.summaryStep === 'salutation') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        <span class="eyebrow">Schritt 2 von 3</span>
+        <h2>Herr oder Frau?</h2>
+        <p>Damit die E-Mail mit der passenden Anrede beginnt.</p>
+        <div class="modal-choices">${['Herr','Frau'].map(s => `<button class="modal-choice" data-salutation-pick="${s}">${icon('pm')}<span>${s}</span></button>`).join('')}</div>
+        <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-salutation">Zurück</button></div>
+      </div>
+    </div>`;
+  }
   return `<div class="modal-overlay">
     <div class="modal-card">
-      <span class="eyebrow">Schritt 1 von 2</span>
+      <span class="eyebrow">Schritt 1 von 3</span>
       <h2>Telefonat oder Termin vor Ort?</h2>
       <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt.</p>
       <div class="modal-choices">${SUMMARY_OCCASIONS.map(o => `<button class="modal-choice" data-occasion-choice="${escapeHtml(o.value)}">${icon(o.icon)}<span>${escapeHtml(o.short)}</span></button>`).join('')}</div>
@@ -1820,11 +1830,18 @@ function bind() {
     const value = button.dataset.occasionChoice;
     state.summaryOccasion = value;
     localStorage.setItem('summaryOccasion', value);
-    state.summaryStep = 'contact';
+    state.summaryStep = 'salutation';
+    render();
+  }));
+  document.querySelectorAll('[data-salutation-pick]').forEach(button => button.addEventListener('click', () => {
+    state.summarySalutation = button.dataset.salutationPick;
+    localStorage.setItem('summarySalutation', state.summarySalutation);
+    state.summaryStep = 'name';
     render();
   }));
   $('#occasionContact')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
-  $('[data-action="occasion-back"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
+  $('[data-action="occasion-back-salutation"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
+  $('[data-action="occasion-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'salutation'; render(); });
   $('[data-action="occasion-send"]')?.addEventListener('click', () => {
     state.summaryStep = null;
     sendCustomerSummaryEmail();
