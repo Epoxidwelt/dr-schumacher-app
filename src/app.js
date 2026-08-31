@@ -386,6 +386,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
+  summarySalutation: localStorage.getItem('summarySalutation') || 'Herr',
   summaryOccasion: localStorage.getItem('summaryOccasion') || SUMMARY_OCCASIONS[0].value,
   summaryIncludePrices: localStorage.getItem('summaryIncludePrices') === 'true',
   summaryQuery: '',
@@ -1036,14 +1037,19 @@ function vsCalculation() {
   return {product, size, ourPrice, unitInfo, ourUnits, ourPerUnit, compPrice, compUnits, compPerUnit, consumption, ourAnnual, compAnnual, savings, ready};
 }
 
+function salutationChips() {
+  return `<div class="price-toggle-row">${['Herr','Frau'].map(s => `<button type="button" class="filter-chip ${state.summarySalutation===s?'active':''}" data-salutation-choice="${s}">${s}</button>`).join('')}</div>`;
+}
+
 function occasionPromptModal() {
   if (state.summaryStep === 'contact') {
     return `<div class="modal-overlay">
       <div class="modal-card">
         <span class="eyebrow">Schritt 2 von 2</span>
         <h2>Wer ist der Ansprechpartner?</h2>
-        <p>Der Name sorgt für die passende Anrede am Anfang der E-Mail.</p>
-        <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller" autofocus></label>
+        <p>Die E-Mail beginnt damit automatisch mit „Hallo ${state.summarySalutation} ${state.summaryCustomer.trim() || 'Name'}".</p>
+        <div class="modal-field">${salutationChips()}</div>
+        <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller" autofocus></label>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back">Zurück</button>
           <button class="primary-button compact" data-action="occasion-send">${icon('talk')}<span>E-Mail senden</span></button>
@@ -1068,7 +1074,7 @@ function summaryScreen(){
   const pickable=query?PRODUCTS.filter(p=>matchesQuery(`${p.name} ${p.kind}`, query)):PRODUCTS;
   return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Alle Produkte, die Sie unterwegs mit dem Stern (★) markiert haben, erscheinen automatisch hier – je Gebinde einzeln, falls Sie z. B. mehrere Packungsgrößen besprochen haben. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
   <section class="offer-config">
-    <label>Anrede<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller"></label>
+    <label>Ansprechpartner${salutationChips()}<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller"></label>
     <label>Anlass des Gesprächs<select id="summaryOccasion">${SUMMARY_OCCASIONS.map(o=>`<option value="${escapeHtml(o.value)}" ${o.value===state.summaryOccasion?'selected':''}>${o.label}</option>`).join('')}</select></label>
   </section>
   <section class="summary-price-toggle">
@@ -1096,7 +1102,8 @@ function summaryChosenCard(entry){
 }
 function buildCustomerSummaryEmail(){
   const entries=favoriteEntries();
-  const salutation=state.summaryCustomer.trim()||'Sehr geehrte Damen und Herren';
+  const contactName=state.summaryCustomer.trim();
+  const salutation=contactName?`Hallo ${state.summarySalutation} ${contactName}`:'Hallo';
   const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
   const lines=[
     `${salutation},`,
@@ -1804,6 +1811,7 @@ function bind() {
   $('[data-action="copy-pitch"]')?.addEventListener('click', async () => { const text=comparisonPitch(state.compareIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean)); try { await navigator.clipboard.writeText(text); alert('Text wurde kopiert.'); } catch { alert(text); } });
   $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#summaryOccasion')?.addEventListener('change', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
+  document.querySelectorAll('[data-salutation-choice]').forEach(button => button.onclick = () => { state.summarySalutation = button.dataset.salutationChoice; localStorage.setItem('summarySalutation', state.summarySalutation); render(); });
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; debouncedRender(); });
   document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
@@ -1938,7 +1946,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','liveFacts','factsImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
+  'summaryCustomer','summarySalutation','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
   'messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeDatum','messeAusgefuelltVon','messeGespraechsinhalt','messeMuster',
   'messeKontaktaufnahme','messeBemusterung','messeNewsletter'
 ];
@@ -2030,9 +2038,10 @@ function customerHistoryScreen() {
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf und Messe-Erfassung werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summaryCustomer','summarySalutation','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
+  state.summarySalutation = 'Herr';
   state.summaryOccasion = SUMMARY_OCCASIONS[0].value;
   state.summaryIncludePrices = false;
   state.quoteCustomer = '';
