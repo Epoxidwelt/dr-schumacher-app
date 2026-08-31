@@ -573,7 +573,7 @@ function regionScreen() {
 }
 
 function priceScreen() {
-  const options = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'];
+  const options = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'];
   return `<main class="price-shell">
     <section class="price-panel">
       <img class="welcome-logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher">
@@ -582,7 +582,7 @@ function priceScreen() {
       <p>Die Auswahl gilt für die gesamte Sitzung. Sie kann später jederzeit geändert werden.</p>
       <div class="price-options">
         <button class="price-option hide-prices-option ${state.customerMode?'selected':''}" data-price="hide"><span class="price-option-strike">UVP</span><small>Keine Preise anzeigen</small></button>
-        ${options.map(option => `<button class="price-option ${!state.customerMode && state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}
+        ${options.map(option => `<button class="price-option ${!state.customerMode && state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':option==='UVP Hygi'?'<small>Marktreferenz hygi.de</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}
       </div>
       <p class="privacy-note">Preise bleiben lokal auf diesem Gerät und werden nicht in eine Cloud übertragen.</p>
     </section>
@@ -703,7 +703,7 @@ function detailScreen() {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
         return `<button class="${active?'active':''}" data-size="${size}" ${isMulti?`data-size-favorite="${p.id}"`:''}>${escapeHtml(size)}</button>`;
-      }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${(state.customerMode||inMesseContext())?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
+      }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${(state.customerMode||inMesseContext())?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
         ${(state.customerMode||inMesseContext()) ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
@@ -2094,7 +2094,8 @@ const PRICE_COLUMNS = [
   ['PL 2',  ['Preisliste 2', 'PL 2', 'PL2']],
   ['PL 3',  ['Preisliste 3', 'PL 3', 'PL3']],
   ['PL 4',  ['Preisliste 4', 'PL 4', 'PL4']],
-  ['PL 5',  ['Preisliste 5', 'PL 5', 'PL5']]
+  ['PL 5',  ['Preisliste 5', 'PL 5', 'PL5']],
+  ['UVP Hygi', ['Preisliste UVP Hygi', 'UVP Hygi', 'Preisliste UVP HYGI', 'UVP HYGI']]
 ];
 const ART_NR_COLUMNS = ['Art. Nr.', 'Art.Nr.', 'Art-Nr.', 'Artikelnummer', 'Artikel-Nr.', 'SKU'];
 function sheetCell(row, names) {
