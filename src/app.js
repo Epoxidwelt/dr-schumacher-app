@@ -124,6 +124,9 @@ const OFFICIAL = {
 };
 
 const PRICE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1z_FuQiBslt71eLzNA-6cstToQp86PKud_7HXY8JK0eQ/export?format=csv&gid=1904728001';
+// Neues Tabellenblatt in derselben (oder einer eigenen) Google-Tabelle: Spalten "Art. Nr.", "Vorteil 1".."Vorteil 5".
+// Sobald das Blatt veröffentlicht ist (Datei > Freigeben > Im Web veröffentlichen > CSV), hier die Export-URL eintragen.
+const FACTS_SHEET_CSV_URL = '';
 
 const REGIONS = [
   {key:'nord', label:'Nord', email:'teamnord@schumacher-online.com'},
@@ -387,6 +390,8 @@ const state = {
   quoteValidUntil: localStorage.getItem('quoteValidUntil') || '',
   quoteItems: JSON.parse(localStorage.getItem('quoteItems') || '{}'),
   importMeta: JSON.parse(localStorage.getItem('priceImportMeta') || '{}'),
+  liveFacts: JSON.parse(localStorage.getItem('liveFacts') || '{}'),
+  factsImportMeta: JSON.parse(localStorage.getItem('factsImportMeta') || '{}'),
   visitReport: JSON.parse(localStorage.getItem('visitReport') || '{}'),
   savedReports: JSON.parse(localStorage.getItem('savedVisitReports') || '[]'),
   customerHistory: JSON.parse(localStorage.getItem('customerHistory') || '[]'),
@@ -664,7 +669,7 @@ function detailScreen() {
       <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}</div><p>${p.summary}</p><small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
-      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${p.einwirkzeitEntries && p.einwirkzeitEntries.length ? `<div class="einwirkzeit-list">${p.einwirkzeitEntries.map(e => `<div class="einwirkzeit-badge ${e.kind}">⏱ ${escapeHtml(e.label)} in ${escapeHtml(e.time)}${e.detail ? ` <span class="einwirkzeit-tier">${escapeHtml(e.detail)}</span>` : ''}</div>`).join('')}</div>` : ''}<ul>${p.facts.map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
+      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${p.einwirkzeitEntries && p.einwirkzeitEntries.length ? `<div class="einwirkzeit-list">${p.einwirkzeitEntries.map(e => `<div class="einwirkzeit-badge ${e.kind}">⏱ ${escapeHtml(e.label)} in ${escapeHtml(e.time)}${e.detail ? ` <span class="einwirkzeit-tier">${escapeHtml(e.detail)}</span>` : ''}</div>`).join('')}</div>` : ''}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
       <div class="price-card-detail"><span>Gebinde auswählen${p.sizes.length>1?' · anklicken markiert die Variante als Favorit':''}</span><div class="size-selector">${p.sizes.map(size => {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
@@ -797,7 +802,7 @@ const ADVISOR_SUBTYPES = {
 };
 
 function advisorRefinement(category, subtype) {
-  const text = p => `${p.kind} ${p.summary} ${p.facts.join(' ')}`;
+  const text = p => `${p.kind} ${p.summary} ${productFacts(p).join(' ')}`;
   if (category === 'surface' && (subtype === 'liquid' || subtype === 'wipes')) {
     return {question:'Was ist besonders wichtig?', options:[
       {value:'routine', label:'Routineanwendung', match:()=>true},
@@ -951,11 +956,11 @@ function compareScreen() {
 
 function compareColumn(p) {
   const price = resolvePrice(p);
-  return `<article class="compare-column"><div class="compare-head" style="--product-color:${p.color}"><span>${p.category==='hands'?'✋':p.category==='surface'?'▦':p.category==='instruments'?'✂':'▣'}</span><h2>${p.name}</h2><small>${p.kind}</small></div><div class="compare-line"><b>Wirkspektrum</b><div class="badges">${p.spectrum.map(spectrumBadge).join('') || '<span>–</span>'}</div></div><div class="compare-line"><b>Stärken</b><ul>${p.facts.slice(0,3).map(f=>`<li>${f}</li>`).join('')}</ul></div><div class="compare-line"><b>Gebinde</b><span>${p.sizes.join(', ')}</span></div><div class="compare-line"><b>${state.customerMode?'Preis':'Preis '+state.priceList}</b><strong>${state.customerMode?'verborgen':money(price)}</strong></div><button class="primary-button compact" data-product="${p.id}">Produkt öffnen</button></article>`;
+  return `<article class="compare-column"><div class="compare-head" style="--product-color:${p.color}"><span>${p.category==='hands'?'✋':p.category==='surface'?'▦':p.category==='instruments'?'✂':'▣'}</span><h2>${p.name}</h2><small>${p.kind}</small></div><div class="compare-line"><b>Wirkspektrum</b><div class="badges">${p.spectrum.map(spectrumBadge).join('') || '<span>–</span>'}</div></div><div class="compare-line"><b>Stärken</b><ul>${productFacts(p).slice(0,3).map(f=>`<li>${f}</li>`).join('')}</ul></div><div class="compare-line"><b>Gebinde</b><span>${p.sizes.join(', ')}</span></div><div class="compare-line"><b>${state.customerMode?'Preis':'Preis '+state.priceList}</b><strong>${state.customerMode?'verborgen':money(price)}</strong></div><button class="primary-button compact" data-product="${p.id}">Produkt öffnen</button></article>`;
 }
 
 function comparisonPitch(list) {
-  if (list.length === 1) return `${list[0].name} eignet sich besonders, wenn ${list[0].facts[0].toLowerCase()}. Die verbindlichen Einsatzbedingungen prüfen wir direkt in der aktuellen Produktinformation.`;
+  if (list.length === 1) return `${list[0].name} eignet sich besonders, wenn ${productFacts(list[0])[0].toLowerCase()}. Die verbindlichen Einsatzbedingungen prüfen wir direkt in der aktuellen Produktinformation.`;
   const names = list.map(p=>p.name).join(', ');
   return `Wir vergleichen ${names}. Entscheidend sind Einsatzbereich, benötigtes Wirkspektrum, Materialverträglichkeit und gewünschte Gebindeform. Anschließend prüfen wir die verbindlichen Einwirkzeiten und Freigaben in den aktuellen offiziellen Unterlagen.`;
 }
@@ -1034,7 +1039,7 @@ function buildCustomerSummaryEmail(){
       if (price !== undefined && price !== null && price !== '') lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
     }
     lines.push('Ihre Vorteile auf einen Blick:');
-    p.facts.forEach(f=>lines.push(`✓ ${f}`));
+    productFacts(p).forEach(f=>lines.push(`✓ ${f}`));
     lines.push('');
   });
   lines.push('Für Rückfragen stehen wir Ihnen jederzeit gerne zur Verfügung.','','Mit freundlichen Grüßen');
@@ -1082,9 +1087,9 @@ function competitionScreen(){
 function talkScreen(){
  const product=PRODUCTS.find(p=>p.id===state.talkProduct)||PRODUCTS[0]; if(!state.talkProduct)state.talkProduct=product.id;
  const situations=['Kurzvorstellung','Bedarf ermitteln','Einwand: zu teuer','Abschlussfrage'];
- return `<main class="page talk-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Gesprächsassistent</h1><p>Produkt und Situation auswählen. Die Formulierung lässt sich direkt kopieren.</p></div></div><section class="talk-config"><label>Produkt<select id="talkProduct">${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===product.id?'selected':''}>${p.name}</option>`).join('')}</select></label><label>Gesprächssituation<select id="talkSituation">${situations.map(x=>`<option ${x===state.talkSituation?'selected':''}>${x}</option>`).join('')}</select></label></section><section class="pitch-card"><span class="eyebrow">Formulierungsvorschlag</span><h2>${product.name}</h2><p class="talk-output">${buildTalkText()}</p><button class="primary-button compact" data-action="copy-talk">Text kopieren</button></section><section class="info-card"><h2>Gesprächsanker</h2><ul>${product.facts.map(f=>`<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Aussagen vor Verwendung mit der aktuellen offiziellen Produktinformation abgleichen.</div></section></main>`;
+ return `<main class="page talk-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Gesprächsassistent</h1><p>Produkt und Situation auswählen. Die Formulierung lässt sich direkt kopieren.</p></div></div><section class="talk-config"><label>Produkt<select id="talkProduct">${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===product.id?'selected':''}>${p.name}</option>`).join('')}</select></label><label>Gesprächssituation<select id="talkSituation">${situations.map(x=>`<option ${x===state.talkSituation?'selected':''}>${x}</option>`).join('')}</select></label></section><section class="pitch-card"><span class="eyebrow">Formulierungsvorschlag</span><h2>${product.name}</h2><p class="talk-output">${buildTalkText()}</p><button class="primary-button compact" data-action="copy-talk">Text kopieren</button></section><section class="info-card"><h2>Gesprächsanker</h2><ul>${productFacts(product).map(f=>`<li><span>✓</span>${f}</li>`).join('')}</ul><div class="info-warning">Aussagen vor Verwendung mit der aktuellen offiziellen Produktinformation abgleichen.</div></section></main>`;
 }
-function buildTalkText(){const p=PRODUCTS.find(x=>x.id===state.talkProduct)||PRODUCTS[0];const fact=p.facts[0].replace(/^[A-ZÄÖÜ]/,m=>m.toLowerCase());if(state.talkSituation==='Bedarf ermitteln')return `Damit ich Ihnen das passende Produkt empfehlen kann: Auf welchen Flächen oder in welchem Prozess möchten Sie es einsetzen, welches Wirkspektrum benötigen Sie und gibt es empfindliche Materialien oder besondere Vorgaben? Anschließend prüfen wir gemeinsam, ob ${p.name} passt.`;if(state.talkSituation==='Einwand: zu teuer')return `Ich verstehe, dass der Preis wichtig ist. Bei ${p.name} sollten wir deshalb nicht nur den Gebindepreis betrachten, sondern Anwendung, Verbrauch, Prozessaufwand und Produktausnutzung. Besonders relevant ist, dass ${fact}. Lassen Sie uns die Kosten pro Anwendung vergleichen.`;if(state.talkSituation==='Abschlussfrage')return `Auf Basis Ihrer Anforderungen halte ich ${p.name} für eine passende Option. Sollen wir die aktuelle Produktinformation gemeinsam prüfen und anschließend ein Muster beziehungsweise ein konkretes Angebot für das passende Gebinde vorbereiten?`;return `${p.name} ist für ${p.kind.toLowerCase()} vorgesehen. Der zentrale Mehrwert: ${fact}. Entscheidend ist, dass wir das Produkt passend zu Ihrem Einsatzbereich und dem benötigten Wirkspektrum auswählen. Die verbindlichen Einwirkzeiten und Freigaben prüfen wir direkt in der aktuellen Produktinformation.`}
+function buildTalkText(){const p=PRODUCTS.find(x=>x.id===state.talkProduct)||PRODUCTS[0];const fact=productFacts(p)[0].replace(/^[A-ZÄÖÜ]/,m=>m.toLowerCase());if(state.talkSituation==='Bedarf ermitteln')return `Damit ich Ihnen das passende Produkt empfehlen kann: Auf welchen Flächen oder in welchem Prozess möchten Sie es einsetzen, welches Wirkspektrum benötigen Sie und gibt es empfindliche Materialien oder besondere Vorgaben? Anschließend prüfen wir gemeinsam, ob ${p.name} passt.`;if(state.talkSituation==='Einwand: zu teuer')return `Ich verstehe, dass der Preis wichtig ist. Bei ${p.name} sollten wir deshalb nicht nur den Gebindepreis betrachten, sondern Anwendung, Verbrauch, Prozessaufwand und Produktausnutzung. Besonders relevant ist, dass ${fact}. Lassen Sie uns die Kosten pro Anwendung vergleichen.`;if(state.talkSituation==='Abschlussfrage')return `Auf Basis Ihrer Anforderungen halte ich ${p.name} für eine passende Option. Sollen wir die aktuelle Produktinformation gemeinsam prüfen und anschließend ein Muster beziehungsweise ein konkretes Angebot für das passende Gebinde vorbereiten?`;return `${p.name} ist für ${p.kind.toLowerCase()} vorgesehen. Der zentrale Mehrwert: ${fact}. Entscheidend ist, dass wir das Produkt passend zu Ihrem Einsatzbereich und dem benötigten Wirkspektrum auswählen. Die verbindlichen Einwirkzeiten und Freigaben prüfen wir direkt in der aktuellen Produktinformation.`}
 
 
 function quoteKey(id, size) { return id + '__' + size; }
@@ -1469,8 +1474,11 @@ function settingsScreen() {
   const meta = state.importMeta || {};
   const isLive = meta.source === 'sheet';
   const metaText = meta.date ? `Zuletzt aktualisiert: ${escapeHtml(meta.date)} · ${meta.rows || 0} Produkte` : 'Noch nicht synchronisiert';
+  const factsMeta = state.factsImportMeta || {};
+  const factsMetaText = factsMeta.date ? `Zuletzt aktualisiert: ${escapeHtml(factsMeta.date)} · ${factsMeta.rows || 0} Produkte` : (FACTS_SHEET_CSV_URL ? 'Noch nicht synchronisiert' : 'Keine Tabelle hinterlegt');
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
     <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${state.activeProfile==='sales'?`<button data-action="region"><span><strong>Team-Region wechseln</strong><small>${state.region?'Aktuell: Team '+regionLabel(state.region):'Noch nicht gewählt'}</small></span><b>›</b></button>`:''}${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
+    ${can('prices')?`<section class="settings-card"><button data-action="sync-facts"><span><strong>Verkaufsargumente jetzt aktualisieren</strong><small>Lädt Produktvorteile aus einer separaten Google-Tabelle (Zuordnung über Art.-Nr.)</small></span><b>⟳</b></button><div id="factsImportStatus" class="import-status"><strong>${state.liveFacts && Object.keys(state.liveFacts).length ? 'Live aus Google Sheets' : 'Werkseinstellung'}</strong><br>${factsMetaText}</div>${!FACTS_SHEET_CSV_URL?'<div class="permission-note"><strong>Tabelle noch nicht verknüpft</strong><span>Spalten „Art. Nr.", „Vorteil 1" bis „Vorteil 5" veröffentlichen und die Export-URL im Code hinterlegen.</span></div>':''}</section>`:''}
     <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht- und Messe-Entwurf zurücksetzen</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Favoriten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
     <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
@@ -1501,6 +1509,10 @@ function documentLink(title, sub, url, emoji) {
 function productDocUrl(product, kind) {
   const docs = PRODUCT_DOCS[product.id];
   return (docs && docs[kind]) || OFFICIAL.sheets;
+}
+function productFacts(product) {
+  const live = state.liveFacts[product.id];
+  return (live && live.length) ? live : product.facts;
 }
 function resolvePrice(product, size='') {
   const row = state.prices[product.sku] || state.prices[product.id] || {};
@@ -1584,6 +1596,7 @@ function bind() {
   document.querySelectorAll('[data-action="home"]').forEach(el => el.addEventListener('click', () => { state.screen='menu'; render(); }));
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.prices={}; state.importMeta={}; localStorage.removeItem('prices'); localStorage.removeItem('priceImportMeta'); render(); });
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
+  $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
   document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard','messe','pm'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
@@ -1705,7 +1718,7 @@ function changeFavoriteSize(id, oldSize, newSize) {
 function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key,value); }
 
 const BACKUP_KEYS = [
-  'prices','priceImportMeta','favorites','recentProducts','compareIds',
+  'prices','priceImportMeta','liveFacts','factsImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
   'summaryCustomer','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
   'messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeDatum','messeAusgefuelltVon','messeGespraechsinhalt','messeMuster',
@@ -2010,14 +2023,57 @@ async function syncLivePrices(manual=false) {
     console.warn('Preis-Sync von Google Sheets fehlgeschlagen', error);
   }
 }
+async function syncLiveFacts(manual=false) {
+  const status = $('#factsImportStatus');
+  if (!FACTS_SHEET_CSV_URL) {
+    if (manual && status) status.textContent = 'Noch keine Verkaufsargumente-Tabelle hinterlegt.';
+    return;
+  }
+  if (manual && status) status.textContent = 'Verkaufsargumente werden von Google Sheets geladen …';
+  try {
+    if (typeof XLSX === 'undefined') throw new Error('Excel-Modul nicht geladen');
+    const res = await fetch(FACTS_SHEET_CSV_URL, {cache:'no-store'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const text = await res.text();
+    const workbook = XLSX.read(text, {type:'string'});
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {defval:''});
+    const byArtNr = {};
+    rows.forEach(row => {
+      const key = String(row['Art. Nr.']||'').trim();
+      if (!key) return;
+      const facts = ['Vorteil 1','Vorteil 2','Vorteil 3','Vorteil 4','Vorteil 5']
+        .map(c => String(row[c]||'').trim())
+        .filter(Boolean);
+      if (facts.length) byArtNr[key] = facts;
+    });
+    const mapped = {};
+    let matchedProducts = 0;
+    PRODUCTS.forEach(p => {
+      if (byArtNr[p.sku]) { mapped[p.id] = byArtNr[p.sku]; matchedProducts++; }
+    });
+    if (!matchedProducts) throw new Error('Keine Verkaufsargumente im Sheet gefunden');
+    state.liveFacts = mapped;
+    localStorage.setItem('liveFacts', JSON.stringify(mapped));
+    state.factsImportMeta = {date:new Date().toLocaleString('de-DE'), ts:Date.now(), rows: matchedProducts};
+    localStorage.setItem('factsImportMeta', JSON.stringify(state.factsImportMeta));
+    if (manual && status) status.textContent = `Zuletzt aktualisiert: ${state.factsImportMeta.date} · ${matchedProducts} Produkte`;
+    if (['settings','detail','products','talk','compare'].includes(state.screen)) render();
+  } catch (error) {
+    if (manual && status) status.textContent = 'Live-Abgleich fehlgeschlagen: ' + error.message + ' – zuletzt gespeicherter Stand bleibt aktiv.';
+    console.warn('Verkaufsargumente-Sync von Google Sheets fehlgeschlagen', error);
+  }
+}
 
 render();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
 syncLivePrices();
-setInterval(() => { if (document.visibilityState === 'visible') syncLivePrices(); }, 20 * 60 * 1000);
+syncLiveFacts();
+setInterval(() => { if (document.visibilityState === 'visible') { syncLivePrices(); syncLiveFacts(); } }, 20 * 60 * 1000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     const last = (state.importMeta && state.importMeta.ts) || 0;
     if (Date.now() - last > 15 * 60 * 1000) syncLivePrices();
+    const lastFacts = (state.factsImportMeta && state.factsImportMeta.ts) || 0;
+    if (Date.now() - lastFacts > 15 * 60 * 1000) syncLiveFacts();
   }
 });
