@@ -687,10 +687,10 @@ function detailScreen() {
 function emailCard(p) {
   const chips = [
     ['price','Preis', !state.customerMode && !inMesseContext()],
+    ['muster','Muster', true],
     ['sheet','Produktdatenblatt', true],
     ['safety','Sicherheitsdatenblatt', true],
-    ['ba','Betriebsanweisung', true],
-    ['muster','Muster', true]
+    ['ba','Betriebsanweisung', true]
   ];
   const count = state.favorites.length;
   return `<div class="email-card">
@@ -717,10 +717,10 @@ function buildStarredProductsEmail() {
       const per = perUnitLabel(p, size);
       if (per) lines.push(`Umgerechnet: ${per}`);
     }
+    if (inc.muster) lines.push(`MUSTER: bitte ein Muster (${size}) an den Kunden senden`);
     if (inc.sheet) lines.push(`PRODUKTDATENBLATT (PIF): ${productDocUrl(p,'pif')}`);
     if (inc.safety) lines.push(`SICHERHEITSDATENBLATT: ${productDocUrl(p,'sdb')}`);
     if (inc.ba) lines.push(`BETRIEBSANWEISUNG (BA): ${productDocUrl(p,'ba')}`);
-    if (inc.muster) lines.push(`MUSTER: bitte ein Muster (${size}) an den Kunden senden`);
     lines.push('');
   });
   lines.push('Danke und Grüße');
