@@ -695,7 +695,7 @@ function detailScreen() {
   return `<main class="page detail-page">
     <section class="detail-hero">
       <div class="detail-image" style="--product-color:${p.color}">${(() => { const img = (p.sizePhotos && p.sizePhotos[state.size]) || p.photo; return img ? `<img src="${img}" alt="${escapeHtml(p.name)}">` : `<div class="bottle"><span>${p.name.split(' ')[0]}</span></div>`; })()}</div>
-      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}</div><p>${p.summary}</p><small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
+      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}</div><p>${p.summary}</p><small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${p.einwirkzeitEntries && p.einwirkzeitEntries.length ? `<div class="einwirkzeit-list">${p.einwirkzeitEntries.map(e => `<div class="einwirkzeit-badge ${e.kind}">⏱ ${escapeHtml(e.label)} in ${escapeHtml(e.time)}${e.detail ? ` <span class="einwirkzeit-tier">${escapeHtml(e.detail)}</span>` : ''}</div>`).join('')}</div>` : ''}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
@@ -1654,6 +1654,10 @@ function resolveVE(product, size='') {
   const row = state.priceByArt[resolveArtNr(product, size)];
   return (row && row.ve) || '';
 }
+function resolvePal(product, size='') {
+  const row = state.priceByArt[resolveArtNr(product, size)];
+  return (row && row.pal) || '';
+}
 function unitsInSize(size) {
   const m = /^(\d+)\s*Tücher/i.exec(size || '');
   return m ? Number(m[1]) : null;
@@ -2064,6 +2068,10 @@ function extractVE(row) {
   if (/^\d+([.,]\d+)?$/.test(gebindeRaw)) return gebindeRaw;
   return '';
 }
+function extractPal(row) {
+  const palRaw = String(sheetCell(row, ['Pal', 'Pal.', 'Palette', 'Pal-Menge']) || '').trim();
+  return /^\d+([.,]\d+)?$/.test(palRaw) ? palRaw : '';
+}
 function resolveSizeLabel(product, baseSize, gebinde) {
   const candidates = product.sizes.filter(s => s === baseSize || s.startsWith(baseSize + ' ('));
   if (candidates.length <= 1) return candidates[0] || baseSize;
@@ -2108,6 +2116,8 @@ function parsePriceRows(rows) {
     if (!hasPrice) return;
     const ve = extractVE(row);
     if (ve) entry.ve = ve;
+    const pal = extractPal(row);
+    if (pal) entry.pal = pal;
     if (!byArt[art]) byArt[art] = entry;   // erste Zeile je Artikelnummer gewinnt
   });
   return byArt;
