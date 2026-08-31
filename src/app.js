@@ -137,6 +137,11 @@ const REGIONS = [
 function regionLabel(key) { return (REGIONS.find(r => r.key === key) || {}).label || ''; }
 function innendienstEmail() { return (REGIONS.find(r => r.key === state.region) || {}).email || ''; }
 
+const SUMMARY_OCCASIONS = [
+  {value:'das freundliche Telefonat', label:'Telefonat – „vielen Dank für das freundliche Telefonat"'},
+  {value:'den Termin', label:'Vor Ort – „vielen Dank für den Termin"'}
+];
+
 const PRODUCT_DOCS = {
   'descosept-spezial': {pif:'https://www.schumacher-online.com/products/pif/P_100000_PIF_00208-Descosept-Spezial-DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/SDB-00208_DESCOSEPT_SPEZIAL_VAR_DE_WEB.pdf',ba:'https://www.schumacher-online.com/products/ba/BA-00208_DESCOSEPT_SPEZIAL_VAR_DE_WEB.pdf'},
   'descosept-sensitive': {pif:'https://www.schumacher-online.com/products/pif/PF_100006_PIF_00323DS-DESCOSEPT%20SENSITIVE_DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/SDB-00323DS_DESCOSEPT_SENSITIVE_DE_WEB.pdf',ba:'https://www.schumacher-online.com/products/ba/BA-00323DS_DESCOSEPT_SENSITIVE_VAR_DE_WEB.pdf'},
@@ -380,7 +385,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
-  summaryOccasion: localStorage.getItem('summaryOccasion') || 'unser heutiges Gespräch',
+  summaryOccasion: localStorage.getItem('summaryOccasion') || SUMMARY_OCCASIONS[0].value,
   summaryIncludePrices: localStorage.getItem('summaryIncludePrices') === 'true',
   summaryQuery: '',
   talkProduct: '', talkSituation: 'Kurzvorstellung',
@@ -999,7 +1004,7 @@ function summaryScreen(){
   return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Alle Produkte, die Sie unterwegs mit dem Stern (★) markiert haben, erscheinen automatisch hier – je Gebinde einzeln, falls Sie z. B. mehrere Packungsgrößen besprochen haben. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
   <section class="offer-config">
     <label>Anrede<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="z. B. Sehr geehrter Herr Müller"></label>
-    <label>Anlass des Gesprächs<input id="summaryOccasion" value="${escapeHtml(state.summaryOccasion)}" placeholder="z. B. unser heutiges Teams-Meeting"></label>
+    <label>Anlass des Gesprächs<select id="summaryOccasion">${SUMMARY_OCCASIONS.map(o=>`<option value="${escapeHtml(o.value)}" ${o.value===state.summaryOccasion?'selected':''}>${o.label}</option>`).join('')}</select></label>
   </section>
   <section class="summary-price-toggle">
     <span>E-Mail-Inhalt</span>
@@ -1685,7 +1690,7 @@ function bind() {
   document.querySelectorAll('[data-compare]').forEach(button => button.onclick = () => toggleCompare(button.dataset.compare));
   $('[data-action="copy-pitch"]')?.addEventListener('click', async () => { const text=comparisonPitch(state.compareIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean)); try { await navigator.clipboard.writeText(text); alert('Text wurde kopiert.'); } catch { alert(text); } });
   $('#summaryCustomer')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
-  $('#summaryOccasion')?.addEventListener('input', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
+  $('#summaryOccasion')?.addEventListener('change', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
   $('#summarySearch')?.addEventListener('input', e => { state.summaryQuery=e.target.value; render(); });
   document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
@@ -1900,7 +1905,7 @@ function resetCustomerData() {
   ['favorites','summaryCustomer','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
-  state.summaryOccasion = 'unser heutiges Gespräch';
+  state.summaryOccasion = SUMMARY_OCCASIONS[0].value;
   state.summaryIncludePrices = false;
   state.quoteCustomer = '';
   state.quoteContact = '';
