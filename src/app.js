@@ -505,9 +505,9 @@ function render() {
   const focusState = isTypingField ? {
     id: active.id,
     selStart: 'selectionStart' in active ? active.selectionStart : null,
-    selEnd: 'selectionEnd' in active ? active.selectionEnd : null,
-    scrollY: window.scrollY
+    selEnd: 'selectionEnd' in active ? active.selectionEnd : null
   } : null;
+  const scrollY = window.scrollY;
   const viewKey = currentViewKey();
   const viewChanged = viewKey !== lastViewKey;
   lastViewKey = viewKey;
@@ -543,11 +543,9 @@ function render() {
       if (focusState.selStart != null && 'setSelectionRange' in el) {
         try { el.setSelectionRange(focusState.selStart, focusState.selEnd); } catch (e) {}
       }
-      window.scrollTo(0, focusState.scrollY);
     }
-  } else if (viewChanged) {
-    window.scrollTo(0, 0);
   }
+  window.scrollTo(0, viewChanged ? 0 : scrollY);
 }
 
 
