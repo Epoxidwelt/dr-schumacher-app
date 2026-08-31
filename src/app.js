@@ -409,7 +409,9 @@ const state = {
   messeNewsletter: localStorage.getItem('messeNewsletter') === 'true',
   messeConsent: false,
   messeSignatureData: '',
-  messeQuery: ''
+  messeQuery: '',
+  messeScanStatus: '',
+  messeScanPreview: null
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -443,7 +445,8 @@ function icon(name) {
     dashboard:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 18h7M17.5 14.5V21"/></svg>',
     copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
     messe:'<svg viewBox="0 0 24 24"><path d="M6 21V4m0 1 13-1-3.5 5L19 14 6 15"/></svg>',
-    pm:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M15 15c2.5 0 5 1.5 5 4"/></svg>'
+    pm:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M15 15c2.5 0 5 1.5 5 4"/></svg>',
+    camera:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13.5" r="3.5"/></svg>'
   };
   return icons[name] || '';
 }
@@ -1257,6 +1260,21 @@ function messeScreen() {
       <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="messeSearch" value="${escapeHtml(state.messeQuery || '')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p => summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
     </section>
     <h2 class="messe-step no-print">2. Kundendaten erfassen</h2>
+    <section class="scan-card no-print">
+      <button class="secondary-button" data-action="scan-card">${icon('camera')}<span>Visitenkarte fotografieren</span></button>
+      <input id="messeCardInput" type="file" accept="image/*" capture="environment" style="display:none">
+      ${state.messeScanStatus ? `<small class="muted-copy">${escapeHtml(state.messeScanStatus)}</small>` : '<small class="muted-copy">Erkennt Name, Adresse und Ansprechpartner automatisch – zur Kontrolle vor der Übernahme.</small>'}
+    </section>
+    ${state.messeScanPreview ? `<section class="scan-preview no-print">
+      <h2>Erkannte Daten prüfen</h2>
+      <label>Name / Firma<input id="scanPreviewName" value="${escapeHtml(state.messeScanPreview.name)}"></label>
+      <label class="wide">Adresse<input id="scanPreviewAdresse" value="${escapeHtml(state.messeScanPreview.adresse)}"></label>
+      <label>Ansprechpartner<input id="scanPreviewAnsprechpartner" value="${escapeHtml(state.messeScanPreview.ansprechpartner)}"></label>
+      <div class="scan-preview-actions">
+        <button class="secondary-button" data-action="discard-scan">Verwerfen</button>
+        <button class="primary-button compact" data-action="apply-scan">In Kundendaten übernehmen</button>
+      </div>
+    </section>` : ''}
     <section class="report-form no-print">
       <label>Name / Firma<input data-messe-field="messeName" value="${escapeHtml(state.messeName)}" placeholder="z. B. Klinikum Musterstadt"></label>
       <label class="wide">Adresse<input data-messe-field="messeAdresse" value="${escapeHtml(state.messeAdresse)}" placeholder="Straße, PLZ, Ort"></label>
@@ -1354,7 +1372,58 @@ function resetMesseForm() {
   state.messeConsent = false;
   state.messeSignatureData = '';
   state.messeQuery = '';
+  state.messeScanStatus = '';
+  state.messeScanPreview = null;
   render();
+}
+async function scanBusinessCard(file) {
+  state.messeScanStatus = 'Visitenkarte wird gescannt …';
+  state.messeScanPreview = null;
+  render();
+  try {
+    if (typeof Tesseract === 'undefined') throw new Error('OCR-Modul nicht geladen');
+    const { data: { text } } = await Tesseract.recognize(file, 'deu');
+    const parsed = parseBusinessCardText(text);
+    if (!parsed.name && !parsed.adresse && !parsed.ansprechpartner) throw new Error('Keine Daten erkannt – bitte schärfer fotografieren oder manuell eintragen');
+    state.messeScanPreview = parsed;
+    state.messeScanStatus = 'Bitte erkannte Daten prüfen und übernehmen.';
+  } catch (error) {
+    state.messeScanStatus = 'Scan fehlgeschlagen: ' + error.message;
+    console.warn('Visitenkarten-Scan fehlgeschlagen', error);
+  }
+  render();
+}
+function parseBusinessCardText(raw) {
+  const lines = raw.split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const emailMatch = raw.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+  const email = emailMatch ? emailMatch[0] : '';
+  let street = '';
+  let cityLine = '';
+  lines.forEach((line, i) => {
+    if (/\b\d{5}\b/.test(line) && !line.includes('@')) {
+      cityLine = line;
+      const prev = lines[i - 1] || '';
+      if (/\d/.test(prev) && !prev.includes('@') && prev.length < 40) street = prev;
+    }
+  });
+  const adresse = [street, cityLine].filter(Boolean).join(', ');
+  const isPhoneLine = l => l !== cityLine && l !== street && !l.includes('@') && /^[+\d][\d\s()\/-]{5,}\d$/.test(l);
+  let phone = '';
+  const labeledPhoneLine = lines.find(l => l !== cityLine && l !== street && /(tel|fon|mobil)[.:]?/i.test(l) && (l.match(/\d/g) || []).length >= 5);
+  if (labeledPhoneLine) {
+    const m = labeledPhoneLine.match(/(\+?\d[\d\s()\/-]{4,}\d)/);
+    phone = m ? m[0].replace(/\s+/g, ' ').trim() : '';
+  } else {
+    const bareLine = lines.find(isPhoneLine);
+    if (bareLine) phone = bareLine;
+  }
+  const candidateLines = lines.filter(l =>
+    l !== street && l !== cityLine && l !== labeledPhoneLine && !l.includes('@') && !isPhoneLine(l) && l.length > 1 && l.length < 60
+  );
+  const name = candidateLines[0] || '';
+  const ansprechpartner = candidateLines[1] || '';
+  const addressWithContact = [adresse, phone && `Tel: ${phone}`, email].filter(Boolean).join(' · ');
+  return { name, adresse: addressWithContact, ansprechpartner, raw };
 }
 
 function buildCrmSummary(report = state.visitReport) {
@@ -1628,6 +1697,22 @@ function bind() {
   $('[data-action="new-messe"]')?.addEventListener('click', () => { if (confirm('Neue Messe-Erfassung starten? Name, Adresse, Gesprächsinhalt und Unterschrift werden dabei gelöscht.')) resetMesseForm(); });
   $('[data-action="clear-signature"]')?.addEventListener('click', () => { state.messeSignatureData=''; const c=document.getElementById('messeSignature'); if (c) c.getContext('2d').clearRect(0,0,c.width,c.height); render(); });
   $('[data-action="send-messe"]')?.addEventListener('click', sendMesseEmail);
+  $('[data-action="scan-card"]')?.addEventListener('click', () => $('#messeCardInput')?.click());
+  $('#messeCardInput')?.addEventListener('change', e => { const file = e.target.files[0]; if (file) scanBusinessCard(file); e.target.value = ''; });
+  $('[data-action="apply-scan"]')?.addEventListener('click', () => {
+    const p = state.messeScanPreview;
+    if (!p) return;
+    const nameVal = $('#scanPreviewName')?.value || '';
+    const adresseVal = $('#scanPreviewAdresse')?.value || '';
+    const ansprechpartnerVal = $('#scanPreviewAnsprechpartner')?.value || '';
+    state.messeName = nameVal; localStorage.setItem('messeName', nameVal);
+    state.messeAdresse = adresseVal; localStorage.setItem('messeAdresse', adresseVal);
+    state.messeAnsprechpartner = ansprechpartnerVal; localStorage.setItem('messeAnsprechpartner', ansprechpartnerVal);
+    state.messeScanPreview = null;
+    state.messeScanStatus = 'Daten aus der Visitenkarte übernommen.';
+    render();
+  });
+  $('[data-action="discard-scan"]')?.addEventListener('click', () => { state.messeScanPreview = null; state.messeScanStatus = ''; render(); });
   $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); const patch={productId:e.target.value, size:p?p.sizes[0]:''}; if (p && !state.vsCompare.competitorName.trim()) { const suggestions=competitorSuggestions(p.kind); if (suggestions.length) patch.competitorName=suggestions[0]; } saveVsCompare(patch); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
   $('#vsCompetitorName')?.addEventListener('input', e => { saveVsCompare({competitorName:e.target.value}); render(); });
