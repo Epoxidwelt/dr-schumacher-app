@@ -673,13 +673,29 @@ function productCard(product, variantSize) {
   // map also passes the index as a 2nd argument, so we only honor a real size string.
   const hasVariant = typeof variantSize === 'string';
   const refSize = (hasVariant && product.sizes.includes(variantSize)) ? variantSize : product.sizes[0];
-  const price = resolvePrice(product, refSize);
-  const perUnit = perUnitLabel(product, refSize);
+  // Price is only shown for a Gebinde that's actually selected (= marked as favorite).
+  // In a plain browsing list no size is selected yet, so no single size's price would be
+  // meaningful; with several favorited sizes, show the highest of those.
+  let price = null, priceSize = refSize;
+  if (hasVariant) {
+    price = resolvePrice(product, refSize);
+  } else {
+    const favoritedSizes = state.favorites.filter(f => f.id === product.id).map(f => f.size);
+    const priced = favoritedSizes
+      .map(s => ({ size: s, price: resolvePrice(product, s) }))
+      .filter(x => x.price !== undefined && x.price !== null && x.price !== '');
+    if (priced.length) {
+      priced.sort((a, b) => Number(b.price) - Number(a.price));
+      price = priced[0].price;
+      priceSize = priced[0].size;
+    }
+  }
+  const perUnit = price != null ? perUnitLabel(product, priceSize) : '';
   const favorite = hasVariant ? state.favorites.some(f => f.id === product.id && f.size === refSize) : state.favorites.some(f => f.id === product.id);
   return `<article class="product-row" data-product="${product.id}">
     <div class="product-image" style="--product-color:${product.color}">${product.photo?`<img src="${product.photo}" alt="${escapeHtml(product.name)}">`:`<span>${product.category==='hands'?'✋':product.category==='surface'?'▦':product.category==='instruments'?'✂':'▣'}</span>`}</div>
     <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}</div><p>Art.-Nr. ${resolveArtNr(product, refSize)} · ${refSize}</p></div>
-    <div class="row-price">${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<strong>${money(price)}</strong><small>${perUnit || state.priceList}</small>`}</div>
+    <div class="row-price">${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':(price!=null?`<strong>${money(price)}</strong><small>${perUnit || state.priceList}</small>`:'<strong class="hidden-price">–</strong>')}</div>
     <button class="favorite-button ${favorite?'active':''}" data-favorite="${product.id}" ${hasVariant?`data-favorite-size="${escapeHtml(refSize)}"`:''} aria-label="Favorit">${icon('star')}</button>
     <span class="chevron">›</span>
   </article>`;
