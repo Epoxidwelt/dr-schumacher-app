@@ -381,7 +381,7 @@ const state = {
   size: '',
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
-  vsCompare: JSON.parse(localStorage.getItem('vsCompare') || 'null') || {productId:'', size:'', competitorName:'', competitorPrice:'', annualUnits:''},
+  vsCompare: {productId:'', size:'', competitorName:'', competitorPrice:'', competitorUnits:'', annualUnits:'', ...(JSON.parse(localStorage.getItem('vsCompare') || 'null') || {})},
   advisor: {category:'', subtype:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -984,16 +984,19 @@ function vsCalculation() {
   const size = product && v.size && product.sizes.includes(v.size) ? v.size : (product ? product.sizes[0] : '');
   const rawOurPrice = product ? resolvePrice(product, size) : null;
   const ourPrice = (rawOurPrice === '' || rawOurPrice == null) ? null : Number(rawOurPrice);
-  const units = size ? unitsInSize(size) : null;
-  const ourPerUnit = (ourPrice != null && units) ? ourPrice / units : null;
+  const unitInfo = size ? vsUnitInfo(size) : null;
+  const ourUnits = unitInfo ? unitInfo.quantity : null;
+  const ourPerUnit = (ourPrice != null && ourUnits) ? ourPrice / ourUnits : null;
   const compPrice = v.competitorPrice === '' ? null : Number(v.competitorPrice);
-  const compPerUnit = (compPrice != null && units) ? compPrice / units : null;
+  const compUnitsInput = v.competitorUnits === '' ? null : Number(v.competitorUnits);
+  const compUnits = unitInfo ? ((compUnitsInput != null && compUnitsInput > 0) ? compUnitsInput : ourUnits) : null;
+  const compPerUnit = (compPrice != null && compUnits) ? compPrice / compUnits : null;
   const consumption = v.annualUnits === '' ? null : Number(v.annualUnits);
-  const ourAnnual = (consumption != null) ? (units ? consumption * (ourPerUnit ?? NaN) : (ourPrice != null ? consumption * ourPrice : null)) : null;
-  const compAnnual = (consumption != null && compPrice != null) ? (units ? consumption * (compPerUnit ?? NaN) : consumption * compPrice) : null;
+  const ourAnnual = (consumption != null) ? (unitInfo ? (ourPerUnit != null ? consumption * ourPerUnit : null) : (ourPrice != null ? consumption * ourPrice : null)) : null;
+  const compAnnual = (consumption != null && compPrice != null) ? (unitInfo ? (compPerUnit != null ? consumption * compPerUnit : null) : consumption * compPrice) : null;
   const savings = (ourAnnual != null && compAnnual != null && !isNaN(ourAnnual) && !isNaN(compAnnual)) ? compAnnual - ourAnnual : null;
   const ready = !!(product && ourPrice != null && compPrice != null && consumption != null);
-  return {product, size, ourPrice, units, ourPerUnit, compPrice, compPerUnit, consumption, ourAnnual, compAnnual, savings, ready};
+  return {product, size, ourPrice, unitInfo, ourUnits, ourPerUnit, compPrice, compUnits, compPerUnit, consumption, ourAnnual, compAnnual, savings, ready};
 }
 
 
@@ -1062,8 +1065,9 @@ function sendCustomerSummaryEmail(){
 function competitionScreen(){
   const v = state.vsCompare;
   const calc = vsCalculation();
-  const unitWord = calc.units ? 'Tuch' : 'Packung';
-  const consumptionLabel = calc.units ? 'Verbrauch (Tücher/Jahr)' : 'Verbrauch (Packungen/Jahr)';
+  const unitSingular = calc.unitInfo ? calc.unitInfo.singular : 'Packung';
+  const unitPlural = calc.unitInfo ? calc.unitInfo.plural : 'Packungen';
+  const consumptionLabel = `Verbrauch (${unitPlural}/Jahr)`;
   return `<main class="page vs-page">
     <div class="section-heading no-print"><div><span class="eyebrow">Kundengespräch</span><h1>Wettbewerbsvergleich</h1><p>Aktuellen Preis des Kunden eintragen – die App rechnet Jahreskosten und Ersparnis sofort aus.</p></div></div>
     <section class="vs-config no-print">
@@ -1071,21 +1075,23 @@ function competitionScreen(){
       ${calc.product ? `<label>Gebinde<select id="vsSize">${calc.product.sizes.map(s=>`<option ${s===calc.size?'selected':''}>${s}</option>`).join('')}</select></label>` : '<div></div>'}
       <label>Wettbewerber<input id="vsCompetitorName" value="${escapeHtml(v.competitorName)}" placeholder="Hersteller / Produktname"></label>
       ${calc.product && competitorSuggestions(calc.product.kind).length ? `<small class="muted-copy wide vs-competitor-hint">Übliche Wettbewerber für „${escapeHtml(calc.product.kind)}“: ${competitorSuggestions(calc.product.kind).map(escapeHtml).join(' · ')}</small>` : ''}
-      <label>Kundenpreis (${escapeHtml(calc.size || 'gleiches Gebinde')})<input id="vsCompetitorPrice" type="text" inputmode="decimal" value="${escapeHtml(v.competitorPrice)}" placeholder="z. B. 9,45"></label>
+      ${calc.unitInfo ? `<label>Gebinde Wettbewerber (${calc.unitInfo.singular})<input id="vsCompetitorUnits" type="text" inputmode="decimal" value="${escapeHtml(v.competitorUnits)}" placeholder="z. B. ${calc.ourUnits}, falls abweichend"></label>` : '<div></div>'}
+      <label>Kundenpreis (Wettbewerber-Gebinde)<input id="vsCompetitorPrice" type="text" inputmode="decimal" value="${escapeHtml(v.competitorPrice)}" placeholder="z. B. 9,45"></label>
       <label class="wide">${consumptionLabel}<input id="vsAnnualUnits" type="text" inputmode="numeric" value="${escapeHtml(v.annualUnits)}" placeholder="z. B. 10000"></label>
+      ${calc.unitInfo ? `<small class="muted-copy wide">Unser Gebinde entspricht ${calc.ourUnits.toLocaleString('de-DE')} ${calc.ourUnits===1?calc.unitInfo.singular:calc.unitInfo.plural}. Weicht das Gebinde des Wettbewerbers ab (z. B. andere Blattzahl oder Füllmenge), oben eintragen – die App rechnet automatisch auf den genauen Preis pro ${calc.unitInfo.singular} um.</small>` : ''}
     </section>
     ${!calc.product ? '<div class="empty-state no-print"><h2>Produkt wählen, um zu starten</h2><p>Wählen Sie oben unser Produkt, tragen Sie den Kundenpreis des Wettbewerbers ein und ergänzen Sie den Jahresverbrauch.</p></div>' : `
     <section class="vs-sheet">
       <div class="offer-brand"><img src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher"><div><span>Wirtschaftlichkeitsvergleich</span><strong>${escapeHtml(calc.product.name)} vs. ${escapeHtml(v.competitorName || 'Wettbewerber')}</strong><small>Preisliste ${escapeHtml(state.priceList)} · ${new Date().toLocaleDateString('de-DE')}</small></div></div>
       <div class="offer-table-wrap"><table class="offer-table vs-table"><thead><tr><th>Kennzahl</th><th>Unser Produkt</th><th>Wettbewerber</th><th>Vorteil</th></tr></thead><tbody>
         <tr><td>Produkt</td><td>${escapeHtml(calc.product.name)}</td><td>${escapeHtml(v.competitorName || '–')}</td><td></td></tr>
-        <tr><td>Gebinde</td><td>${escapeHtml(calc.size)}</td><td>${escapeHtml(calc.size)}</td><td></td></tr>
+        <tr><td>Gebinde</td><td>${escapeHtml(calc.size)}</td><td>${calc.unitInfo && calc.compUnits ? `${calc.compUnits.toLocaleString('de-DE')} ${calc.compUnits===1?calc.unitInfo.singular:calc.unitInfo.plural}` : escapeHtml(calc.size)}</td><td></td></tr>
         <tr><td>Preis</td><td>${calc.ourPrice!=null?money(calc.ourPrice):'–'}</td><td>${calc.compPrice!=null?money(calc.compPrice):'–'}</td><td>${(calc.ourPrice!=null&&calc.compPrice!=null)?money(calc.compPrice-calc.ourPrice):''}</td></tr>
-        ${calc.units?`<tr><td>Preis pro ${unitWord}</td><td>${calc.ourPerUnit!=null?moneyPerUnit(calc.ourPerUnit):'–'}</td><td>${calc.compPerUnit!=null?moneyPerUnit(calc.compPerUnit):'–'}</td><td>${(calc.ourPerUnit!=null&&calc.compPerUnit!=null)?moneyPerUnit(calc.compPerUnit-calc.ourPerUnit):''}</td></tr>`:''}
-        <tr><td>Verbrauch/Jahr</td><td colspan="2">${calc.consumption!=null?calc.consumption.toLocaleString('de-DE')+' '+unitWord+(calc.consumption===1?'':'er'):'–'}</td><td></td></tr>
+        ${calc.unitInfo?`<tr><td>Preis pro ${unitSingular}</td><td>${calc.ourPerUnit!=null?moneyPerUnit(calc.ourPerUnit):'–'}</td><td>${calc.compPerUnit!=null?moneyPerUnit(calc.compPerUnit):'–'}</td><td>${(calc.ourPerUnit!=null&&calc.compPerUnit!=null)?moneyPerUnit(calc.compPerUnit-calc.ourPerUnit):''}</td></tr>`:''}
+        <tr><td>Verbrauch/Jahr</td><td colspan="2">${calc.consumption!=null?calc.consumption.toLocaleString('de-DE')+' '+(calc.consumption===1?unitSingular:unitPlural):'–'}</td><td></td></tr>
         <tr><td>Jahreskosten</td><td>${calc.ourAnnual!=null?money(calc.ourAnnual):'–'}</td><td>${calc.compAnnual!=null?money(calc.compAnnual):'–'}</td><td class="line-total">${calc.savings!=null?money(calc.savings):''}</td></tr>
       </tbody></table></div>
-      ${calc.savings!=null ? `<div class="vs-result ${calc.savings>=0?'positive':'negative'}">Ergebnis: ${money(Math.abs(calc.savings))} ${calc.savings>=0?'Ersparnis':'Mehrkosten'} pro Jahr bei ${calc.consumption.toLocaleString('de-DE')} ${unitWord}${calc.consumption===1?'':'ern'} – Berechnung auf Basis der eingegebenen Kundenpreise.</div>` : '<div class="empty-state no-print"><p>Kundenpreis und Jahresverbrauch eintragen, um das Ergebnis zu berechnen.</p></div>'}
+      ${calc.savings!=null ? `<div class="vs-result ${calc.savings>=0?'positive':'negative'}">Ergebnis: ${money(Math.abs(calc.savings))} ${calc.savings>=0?'Ersparnis':'Mehrkosten'} pro Jahr bei ${calc.consumption.toLocaleString('de-DE')} ${calc.consumption===1?unitSingular:(unitPlural.endsWith('n')?unitPlural:unitPlural+'n')} – Berechnung auf Basis der eingegebenen Kundenpreise.</div>` : '<div class="empty-state no-print"><p>Kundenpreis und Jahresverbrauch eintragen, um das Ergebnis zu berechnen.</p></div>'}
       <div class="offer-actions no-print"><button class="primary-button compact" data-action="print-vs" ${calc.ready?'':'disabled'}>Drucken / als PDF speichern</button></div>
       <div class="offer-disclaimer">Berechnung auf Basis der vom Nutzer eingegebenen Kundenpreise und Verbrauchsangaben. Keine Gleichwertigkeits- oder Freigabeerklärung. Anwendung, Materialverträglichkeit, Wirkbereich und Einwirkzeit bitte anhand der aktuellen Produktunterlagen prüfen.</div>
     </section>`}
@@ -1607,6 +1613,28 @@ function unitsInSize(size) {
   const m = /^(\d+)\s*Tücher/i.exec(size || '');
   return m ? Number(m[1]) : null;
 }
+function volumeInMl(size) {
+  if (!size) return null;
+  const multi = /^(\d+)\s*[x×]\s*([\d.,]+)\s*(ml|l)\b/i.exec(size);
+  if (multi) {
+    const count = Number(multi[1]);
+    const qty = Number(multi[2].replace(',', '.'));
+    const unit = multi[3].toLowerCase();
+    return count * qty * (unit === 'l' ? 1000 : 1);
+  }
+  const m = /^([\d.,]+)\s*(ml|l)\b/i.exec(size);
+  if (!m) return null;
+  const qty = Number(m[1].replace(',', '.'));
+  const unit = m[2].toLowerCase();
+  return qty * (unit === 'l' ? 1000 : 1);
+}
+function vsUnitInfo(size) {
+  const tuecher = unitsInSize(size);
+  if (tuecher) return { quantity: tuecher, singular: 'Tuch', plural: 'Tücher' };
+  const ml = volumeInMl(size);
+  if (ml) return { quantity: ml / 1000, singular: 'Liter', plural: 'Liter' };
+  return null;
+}
 function pricePerUnit(product, size) {
   const units = unitsInSize(size);
   const price = resolvePrice(product, size);
@@ -1722,6 +1750,7 @@ function bind() {
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
   $('#vsCompetitorName')?.addEventListener('input', e => { saveVsCompare({competitorName:e.target.value}); render(); });
   $('#vsCompetitorPrice')?.addEventListener('input', e => { saveVsCompare({competitorPrice:e.target.value}); render(); });
+  $('#vsCompetitorUnits')?.addEventListener('input', e => { saveVsCompare({competitorUnits:e.target.value}); render(); });
   $('#vsAnnualUnits')?.addEventListener('input', e => { saveVsCompare({annualUnits:e.target.value}); render(); });
   $('[data-action="print-vs"]')?.addEventListener('click', () => window.print());
   document.querySelectorAll('[data-action="compare-competitor"]').forEach(button => button.onclick = () => { saveVsCompare({productId:button.dataset.product, size:state.size||''}); state.screen='competition'; render(); });
