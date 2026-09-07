@@ -373,7 +373,7 @@ const state = {
   region: localStorage.getItem('region') || '',
   repName: localStorage.getItem('repName') || '',
   regionLoginName: '', regionLoginError: '',
-  aroundMe: { mode:'kunden', radiusKm:10, myPos:null, category:null, results:[], loading:false, error:'', searched:false },
+  aroundMe: { mode:'kunden', radiusKm:10, myPos:null, category:null, results:[], loading:false, error:'', searched:false, kundenFilter:'all', savedIndices:[] },
   priceList: localStorage.getItem('priceList') || 'UVP',
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
@@ -385,7 +385,7 @@ const state = {
   size: '',
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
-  vsCompare: {productId:'', size:'', competitorName:'', competitorPrice:'', competitorUnits:'', annualUnits:'', ...(JSON.parse(localStorage.getItem('vsCompare') || 'null') || {})},
+  vsCompare: {productId:'', size:'', competitorName:'', competitorCustom:false, competitorPrice:'', competitorUnits:'', annualUnits:'', ...(JSON.parse(localStorage.getItem('vsCompare') || 'null') || {})},
   advisor: {category:'', subtype:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -717,6 +717,8 @@ async function searchNearbyCategory(tag, lat, lng, radiusKm){
     return {
       name: tags.name || tags['name:de'] || 'Ohne Namen',
       address: [addrParts, addr2].filter(Boolean).join(', '),
+      strasse: tags['addr:street'] || '', hausnummer: tags['addr:housenumber'] || '',
+      plz: tags['addr:postcode'] || '', ort: tags['addr:city'] || '',
       lat: elLat, lng: elLng,
       distanceKm: haversineKm(lat, lng, elLat, elLng)
     };
@@ -740,13 +742,13 @@ async function findContactsNearby(myPos, radiusKm){
     }
     if (!c._geo) continue;
     const d = haversineKm(myPos.lat, myPos.lng, c._geo.lat, c._geo.lng);
-    if (d <= radiusKm) results.push({ name:c.name, address:[c.plz,c.ort].filter(Boolean).join(' '), lat:c._geo.lat, lng:c._geo.lng, distanceKm:d, contactId:c.id });
+    if (d <= radiusKm) results.push({ name:c.name, address:[c.plz,c.ort].filter(Boolean).join(' '), lat:c._geo.lat, lng:c._geo.lng, distanceKm:d, contactId:c.id, kundenstatus:c.kundenstatus || 'kunde' });
   }
   return results.sort((a,b)=>a.distanceKm-b.distanceKm);
 }
 async function aroundMeRun(){
   const am = state.aroundMe;
-  am.loading = true; am.error = ''; am.results = []; am.searched = true;
+  am.loading = true; am.error = ''; am.results = []; am.searched = true; am.savedIndices = [];
   render();
   try {
     if (!am.myPos) am.myPos = await getMyLocation();
@@ -762,8 +764,26 @@ async function aroundMeRun(){
   am.loading = false;
   render();
 }
+function aroundMeSaveAsContact(index){
+  const am = state.aroundMe;
+  const r = am.results[index];
+  if (!r || am.savedIndices.includes(index)) return;
+  const id = 'k' + Date.now().toString(36);
+  state.one.contacts.push({
+    id, externeNr:'', kundenNr:'', name:r.name,
+    plz:r.plz||'', ort:r.ort||'', strasse:r.strasse||'', hausnummer:r.hausnummer||'', bezirk:'',
+    preisliste:'UVP', email:'', comm:'bestand', active:true, override:null, abc:null, nextFollowUp:null,
+    kundenstatus:'kontakt'
+  });
+  oneAudit('Kontakt aus „Rund um mich" übernommen', r.name + (state.repName ? ' (' + state.repName + ')' : ''));
+  am.savedIndices.push(index);
+  render();
+}
 function aroundMeScreen(){
   const am = state.aroundMe;
+  const shownResults = (am.mode==='kunden' && am.kundenFilter!=='all')
+    ? am.results.filter(r => r.kundenstatus === am.kundenFilter)
+    : am.results;
   return `<main class="page aroundme-page">
     <div class="section-heading"><div><span class="eyebrow">Vor Ort</span><h1>Rund um mich</h1><p>Kunden in der Nähe finden oder nach Kliniken, Praxen und anderen Einrichtungen suchen, die noch keine Kunden sind.</p></div></div>
     <section class="aroundme-controls">
@@ -772,6 +792,11 @@ function aroundMeScreen(){
         <button class="filter-chip ${am.mode==='kategorie'?'active':''}" data-aroundme-mode="kategorie">Kategorien suchen</button>
       </div>
       ${am.mode==='kategorie' ? `<div class="aroundme-categories">${AROUND_ME_CATEGORIES.map(c => `<button class="filter-chip ${am.category===c.key?'active':''}" data-aroundme-category="${c.key}">${c.label}</button>`).join('')}</div>` : ''}
+      ${am.mode==='kunden' ? `<div class="aroundme-categories">
+          <button class="filter-chip ${am.kundenFilter==='all'?'active':''}" data-aroundme-kundenfilter="all">Alle Bestandskunden</button>
+          <button class="filter-chip ${am.kundenFilter==='kunde'?'active':''}" data-aroundme-kundenfilter="kunde">Nur kaufende Kunden</button>
+          <button class="filter-chip ${am.kundenFilter==='kontakt'?'active':''}" data-aroundme-kundenfilter="kontakt">Nur Kontakte im System</button>
+        </div>` : ''}
       <div class="aroundme-radius">
         <label for="aroundmeRadius">Umkreis: <strong>${am.radiusKm} km</strong></label>
         <input type="range" id="aroundmeRadius" min="1" max="100" value="${am.radiusKm}">
@@ -780,10 +805,17 @@ function aroundMeScreen(){
     </section>
     ${am.error ? `<div class="empty-state"><h2>Das hat nicht geklappt</h2><p>${escapeHtml(am.error)}</p></div>` : ''}
     ${am.loading ? `<div class="empty-state"><h2>Einen Moment …</h2><p>${am.mode==='kunden' ? 'Standorte der Kunden werden ermittelt.' : 'Umgebung wird durchsucht.'}</p></div>` : ''}
-    ${!am.loading && !am.error && am.searched ? (am.results.length ? `<div class="aroundme-results">${am.results.map(r => `<article class="aroundme-row">
-        <div><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(r.address || '')} · ${r.distanceKm.toFixed(1)} km</small></div>
-        <a class="secondary-button compact" href="${mapsDirectionsUrl(r.lat, r.lng)}" target="_blank" rel="noopener">${icon('pin')}<span>Navigieren</span></a>
-      </article>`).join('')}</div>` : `<div class="empty-state"><h2>Nichts gefunden</h2><p>Im gewählten Umkreis von ${am.radiusKm} km gibt es keine Treffer. Umkreis vergrößern oder andere Kategorie wählen.</p></div>`) : ''}
+    ${!am.loading && !am.error && am.searched ? (shownResults.length ? `<div class="aroundme-results">${shownResults.map(r => {
+        const index = am.results.indexOf(r);
+        const saved = am.savedIndices.includes(index);
+        return `<article class="aroundme-row">
+        <div><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(r.address || '')} · ${r.distanceKm.toFixed(1)} km</small>${am.mode==='kunden' ? `<small>${r.kundenstatus==='kontakt' ? '<span class="one-chip quiet">Nur Kontakt</span>' : '<span class="one-chip ok">Kaufender Kunde</span>'}</small>` : ''}</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          ${am.mode==='kategorie' ? `<button class="secondary-button compact" data-aroundme-save="${index}" ${saved?'disabled':''}>${saved ? '✓ Gespeichert' : '+ Als Kontakt speichern'}</button>` : ''}
+          <a class="secondary-button compact" href="${mapsDirectionsUrl(r.lat, r.lng)}" target="_blank" rel="noopener">${icon('pin')}<span>Navigieren</span></a>
+        </div>
+      </article>`;
+      }).join('')}</div>` : `<div class="empty-state"><h2>Nichts gefunden</h2><p>Im gewählten Umkreis von ${am.radiusKm} km gibt es keine Treffer. Umkreis vergrößern, Filter zurücksetzen oder andere Kategorie wählen.</p></div>`) : ''}
     ${!am.searched ? `<div class="empty-state"><h2>Bereit zur Suche</h2><p>Umkreis einstellen und auf „Suchen" tippen. Der Browser fragt einmalig nach dem Standort.</p></div>` : ''}
   </main>`;
 }
@@ -1224,8 +1256,7 @@ function summaryScreen(){
   const pickable=query?PRODUCTS.filter(p=>matchesQuery(`${p.name} ${p.kind}`, query)):PRODUCTS;
   return `<main class="page lists-page"><div class="section-heading"><div><span class="eyebrow">Kundengespräch</span><h1>Kundenzusammenfassung</h1><p>Alle Produkte, die Sie unterwegs mit dem Stern (★) markiert haben, erscheinen automatisch hier – je Gebinde einzeln, falls Sie z. B. mehrere Packungsgrößen besprochen haben. Daraus erstellt die App eine kurze Vorteils-Zusammenfassung, die Sie direkt per E-Mail an den Kunden senden können.</p></div></div>
   <section class="offer-config">
-    <label>Ansprechpartner${salutationChips()}<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller"></label>
-    <label>Anlass des Gesprächs<select id="summaryOccasion">${SUMMARY_OCCASIONS.map(o=>`<option value="${escapeHtml(o.value)}" ${o.value===state.summaryOccasion?'selected':''}>${o.label}</option>`).join('')}</select></label>
+    <label class="wide">Ansprechpartner${salutationChips()}<input id="summaryCustomer" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller"></label>
   </section>
   <section class="summary-price-toggle">
     <span>E-Mail-Inhalt</span>
@@ -1293,8 +1324,18 @@ function competitionScreen(){
     <section class="vs-config no-print">
       <label>Unser Produkt<select id="vsProduct"><option value="">Bitte wählen…</option>${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===v.productId?'selected':''}>${p.name}</option>`).join('')}</select></label>
       ${calc.product ? `<label>Gebinde<select id="vsSize">${calc.product.sizes.map(s=>`<option ${s===calc.size?'selected':''}>${s}</option>`).join('')}</select></label>` : '<div></div>'}
-      <label>Wettbewerber<input id="vsCompetitorName" value="${escapeHtml(v.competitorName)}" placeholder="Hersteller / Produktname"></label>
-      ${calc.product && competitorSuggestions(calc.product.kind).length ? `<small class="muted-copy wide vs-competitor-hint">Übliche Wettbewerber für „${escapeHtml(calc.product.kind)}“: ${competitorSuggestions(calc.product.kind).map(escapeHtml).join(' · ')}</small>` : ''}
+      ${(() => {
+        const suggestions = calc.product ? competitorSuggestions(calc.product.kind) : [];
+        const isKnown = suggestions.includes(v.competitorName);
+        const isCustom = v.competitorCustom || (!!v.competitorName.trim() && !isKnown);
+        if (!suggestions.length) return `<label>Wettbewerber<input id="vsCompetitorName" value="${escapeHtml(v.competitorName)}" placeholder="Hersteller / Produktname"></label>`;
+        return `<label>Wettbewerber<select id="vsCompetitorSelect">
+            <option value="" ${!isKnown && !isCustom?'selected':''}>Bitte wählen…</option>
+            ${suggestions.map(s => `<option value="${escapeHtml(s)}" ${isKnown && !isCustom && s===v.competitorName?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+            <option value="__custom__" ${isCustom?'selected':''}>Sonstiger Wettbewerber (manuell)…</option>
+          </select></label>
+          ${isCustom ? `<label>Wettbewerber (manuell)<input id="vsCompetitorName" value="${escapeHtml(v.competitorName)}" placeholder="Hersteller / Produktname"></label>` : '<div></div>'}`;
+      })()}
       ${calc.unitInfo ? `<label>Gebinde Wettbewerber (${calc.unitInfo.singular})<input id="vsCompetitorUnits" type="text" inputmode="decimal" value="${escapeHtml(v.competitorUnits)}" placeholder="z. B. ${calc.ourUnits}, falls abweichend"></label>` : '<div></div>'}
       <label>Kundenpreis (Wettbewerber-Gebinde)<input id="vsCompetitorPrice" type="text" inputmode="decimal" value="${escapeHtml(v.competitorPrice)}" placeholder="z. B. 9,45"></label>
       <label class="wide">${consumptionLabel}<input id="vsAnnualUnits" type="text" inputmode="numeric" value="${escapeHtml(v.annualUnits)}" placeholder="z. B. 10000"></label>
@@ -1994,6 +2035,8 @@ function bind() {
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
+  document.querySelectorAll('[data-aroundme-kundenfilter]').forEach(button => button.onclick = () => { state.aroundMe.kundenFilter=button.dataset.aroundmeKundenfilter; render(); });
+  document.querySelectorAll('[data-aroundme-save]').forEach(button => button.onclick = () => { aroundMeSaveAsContact(Number(button.dataset.aroundmeSave)); });
   $('#aroundmeRadius')?.addEventListener('input', e => { state.aroundMe.radiusKm = Number(e.target.value); render(); });
   $('[data-action="aroundme-search"]')?.addEventListener('click', () => aroundMeRun());
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
@@ -2062,9 +2105,10 @@ function bind() {
     render();
   });
   $('[data-action="discard-scan"]')?.addEventListener('click', () => { state.messeScanPreview = null; state.messeScanStatus = ''; render(); });
-  $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); const patch={productId:e.target.value, size:p?p.sizes[0]:''}; if (p && !state.vsCompare.competitorName.trim()) { const suggestions=competitorSuggestions(p.kind); if (suggestions.length) patch.competitorName=suggestions[0]; } saveVsCompare(patch); render(); });
+  $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); const patch={productId:e.target.value, size:p?p.sizes[0]:''}; if (p && !state.vsCompare.competitorName.trim()) { const suggestions=competitorSuggestions(p.kind); if (suggestions.length){ patch.competitorName=suggestions[0]; patch.competitorCustom=false; } } saveVsCompare(patch); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
   $('#vsCompetitorName')?.addEventListener('input', e => { saveVsCompare({competitorName:e.target.value}); render(); });
+  $('#vsCompetitorSelect')?.addEventListener('change', e => { const custom = e.target.value === '__custom__'; saveVsCompare(custom ? {competitorCustom:true} : {competitorName:e.target.value, competitorCustom:false}); render(); });
   $('#vsCompetitorPrice')?.addEventListener('input', e => { saveVsCompare({competitorPrice:e.target.value}); render(); });
   $('#vsCompetitorUnits')?.addEventListener('input', e => { saveVsCompare({competitorUnits:e.target.value}); render(); });
   $('#vsAnnualUnits')?.addEventListener('input', e => { saveVsCompare({annualUnits:e.target.value}); render(); });
@@ -2498,22 +2542,22 @@ function oneSeed() {
     tenant:{ name:'Dr. Schumacher', short:'DS' },
     territories: JSON.parse(JSON.stringify(ONE_TERRITORIES)),
     contacts:[
-      {id:'k1', externeNr:'EX-10021', kundenNr:'K-4471', name:'Dentalzentrum Hamburg',   plz:'20095', ort:'Hamburg',   strasse:'Mönckebergstraße', hausnummer:'12', bezirk:'Altstadt',  preisliste:'UVP',  email:'anna.petersen@example.com',   comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-3)},
-      {id:'k2', externeNr:'EX-10022', kundenNr:'K-4472', name:'Praxis Nordblick',        plz:'24103', ort:'Kiel',      strasse:'Holstenstraße',    hausnummer:'44', bezirk:'Zentrum',   preisliste:'PL 1', email:'jan.hansen@example.com',      comm:'bestand',     active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,12)},
-      {id:'k3', externeNr:'EX-10023', kundenNr:'K-4473', name:'Dentalzentrum Leipzig',   plz:'04109', ort:'Leipzig',   strasse:'Grimmaische Straße',hausnummer:'7', bezirk:'Mitte',     preisliste:'UVP',  email:'laura.richter@example.com',   comm:'frei',        active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,40)},
-      {id:'k4', externeNr:'EX-10024', kundenNr:'K-4474', name:'Praxis Dresden',          plz:'01067', ort:'Dresden',   strasse:'Prager Straße',    hausnummer:'3', bezirk:'Altstadt',  preisliste:'PL 2', email:'thomas.berger@example.com',   comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null},
-      {id:'k5', externeNr:'EX-10025', kundenNr:'K-4475', name:'Dentalzentrum Düsseldorf',plz:'40210', ort:'Düsseldorf',strasse:'Königsallee',      hausnummer:'21', bezirk:'Stadtmitte',preisliste:'UVP',  email:'sarah.becker@example.com',    comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-1)},
-      {id:'k6', externeNr:'EX-10026', kundenNr:'K-4476', name:'Praxis Rheinblick',       plz:'41460', ort:'Neuss',     strasse:'Further Straße',   hausnummer:'56', bezirk:'Furth',     preisliste:'PL 1', email:'daniel.weber@example.com',    comm:'widerspruch', active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,5)},
-      {id:'k7', externeNr:'EX-10027', kundenNr:'K-4477', name:'Dentalzentrum Stuttgart', plz:'70173', ort:'Stuttgart', strasse:'Königstraße',      hausnummer:'9', bezirk:'Mitte',     preisliste:'UVP',  email:'julia.wagner@example.com',    comm:'frei',        active:true, override:null, abc:null,nextFollowUp:null},
-      {id:'k8', externeNr:'EX-10028', kundenNr:'K-4478', name:'Praxis München',          plz:'80331', ort:'München',   strasse:'Sendlinger Straße',hausnummer:'18', bezirk:'Altstadt',  preisliste:'PL 3', email:'michael.fischer@example.com', comm:'bestand',     active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,80)},
-      {id:'k9', externeNr:'EX-10029', kundenNr:'K-4479', name:'Praxis Grenzfall',        plz:'99999', ort:'',          strasse:'',                 hausnummer:'',   bezirk:'',          preisliste:'UVP',  email:'',                            comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null}
+      {id:'k1', externeNr:'EX-10021', kundenNr:'K-4471', name:'Dentalzentrum Hamburg',   plz:'20095', ort:'Hamburg',   strasse:'Mönckebergstraße', hausnummer:'12', bezirk:'Altstadt',  preisliste:'UVP',  email:'anna.petersen@example.com',   comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-3), kundenstatus:'kunde'},
+      {id:'k2', externeNr:'EX-10022', kundenNr:'K-4472', name:'Praxis Nordblick',        plz:'24103', ort:'Kiel',      strasse:'Holstenstraße',    hausnummer:'44', bezirk:'Zentrum',   preisliste:'PL 1', email:'jan.hansen@example.com',      comm:'bestand',     active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,12), kundenstatus:'kunde'},
+      {id:'k3', externeNr:'EX-10023', kundenNr:'K-4473', name:'Dentalzentrum Leipzig',   plz:'04109', ort:'Leipzig',   strasse:'Grimmaische Straße',hausnummer:'7', bezirk:'Mitte',     preisliste:'UVP',  email:'laura.richter@example.com',   comm:'frei',        active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,40), kundenstatus:'kontakt'},
+      {id:'k4', externeNr:'EX-10024', kundenNr:'K-4474', name:'Praxis Dresden',          plz:'01067', ort:'Dresden',   strasse:'Prager Straße',    hausnummer:'3', bezirk:'Altstadt',  preisliste:'PL 2', email:'thomas.berger@example.com',   comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kunde'},
+      {id:'k5', externeNr:'EX-10025', kundenNr:'K-4475', name:'Dentalzentrum Düsseldorf',plz:'40210', ort:'Düsseldorf',strasse:'Königsallee',      hausnummer:'21', bezirk:'Stadtmitte',preisliste:'UVP',  email:'sarah.becker@example.com',    comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-1), kundenstatus:'kunde'},
+      {id:'k6', externeNr:'EX-10026', kundenNr:'K-4476', name:'Praxis Rheinblick',       plz:'41460', ort:'Neuss',     strasse:'Further Straße',   hausnummer:'56', bezirk:'Furth',     preisliste:'PL 1', email:'daniel.weber@example.com',    comm:'widerspruch', active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,5), kundenstatus:'kunde'},
+      {id:'k7', externeNr:'EX-10027', kundenNr:'K-4477', name:'Dentalzentrum Stuttgart', plz:'70173', ort:'Stuttgart', strasse:'Königstraße',      hausnummer:'9', bezirk:'Mitte',     preisliste:'UVP',  email:'julia.wagner@example.com',    comm:'frei',        active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kontakt'},
+      {id:'k8', externeNr:'EX-10028', kundenNr:'K-4478', name:'Praxis München',          plz:'80331', ort:'München',   strasse:'Sendlinger Straße',hausnummer:'18', bezirk:'Altstadt',  preisliste:'PL 3', email:'michael.fischer@example.com', comm:'bestand',     active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,80), kundenstatus:'kunde'},
+      {id:'k9', externeNr:'EX-10029', kundenNr:'K-4479', name:'Praxis Grenzfall',        plz:'99999', ort:'',          strasse:'',                 hausnummer:'',   bezirk:'',          preisliste:'UVP',  email:'',                            comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kunde'}
     ],
     users:[
-      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlz:[], active:true},
-      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical'],               team:'nord', territories:['nord'], individualPlz:[], active:true},
-      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['nonmedical'],            team:'ost',  territories:['ost'],  individualPlz:[], active:true},
-      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlz:[], active:true},
-      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:['nonmedical'],            team:'sued', territories:['sued'], individualPlz:[], active:true}
+      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlzRanges:[], active:true},
+      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical'],               team:'nord', territories:['nord'], individualPlzRanges:[], active:true},
+      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['nonmedical'],            team:'ost',  territories:['ost'],  individualPlzRanges:[], active:true},
+      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlzRanges:[], active:true},
+      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:['nonmedical'],            team:'sued', territories:['sued'], individualPlzRanges:[], active:true}
     ],
     templates:[
       {id:'t1', name:'Produktneuheit',            promo:true,  subject:'Neu im Sortiment: {{produkt}}',                 body:'wir haben unser Sortiment erweitert. {{produkt}} ist ab sofort lieferbar.\n\nGerne stelle ich Ihnen das Produkt bei Ihrem nächsten Termin persönlich vor.'},
@@ -2558,24 +2602,28 @@ function oneTerritoryOfContact(c, terrs){
   for (const t of T) for (const r of t.ranges) if (n >= r.from && n <= r.to) return t;
   return null;
 }
+function onePlzInRanges(plz, ranges){
+  const n = parseInt(plz, 10);
+  if (isNaN(n)) return false;
+  return (ranges||[]).some(r => n >= r.from && n <= r.to);
+}
 function oneVisibleContacts(user, o){
   const O = o || state.one;
   if (!user || user.role === 'admin') return O.contacts.slice();
   if (!user.active) return [];
   const allowed = new Set(user.territories);
-  const indivPlz = new Set(user.individualPlz || []);
   return O.contacts.filter(c => {
     const t = oneTerritoryOfContact(c, O.territories);
     if (t && allowed.has(t.id)) return true;
-    return c.plz && indivPlz.has(c.plz);
+    return c.plz && onePlzInRanges(c.plz, user.individualPlzRanges);
   });
 }
 // Ein Kontakt gilt als zugeordnet, sobald ihn ein Gebiet (per PLZ oder Override) trägt
-// oder seine PLZ einem Mitarbeiter direkt als Einzel-PLZ zugewiesen wurde.
+// oder seine PLZ in einem PLZ-Bereich liegt, der einem Mitarbeiter direkt zugewiesen wurde.
 function oneContactIsAssigned(c, o){
   const O = o || state.one;
   if (oneTerritoryOfContact(c, O.territories)) return true;
-  return c.plz && O.users.some(u => u.role==='employee' && (u.individualPlz||[]).includes(c.plz));
+  return c.plz && O.users.some(u => u.role==='employee' && onePlzInRanges(c.plz, u.individualPlzRanges));
 }
 const ONE_MED_LABELS = { medical:'Medical', nonmedical:'Non-Medical' };
 function oneMedLabel(list){ return (list && list.length) ? list.map(k=>ONE_MED_LABELS[k]).join(', ') : '—'; }
@@ -2625,6 +2673,7 @@ function oneAudit(action, detail){
 }
 function oneTerrChip(t){ return t ? `<span class="one-chip ${t.cls}">${escapeHtml(t.name)}</span>` : '<span class="one-chip none">nicht zugeordnet</span>'; }
 function oneCommChip(c){ const m = ONE_COMM[c.comm]; return `<span class="one-chip ${m.chip}">${escapeHtml(m.label)}</span>`; }
+function oneKundenstatusChip(c){ return c.kundenstatus === 'kontakt' ? '<span class="one-chip quiet">Nur Kontakt</span>' : '<span class="one-chip ok">Kaufender Kunde</span>'; }
 
 const ONE_ADMIN_NAV = [
   ['dashboard','Dashboard'], ['staff','Mitarbeiter'], ['terr','Gebiete'],
@@ -2668,12 +2717,33 @@ function oneViewDashboard(){
   </div></div>
   <div class="one-panel"><div class="one-panel-body" style="padding:0">
     <div class="one-stats">
-      <div class="one-stat"><div class="k">Kontakte</div><div class="v">${O.contacts.length}</div><div class="s">im Mandanten</div></div>
-      <div class="one-stat"><div class="k">Gebiete</div><div class="v">${O.territories.length}</div><div class="s">über PLZ definiert</div></div>
-      <div class="one-stat"><div class="k">Aktive Mitarbeiter</div><div class="v">${O.users.filter(u=>u.role==='employee'&&u.active).length}</div><div class="s">von ${O.users.filter(u=>u.role==='employee').length} angelegt</div></div>
-      <div class="one-stat"><div class="k">Ohne Gebiet</div><div class="v" style="${unassigned.length?'color:var(--one-warn)':''}">${unassigned.length}</div><div class="s">PLZ in keinem Bereich</div></div>
+      <div class="one-stat clickable" data-one-nav="contacts"><div class="k">Kontakte</div><div class="v">${O.contacts.length}</div><div class="s">im Mandanten</div></div>
+      <div class="one-stat clickable" data-one-nav="terr"><div class="k">Gebiete</div><div class="v">${O.territories.length}</div><div class="s">über PLZ definiert</div></div>
+      <div class="one-stat clickable" data-one-nav="staff"><div class="k">Aktive Mitarbeiter</div><div class="v">${O.users.filter(u=>u.role==='employee'&&u.active).length}</div><div class="s">von ${O.users.filter(u=>u.role==='employee').length} angelegt</div></div>
+      <div class="one-stat clickable" data-one-nav="contacts"><div class="k">Ohne Gebiet</div><div class="v" style="${unassigned.length?'color:var(--one-warn)':''}">${unassigned.length}</div><div class="s">PLZ in keinem Bereich</div></div>
     </div>
   </div></div>
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Mitarbeiter</h2><p>Nach Team filtern.</p></div>
+    <div class="one-panel-body">
+      <div class="one-choices" style="margin-top:0">
+        <button type="button" class="one-choice sm ${!O.dashboardTeamFilter?'on':''}" data-one-act="dashboard-team-filter" data-one-value="">Alle</button>
+        ${ONE_TEAMS.map(t => `<button type="button" class="one-choice sm ${O.dashboardTeamFilter===t.id?'on':''}" data-one-act="dashboard-team-filter" data-one-value="${t.id}">${t.label}</button>`).join('')}
+      </div>
+      <div class="one-tablewrap"><table>
+        <thead><tr><th>Name</th><th>Team</th><th>Funktion</th><th>Kundenkreis</th><th>Status</th><th>Kontakte</th></tr></thead>
+        <tbody>${O.users.filter(u=>u.role==='employee' && (!O.dashboardTeamFilter || u.team===O.dashboardTeamFilter)).map(u => `
+          <tr>
+            <td class="strong">${escapeHtml(u.name)}</td>
+            <td>${u.team ? oneTerrChip(oneTerrById(u.team)) : '<span class="muted">—</span>'}</td>
+            <td class="muted">${u.funktion==='aussendienst'?'Außendienst':u.funktion==='innendienst'?'Innendienst':'—'}</td>
+            <td class="muted">${oneMedLabel(u.medNonMed)}</td>
+            <td><span class="one-chip ${u.active?'ok':'stop'}">${u.active?'aktiv':'deaktiviert'}</span></td>
+            <td class="num strong">${oneVisibleContacts(u).length}</td>
+          </tr>`).join('') || '<tr><td colspan="6" class="muted">Keine Mitarbeiter in diesem Team.</td></tr>'}</tbody>
+      </table></div>
+    </div>
+  </div>
   <div class="one-panel">
     <div class="one-panel-head"><h2>Zuordnungskette</h2><p>So entsteht jede Sichtbarkeit im System — am Beispiel von Praxis Rheinblick.</p></div>
     <div class="one-panel-body">
@@ -2721,10 +2791,12 @@ function oneStaffGebietTabHtml(u){
           ${escapeHtml(t.name)}</label>`;
       }).join('')}</div>`
     : `<div class="one-plz-chip-row">
-        <input type="text" id="staff-plz-input-${u.id}" placeholder="PLZ, z. B. 41234" maxlength="5" style="width:120px" ${u.active?'':'disabled'}>
+        <input type="text" id="staff-plz-from-${u.id}" placeholder="PLZ von" maxlength="5" style="width:100px" ${u.active?'':'disabled'}>
+        <span class="muted">bis</span>
+        <input type="text" id="staff-plz-to-${u.id}" placeholder="PLZ bis" maxlength="5" style="width:100px" ${u.active?'':'disabled'}>
         <button type="button" class="one-btn sm" data-one-act="staff-add-plz" data-one-id="${u.id}" ${u.active?'':'disabled'}>+ Hinzufügen</button>
       </div>
-      <div class="one-plz-chips">${(u.individualPlz||[]).length ? u.individualPlz.map(p => `<span class="one-chip quiet">${escapeHtml(p)}<button type="button" class="one-remove-range" data-one-act="staff-remove-plz" data-one-id="${u.id}" data-one-value="${escapeHtml(p)}">×</button></span>`).join('') : '<span class="muted">Noch keine einzelne PLZ zugeordnet.</span>'}</div>`}`;
+      <div class="one-plz-chips">${(u.individualPlzRanges||[]).length ? u.individualPlzRanges.map((r,i) => `<span class="one-chip quiet">${String(r.from).padStart(5,'0')}–${String(r.to).padStart(5,'0')}<button type="button" class="one-remove-range" data-one-act="staff-remove-plz" data-one-id="${u.id}" data-one-value="${i}">×</button></span>`).join('') : '<span class="muted">Noch kein PLZ-Bereich zugeordnet.</span>'}</div>`}`;
 }
 function oneViewStaff(){
   const O = state.one;
@@ -2747,6 +2819,7 @@ function oneViewStaff(){
         <span class="one-chip ${u.active?'ok':'stop'}">${u.active?'aktiv':'deaktiviert'}</span>
         <span class="one-chip quiet">${vis.length} Kontakte</span>
         <button class="one-btn sm ${u.active?'danger':''}" data-one-act="toggle-active" data-one-id="${u.id}">${u.active?'Deaktivieren':'Reaktivieren'}</button>
+        <button class="one-btn sm danger" data-one-act="delete-staff" data-one-id="${u.id}">Löschen</button>
       </div>
       <div class="one-panel-body">
         <div class="one-staff-grid">
@@ -2788,12 +2861,14 @@ function oneViewStaffWizard(){
     body = `<h2>2. Team zuordnen</h2>
       <p>Regionales Team, dem ${escapeHtml(d.name)} angehört — das zugehörige Gesamtgebiet wird automatisch übernommen.</p>
       <div class="one-choices">${ONE_TEAMS.map(t => `<button class="one-choice ${d.team===t.id?'on':''}" data-one-act="wizard-team" data-one-value="${t.id}">${t.label}</button>`).join('')}</div>
-      ${d.team ? `<div class="one-staff-label" style="margin-top:18px">Zusätzlich einzelne PLZ zuordnen (optional)</div>
+      ${d.team ? `<div class="one-staff-label" style="margin-top:18px">Zusätzlich einzelnen PLZ-Bereich zuordnen (optional)</div>
       <div class="one-plz-chip-row">
-        <input type="text" id="wizard-plz-input" placeholder="PLZ, z. B. 41234" maxlength="5" style="width:120px">
+        <input type="text" id="wizard-plz-from" placeholder="PLZ von" maxlength="5" style="width:100px">
+        <span class="muted">bis</span>
+        <input type="text" id="wizard-plz-to" placeholder="PLZ bis" maxlength="5" style="width:100px">
         <button type="button" class="one-btn sm" data-one-act="wizard-add-plz">+ Hinzufügen</button>
       </div>
-      <div class="one-plz-chips">${d.individualPlz.length ? d.individualPlz.map(p => `<span class="one-chip quiet">${escapeHtml(p)}<button type="button" class="one-remove-range" data-one-act="wizard-remove-plz" data-one-value="${escapeHtml(p)}">×</button></span>`).join('') : '<span class="muted">Nur nötig für Ausnahmen außerhalb des Gebiets.</span>'}</div>` : ''}
+      <div class="one-plz-chips">${d.individualPlzRanges.length ? d.individualPlzRanges.map((r,i) => `<span class="one-chip quiet">${String(r.from).padStart(5,'0')}–${String(r.to).padStart(5,'0')}<button type="button" class="one-remove-range" data-one-act="wizard-remove-plz" data-one-value="${i}">×</button></span>`).join('') : '<span class="muted">Nur nötig für Ausnahmen außerhalb des Gebiets.</span>'}</div>` : ''}
       <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.team?'':'disabled'}>Weiter</button></div>`;
   } else if (step === 'funktion'){
     body = `<h2>3. Funktion zuordnen</h2>
@@ -2818,7 +2893,7 @@ function oneViewStaffWizard(){
         <div class="one-chain-step"><span class="k">Team</span><span class="v">${escapeHtml(oneTeamLabel(d.team))}</span></div>
         <div class="one-chain-step"><span class="k">Funktion</span><span class="v">${escapeHtml(oneFunktionLabel(d.funktion))}</span></div>
         <div class="one-chain-step"><span class="k">Kundenkreis</span><span class="v">${escapeHtml(oneMedLabel(d.medNonMed))}</span></div>
-        <div class="one-chain-step is-accent"><span class="k">Gebiete</span><span class="v">${d.territories.length ? d.territories.map(id=>oneTerrById(id).name).join(', ') : 'keine'}${d.individualPlz.length ? ' + PLZ ' + d.individualPlz.join(', ') : ''}</span></div>
+        <div class="one-chain-step is-accent"><span class="k">Gebiete</span><span class="v">${d.territories.length ? d.territories.map(id=>oneTerrById(id).name).join(', ') : 'keine'}${d.individualPlzRanges.length ? ' + PLZ ' + d.individualPlzRanges.map(r=>String(r.from).padStart(5,'0')+'–'+String(r.to).padStart(5,'0')).join(', ') : ''}</span></div>
       </div>
       <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-finish">Mitarbeiter speichern</button></div>`;
   }
@@ -2872,7 +2947,7 @@ function oneViewTerr(){
 }
 
 function oneNewContactDraft(){
-  return { externeNr:'', kundenNr:'', name:'', plz:'', ort:'', strasse:'', hausnummer:'', bezirk:'', preisliste:'UVP', email:'' };
+  return { externeNr:'', kundenNr:'', name:'', plz:'', ort:'', strasse:'', hausnummer:'', bezirk:'', preisliste:'UVP', email:'', kundenstatus:'kunde' };
 }
 function oneContactFormHtml(){
   const d = state.one.newContact;
@@ -2891,6 +2966,7 @@ function oneContactFormHtml(){
       <div class="one-filters">
         ${fields.map(([k,label]) => `<div class="one-field"><label for="oneNC-${k}">${label}</label><input type="text" id="oneNC-${k}" data-one-nc="${k}" value="${escapeHtml(d[k])}"></div>`).join('')}
         <div class="one-field"><label for="oneNC-preisliste">Preisliste</label><select class="f" id="oneNC-preisliste" data-one-nc="preisliste">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(p=>`<option ${d.preisliste===p?'selected':''}>${p}</option>`).join('')}</select></div>
+        <div class="one-field"><label for="oneNC-kundenstatus">Status</label><select class="f" id="oneNC-kundenstatus" data-one-nc="kundenstatus"><option value="kunde" ${d.kundenstatus==='kunde'?'selected':''}>Kaufender Kunde</option><option value="kontakt" ${d.kundenstatus==='kontakt'?'selected':''}>Nur Kontakt im System (noch kein Kauf)</option></select></div>
       </div>
       <div class="one-wizard-actions" style="margin-top:14px">
         <button class="one-btn" data-one-act="cancel-new-contact">Abbrechen</button>
@@ -2937,7 +3013,7 @@ function oneViewContacts(){
   ${O.importStatus ? `<div class="one-panel"><div class="one-panel-body"><div class="one-note">${escapeHtml(O.importStatus)}</div></div></div>` : ''}
   ${oneViewUnassignedPanel()}
   <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
-    <thead><tr><th>Kundennr.</th><th>Name</th><th>Ort</th><th>Gebiet</th><th>Preisliste</th><th>Verantwortlich</th><th>Einstufung</th><th>Wiedervorlage</th><th>Kommunikation</th><th></th></tr></thead>
+    <thead><tr><th>Kundennr.</th><th>Name</th><th>Ort</th><th>Gebiet</th><th>Preisliste</th><th>Verantwortlich</th><th>Status</th><th>Einstufung</th><th>Wiedervorlage</th><th>Kommunikation</th><th></th></tr></thead>
     <tbody>${O.contacts.map(c => { const resp = oneResponsibleFor(c); return `<tr>
       <td class="mono muted">${escapeHtml(c.kundenNr)}</td>
       <td class="strong">${escapeHtml(c.name)}</td>
@@ -2945,6 +3021,7 @@ function oneViewContacts(){
       <td>${oneTerrChip(oneTerritoryOfContact(c))}</td>
       <td class="muted">${escapeHtml(c.preisliste)}</td>
       <td class="muted">${resp ? escapeHtml(resp.name) : '—'}</td>
+      <td>${oneKundenstatusChip(c)}</td>
       <td>${oneAbcChip(c)}</td>
       <td>${oneDueBadge(c) || '<span class="muted">—</span>'}</td>
       <td>${oneCommChip(c)}</td>
@@ -3467,13 +3544,13 @@ function oneSuggestEmail(name){
   return vorname + '.' + nachname + '@schumacher-online.com';
 }
 function oneStartWizard(){
-  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, medNonMed:[], territories:[], individualPlz:[] } };
+  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, medNonMed:[], territories:[], individualPlzRanges:[] } };
 }
 function oneWizardCommit(){
   const O = state.one; const d = O.wizard.data;
   const n = O.users.filter(x=>x.role==='employee').length + 1;
   const id = 'm' + n + '-' + Date.now().toString(36);
-  O.users.push({ id, name:d.name.trim(), email:d.email.trim() || (id+'@example.com'), password:d.password.trim() || '1234', role:'employee', funktion:d.funktion, medNonMed:d.medNonMed.slice(), team:d.team, territories:d.territories.slice(), individualPlz:d.individualPlz.slice(), active:true });
+  O.users.push({ id, name:d.name.trim(), email:d.email.trim() || (id+'@example.com'), password:d.password.trim() || '1234', role:'employee', funktion:d.funktion, medNonMed:d.medNonMed.slice(), team:d.team, territories:d.territories.slice(), individualPlzRanges:d.individualPlzRanges.slice(), active:true });
   oneAudit('Mitarbeiter angelegt', d.name + ' — ' + oneTeamLabel(d.team) + ' · ' + oneFunktionLabel(d.funktion) + ' · ' + oneMedLabel(d.medNonMed) + ' · ' + (d.territories.length ? d.territories.map(t=>oneTerrById(t).name).join(', ') : 'ohne Gebiet'));
   O.wizard = null;
   onePersistUsers();
@@ -3632,22 +3709,24 @@ function bindOne(){
     if (a === 'staff-gebiet-tab'){ O.staffTab[el.dataset.oneId] = el.dataset.oneValue; render(); return; }
     if (a === 'staff-add-plz'){
       const u = O.users.find(x => x.id === el.dataset.oneId);
-      const inp = document.getElementById('staff-plz-input-'+u.id);
-      const val = (inp && inp.value || '').trim();
-      if (/^\d{5}$/.test(val)){
-        u.individualPlz = u.individualPlz || [];
-        if (!u.individualPlz.includes(val)){
-          u.individualPlz.push(val);
-          oneAudit('Einzelne PLZ zugeordnet', 'PLZ ' + val + ' → ' + u.name);
-          onePersistUsers();
-        }
+      const inpFrom = document.getElementById('staff-plz-from-'+u.id);
+      const inpTo = document.getElementById('staff-plz-to-'+u.id);
+      const from = (inpFrom && inpFrom.value || '').trim();
+      const to = (inpTo && inpTo.value || '').trim();
+      if (/^\d{5}$/.test(from) && /^\d{5}$/.test(to) && parseInt(from,10) <= parseInt(to,10)){
+        u.individualPlzRanges = u.individualPlzRanges || [];
+        u.individualPlzRanges.push({ from: parseInt(from,10), to: parseInt(to,10) });
+        oneAudit('PLZ-Bereich zugeordnet', from + '–' + to + ' → ' + u.name);
+        onePersistUsers();
       }
       render(); return;
     }
     if (a === 'staff-remove-plz'){
       const u = O.users.find(x => x.id === el.dataset.oneId);
-      u.individualPlz = (u.individualPlz||[]).filter(p => p !== el.dataset.oneValue);
-      oneAudit('Einzelne PLZ entfernt', 'PLZ ' + el.dataset.oneValue + ' von ' + u.name);
+      const idx = parseInt(el.dataset.oneValue, 10);
+      const removed = (u.individualPlzRanges||[])[idx];
+      u.individualPlzRanges = (u.individualPlzRanges||[]).filter((r,i) => i !== idx);
+      if (removed) oneAudit('PLZ-Bereich entfernt', String(removed.from).padStart(5,'0') + '–' + String(removed.to).padStart(5,'0') + ' von ' + u.name);
       onePersistUsers();
       render(); return;
     }
@@ -3672,6 +3751,17 @@ function bindOne(){
       if (!u.active && O.loggedInUserId === u.id) O.loggedInUserId = null;
       render(); return;
     }
+    if (a === 'delete-staff'){
+      const u = O.users.find(x => x.id === el.dataset.oneId);
+      if (!u) return;
+      if (!confirm('Mitarbeiter „' + u.name + '“ endgültig löschen? Dies kann nicht rückgängig gemacht werden.')) return;
+      O.users = O.users.filter(x => x.id !== u.id);
+      oneAudit('Mitarbeiter gelöscht', u.name);
+      onePersistUsers();
+      if (O.loggedInUserId === u.id) O.loggedInUserId = null;
+      render(); return;
+    }
+    if (a === 'dashboard-team-filter'){ O.dashboardTeamFilter = el.dataset.oneValue || null; render(); return; }
     if (a === 'add-staff'){ oneStartWizard(); render(); return; }
     if (a === 'wizard-team'){
       O.wizard.data.team = el.dataset.oneValue;
@@ -3690,13 +3780,18 @@ function bindOne(){
       render(); return;
     }
     if (a === 'wizard-add-plz'){
-      const inp = document.getElementById('wizard-plz-input');
-      const val = (inp && inp.value || '').trim();
-      if (/^\d{5}$/.test(val) && !O.wizard.data.individualPlz.includes(val)) O.wizard.data.individualPlz.push(val);
+      const inpFrom = document.getElementById('wizard-plz-from');
+      const inpTo = document.getElementById('wizard-plz-to');
+      const from = (inpFrom && inpFrom.value || '').trim();
+      const to = (inpTo && inpTo.value || '').trim();
+      if (/^\d{5}$/.test(from) && /^\d{5}$/.test(to) && parseInt(from,10) <= parseInt(to,10)){
+        O.wizard.data.individualPlzRanges.push({ from: parseInt(from,10), to: parseInt(to,10) });
+      }
       render(); return;
     }
     if (a === 'wizard-remove-plz'){
-      O.wizard.data.individualPlz = O.wizard.data.individualPlz.filter(p => p !== el.dataset.oneValue);
+      const idx = parseInt(el.dataset.oneValue, 10);
+      O.wizard.data.individualPlzRanges = O.wizard.data.individualPlzRanges.filter((r,i) => i !== idx);
       render(); return;
     }
     if (a === 'wizard-next'){
@@ -3721,7 +3816,7 @@ function bindOne(){
     if (a === 'save-new-contact'){
       const d = O.newContact;
       const id = 'k' + Date.now().toString(36);
-      O.contacts.push({ id, externeNr:d.externeNr.trim(), kundenNr:d.kundenNr.trim(), name:d.name.trim(), plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(), bezirk:d.bezirk.trim(), preisliste:d.preisliste, email:d.email.trim(), comm:'bestand', active:true, override:null, abc:null, nextFollowUp:null });
+      O.contacts.push({ id, externeNr:d.externeNr.trim(), kundenNr:d.kundenNr.trim(), name:d.name.trim(), plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(), bezirk:d.bezirk.trim(), preisliste:d.preisliste, email:d.email.trim(), comm:'bestand', active:true, override:null, abc:null, nextFollowUp:null, kundenstatus:d.kundenstatus || 'kunde' });
       oneAudit('Kontakt angelegt', d.name + ' (' + (oneCurrentUser()||{}).name + ')');
       O.newContact = null;
       render(); return;
