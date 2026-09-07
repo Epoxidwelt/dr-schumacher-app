@@ -373,6 +373,7 @@ const state = {
   region: localStorage.getItem('region') || '',
   repName: localStorage.getItem('repName') || '',
   regionLoginName: '', regionLoginError: '',
+  aroundMe: { mode:'kunden', radiusKm:10, myPos:null, category:null, results:[], loading:false, error:'', searched:false },
   priceList: localStorage.getItem('priceList') || 'UVP',
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
@@ -458,7 +459,8 @@ function icon(name) {
     pm:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M15 15c2.5 0 5 1.5 5 4"/></svg>',
     camera:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13.5" r="3.5"/></svg>',
     phone:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/></svg>',
-    pin:'<svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>'
+    pin:'<svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+    aroundme:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="8"/></svg>'
   };
   return icons[name] || '';
 }
@@ -535,6 +537,7 @@ function render() {
   if (state.screen === 'dashboard') html = header(true) + dashboardScreen() + bottomNav('home');
   if (state.screen === 'messe') html = header(true) + messeScreen() + bottomNav('home');
   if (state.screen === 'pm') html = header(true) + productManagementScreen() + bottomNav('home');
+  if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
   if (state.summaryStep) html += occasionPromptModal();
   app.innerHTML = html;
   bind();
@@ -611,6 +614,7 @@ function menuScreen() {
     ['hands','Hände & Haut','Händedesinfektion & Pflege'],
     ['instruments','Instrumente','Aufbereitung & Desinfektion'],
     ['application','Applikation','Spendersysteme & Zubehör'],
+    ['aroundme','Rund um mich','Kunden in der Nähe finden oder nach Kliniken, Praxen usw. suchen'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
@@ -625,6 +629,7 @@ function menuScreen() {
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
   if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary'].includes(card[0]));
+  if (state.activeProfile !== 'sales') cards = cards.filter(card => card[0] !== 'aroundme');
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
   const today = new Date().toISOString().slice(0,10);
@@ -651,6 +656,135 @@ function menuScreen() {
     <div class="section-heading"><div><span class="eyebrow">Weitere Funktionen</span><h2>Werkzeuge</h2></div></div>
     <div class="category-grid compact-grid">${toolCards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>
     <section class="online-card"><div class="online-dot"></div><div><strong>Unterlagen immer aktuell</strong><p>Produktinformationen, Datenblätter und Bilder werden direkt von schumacher-online.com geöffnet.</p></div><a href="${OFFICIAL.home}" target="_blank" rel="noopener">Website öffnen</a></section>
+  </main>`;
+}
+
+/* ================================================================
+   RUND UM MICH — Kunden bzw. Kategorien (Krankenhäuser, Rettungswachen …)
+   im Umkreis der eigenen Position finden. Nutzt echte Geolokalisierung
+   (Browser-API) und echte, kostenlose OpenStreetMap-Dienste (Nominatim
+   zum Geocodieren von Adressen, Overpass zur Umgebungssuche) — beides
+   externe Live-Dienste ohne API-Key, kein simulierter Platzhalter.
+   ================================================================ */
+const AROUND_ME_CATEGORIES = [
+  {key:'hospital', label:'Krankenhäuser', tag:'amenity=hospital'},
+  {key:'ambulance', label:'Rettungswachen', tag:'emergency=ambulance_station'},
+  {key:'doctors', label:'Arztpraxen', tag:'amenity=doctors'},
+  {key:'dentist', label:'Zahnarztpraxen', tag:'amenity=dentist'},
+  {key:'pharmacy', label:'Apotheken', tag:'amenity=pharmacy'},
+  {key:'nursing_home', label:'Pflegeheime', tag:'amenity=nursing_home'}
+];
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function mapsDirectionsUrl(lat, lng){ return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`; }
+function getMyLocation(){
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error('Geolokalisierung wird von diesem Gerät nicht unterstützt.')); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({lat: pos.coords.latitude, lng: pos.coords.longitude}),
+      err => reject(new Error('Standort nicht verfügbar: ' + err.message + ' – bitte Standortzugriff für diese Seite erlauben.')),
+      { enableHighAccuracy:true, timeout:15000, maximumAge:60000 }
+    );
+  });
+}
+async function geocodeAddress(query){
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+  const res = await fetch(url, { headers: { 'Accept':'application/json' } });
+  if (!res.ok) throw new Error('Geocoding fehlgeschlagen');
+  const data = await res.json();
+  if (!data.length) return null;
+  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+}
+async function searchNearbyCategory(tag, lat, lng, radiusKm){
+  const radiusM = Math.round(radiusKm * 1000);
+  const [k, v] = tag.split('=');
+  const ql = `[out:json][timeout:25];(node["${k}"="${v}"](around:${radiusM},${lat},${lng});way["${k}"="${v}"](around:${radiusM},${lat},${lng}););out center 30;`;
+  const res = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body: ql });
+  if (!res.ok) throw new Error('Suche fehlgeschlagen (Server nicht erreichbar)');
+  const data = await res.json();
+  return (data.elements||[]).map(el => {
+    const elLat = el.lat != null ? el.lat : (el.center && el.center.lat);
+    const elLng = el.lon != null ? el.lon : (el.center && el.center.lon);
+    if (elLat == null || elLng == null) return null;
+    const tags = el.tags || {};
+    const addrParts = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
+    const addr2 = [tags['addr:postcode'], tags['addr:city']].filter(Boolean).join(' ');
+    return {
+      name: tags.name || tags['name:de'] || 'Ohne Namen',
+      address: [addrParts, addr2].filter(Boolean).join(', '),
+      lat: elLat, lng: elLng,
+      distanceKm: haversineKm(lat, lng, elLat, elLng)
+    };
+  }).filter(Boolean).sort((a,b)=>a.distanceKm-b.distanceKm);
+}
+function aroundMeRepUser(){
+  return state.repName ? state.one.users.find(u => u.role==='employee' && u.name.trim().toLowerCase() === state.repName.trim().toLowerCase()) : null;
+}
+async function findContactsNearby(myPos, radiusKm){
+  const u = aroundMeRepUser();
+  const visible = u ? oneVisibleContacts(u) : state.one.contacts.slice();
+  const results = [];
+  for (const c of visible){
+    if (c._geo === undefined){
+      const addr = [c.strasse, c.hausnummer, c.plz, c.ort].filter(Boolean).join(' ').trim();
+      if (!addr){ c._geo = null; }
+      else {
+        try { c._geo = await geocodeAddress(addr + ', Deutschland'); } catch(e){ c._geo = null; }
+        await new Promise(r => setTimeout(r, 1000)); // Nominatim-Nutzungsregeln: max. 1 Anfrage/Sekunde
+      }
+    }
+    if (!c._geo) continue;
+    const d = haversineKm(myPos.lat, myPos.lng, c._geo.lat, c._geo.lng);
+    if (d <= radiusKm) results.push({ name:c.name, address:[c.plz,c.ort].filter(Boolean).join(' '), lat:c._geo.lat, lng:c._geo.lng, distanceKm:d, contactId:c.id });
+  }
+  return results.sort((a,b)=>a.distanceKm-b.distanceKm);
+}
+async function aroundMeRun(){
+  const am = state.aroundMe;
+  am.loading = true; am.error = ''; am.results = []; am.searched = true;
+  render();
+  try {
+    if (!am.myPos) am.myPos = await getMyLocation();
+    if (am.mode === 'kunden'){
+      am.results = await findContactsNearby(am.myPos, am.radiusKm);
+    } else if (am.category) {
+      const cat = AROUND_ME_CATEGORIES.find(c => c.key === am.category);
+      am.results = await searchNearbyCategory(cat.tag, am.myPos.lat, am.myPos.lng, am.radiusKm);
+    }
+  } catch (error) {
+    am.error = error.message;
+  }
+  am.loading = false;
+  render();
+}
+function aroundMeScreen(){
+  const am = state.aroundMe;
+  return `<main class="page aroundme-page">
+    <div class="section-heading"><div><span class="eyebrow">Vor Ort</span><h1>Rund um mich</h1><p>Kunden in der Nähe finden oder nach Kliniken, Praxen und anderen Einrichtungen suchen, die noch keine Kunden sind.</p></div></div>
+    <section class="aroundme-controls">
+      <div class="aroundme-modes">
+        <button class="filter-chip ${am.mode==='kunden'?'active':''}" data-aroundme-mode="kunden">Kunden in der Nähe</button>
+        <button class="filter-chip ${am.mode==='kategorie'?'active':''}" data-aroundme-mode="kategorie">Kategorien suchen</button>
+      </div>
+      ${am.mode==='kategorie' ? `<div class="aroundme-categories">${AROUND_ME_CATEGORIES.map(c => `<button class="filter-chip ${am.category===c.key?'active':''}" data-aroundme-category="${c.key}">${c.label}</button>`).join('')}</div>` : ''}
+      <div class="aroundme-radius">
+        <label for="aroundmeRadius">Umkreis: <strong>${am.radiusKm} km</strong></label>
+        <input type="range" id="aroundmeRadius" min="1" max="100" value="${am.radiusKm}">
+      </div>
+      <button class="primary-button compact" data-action="aroundme-search" ${(am.mode==='kategorie' && !am.category) || am.loading ? 'disabled' : ''}>${icon('aroundme')}<span>${am.loading ? 'Suche läuft …' : 'Suchen'}</span></button>
+    </section>
+    ${am.error ? `<div class="empty-state"><h2>Das hat nicht geklappt</h2><p>${escapeHtml(am.error)}</p></div>` : ''}
+    ${am.loading ? `<div class="empty-state"><h2>Einen Moment …</h2><p>${am.mode==='kunden' ? 'Standorte der Kunden werden ermittelt.' : 'Umgebung wird durchsucht.'}</p></div>` : ''}
+    ${!am.loading && !am.error && am.searched ? (am.results.length ? `<div class="aroundme-results">${am.results.map(r => `<article class="aroundme-row">
+        <div><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(r.address || '')} · ${r.distanceKm.toFixed(1)} km</small></div>
+        <a class="secondary-button compact" href="${mapsDirectionsUrl(r.lat, r.lng)}" target="_blank" rel="noopener">${icon('pin')}<span>Navigieren</span></a>
+      </article>`).join('')}</div>` : `<div class="empty-state"><h2>Nichts gefunden</h2><p>Im gewählten Umkreis von ${am.radiusKm} km gibt es keine Treffer. Umkreis vergrößern oder andere Kategorie wählen.</p></div>`) : ''}
+    ${!am.searched ? `<div class="empty-state"><h2>Bereit zur Suche</h2><p>Umkreis einstellen und auf „Suchen" tippen. Der Browser fragt einmalig nach dem Standort.</p></div>` : ''}
   </main>`;
 }
 
@@ -1856,8 +1990,12 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard','messe','pm'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(['advisor','recent','compare','competition','talk','offer','summary','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
+  document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
+  document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
+  $('#aroundmeRadius')?.addEventListener('input', e => { state.aroundMe.radiusKm = Number(e.target.value); render(); });
+  $('[data-action="aroundme-search"]')?.addEventListener('click', () => aroundMeRun());
   document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
   document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => { state.size=button.dataset.size; if (button.dataset.sizeFavorite) toggleFavorite(button.dataset.sizeFavorite, button.dataset.size); render(); });
@@ -2633,22 +2771,7 @@ function oneViewStaff(){
   </div></div>`;
 }
 
-const ONE_WIZARD_STEPS = ['person','team','funktion','medical','gebiet','fertig'];
-function oneWizardGebietTabHtml(d, prefix){
-  const tab = d.gebietTab || 'gebiete';
-  const plzList = d.individualPlz || [];
-  return `<div class="one-tabs">
-      <button type="button" class="one-tab ${tab==='gebiete'?'on':''}" data-one-act="${prefix}-tab" data-one-value="gebiete">Gesamtgebiete</button>
-      <button type="button" class="one-tab ${tab==='plz'?'on':''}" data-one-act="${prefix}-tab" data-one-value="plz">Einzelne PLZ</button>
-    </div>
-    ${tab==='gebiete' ? `<div class="one-terr-picker">${state.one.territories.map(t => `<label class="one-terr-opt ${d.territories.includes(t.id)?'on':''}">
-        <input type="checkbox" data-one-act="${prefix}-terr" data-one-value="${t.id}" ${d.territories.includes(t.id)?'checked':''}>${escapeHtml(t.name)}</label>`).join('')}</div>`
-    : `<div class="one-plz-chip-row">
-        <input type="text" id="${prefix}-plz-input" placeholder="PLZ, z. B. 41234" maxlength="5" style="width:120px">
-        <button type="button" class="one-btn sm" data-one-act="${prefix}-add-plz">+ Hinzufügen</button>
-      </div>
-      <div class="one-plz-chips">${plzList.length ? plzList.map(p => `<span class="one-chip quiet">${escapeHtml(p)}<button type="button" class="one-remove-range" data-one-act="${prefix}-remove-plz" data-one-value="${escapeHtml(p)}">×</button></span>`).join('') : '<span class="muted">Noch keine einzelne PLZ zugeordnet.</span>'}</div>`}`;
-}
+const ONE_WIZARD_STEPS = ['person','team','funktion','medical','fertig'];
 function oneViewStaffWizard(){
   const w = state.one.wizard; const step = w.step; const d = w.data;
   const stepIndex = ONE_WIZARD_STEPS.indexOf(step);
@@ -2663,8 +2786,14 @@ function oneViewStaffWizard(){
       <div class="one-wizard-actions"><button class="one-btn primary" data-one-act="wizard-next" ${d.name.trim()?'':'disabled'}>Weiter</button></div>`;
   } else if (step === 'team'){
     body = `<h2>2. Team zuordnen</h2>
-      <p>Regionales Team, dem ${escapeHtml(d.name)} angehört.</p>
+      <p>Regionales Team, dem ${escapeHtml(d.name)} angehört — das zugehörige Gesamtgebiet wird automatisch übernommen.</p>
       <div class="one-choices">${ONE_TEAMS.map(t => `<button class="one-choice ${d.team===t.id?'on':''}" data-one-act="wizard-team" data-one-value="${t.id}">${t.label}</button>`).join('')}</div>
+      ${d.team ? `<div class="one-staff-label" style="margin-top:18px">Zusätzlich einzelne PLZ zuordnen (optional)</div>
+      <div class="one-plz-chip-row">
+        <input type="text" id="wizard-plz-input" placeholder="PLZ, z. B. 41234" maxlength="5" style="width:120px">
+        <button type="button" class="one-btn sm" data-one-act="wizard-add-plz">+ Hinzufügen</button>
+      </div>
+      <div class="one-plz-chips">${d.individualPlz.length ? d.individualPlz.map(p => `<span class="one-chip quiet">${escapeHtml(p)}<button type="button" class="one-remove-range" data-one-act="wizard-remove-plz" data-one-value="${escapeHtml(p)}">×</button></span>`).join('') : '<span class="muted">Nur nötig für Ausnahmen außerhalb des Gebiets.</span>'}</div>` : ''}
       <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.team?'':'disabled'}>Weiter</button></div>`;
   } else if (step === 'funktion'){
     body = `<h2>3. Funktion zuordnen</h2>
@@ -2682,13 +2811,8 @@ function oneViewStaffWizard(){
         <button class="one-choice ${d.medNonMed.includes('nonmedical')?'on':''}" data-one-act="wizard-medical" data-one-value="nonmedical">Non-Medical</button>
       </div>
       <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.medNonMed.length?'':'disabled'}>Weiter</button></div>`;
-  } else if (step === 'gebiet'){
-    body = `<h2>5. Gebiete zuweisen</h2>
-      <p>Gesamte Gebiete auswählen oder unter „Einzelne PLZ" gezielt einzelne Postleitzahlen zusätzlich zuordnen.</p>
-      ${oneWizardGebietTabHtml(d, 'wizard')}
-      <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next">Weiter</button></div>`;
   } else {
-    body = `<h2>6. Zusammenfassung</h2>
+    body = `<h2>5. Zusammenfassung</h2>
       <div class="one-chain" style="margin:14px 0">
         <div class="one-chain-step"><span class="k">Name</span><span class="v">${escapeHtml(d.name)}</span></div>
         <div class="one-chain-step"><span class="k">Team</span><span class="v">${escapeHtml(oneTeamLabel(d.team))}</span></div>
@@ -3343,7 +3467,7 @@ function oneSuggestEmail(name){
   return vorname + '.' + nachname + '@schumacher-online.com';
 }
 function oneStartWizard(){
-  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, medNonMed:[], territories:[], individualPlz:[], gebietTab:'gebiete' } };
+  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, medNonMed:[], territories:[], individualPlz:[] } };
 }
 function oneWizardCommit(){
   const O = state.one; const d = O.wizard.data;
@@ -3549,7 +3673,11 @@ function bindOne(){
       render(); return;
     }
     if (a === 'add-staff'){ oneStartWizard(); render(); return; }
-    if (a === 'wizard-team'){ O.wizard.data.team = el.dataset.oneValue; render(); return; }
+    if (a === 'wizard-team'){
+      O.wizard.data.team = el.dataset.oneValue;
+      O.wizard.data.territories = [el.dataset.oneValue]; // Team = Gesamtgebiet, keine getrennte Abfrage mehr nötig
+      render(); return;
+    }
     if (a === 'wizard-funktion'){ O.wizard.data.funktion = el.dataset.oneValue; render(); return; }
     if (a === 'wizard-medical'){
       const v = el.dataset.oneValue; const list = O.wizard.data.medNonMed;
@@ -3561,7 +3689,6 @@ function bindOne(){
       O.wizard.data.territories = t.includes(id) ? t.filter(x=>x!==id) : t.concat([id]);
       render(); return;
     }
-    if (a === 'wizard-tab'){ O.wizard.data.gebietTab = el.dataset.oneValue; render(); return; }
     if (a === 'wizard-add-plz'){
       const inp = document.getElementById('wizard-plz-input');
       const val = (inp && inp.value || '').trim();
