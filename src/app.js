@@ -1813,12 +1813,11 @@ function bind() {
     e.preventDefault();
     const name = ($('#regionLoginName')||{}).value || '';
     const pw = ($('#regionLoginPw')||{}).value || '';
-    const match = (state.one.users||[]).find(u => u.role==='employee' && u.name.trim().toLowerCase() === name.trim().toLowerCase() && u.password === pw);
+    const match = (state.one.users||[]).find(u => u.name.trim().toLowerCase() === name.trim().toLowerCase() && u.password === pw);
     if (!match){ state.regionLoginError = 'Name oder Passwort unbekannt.'; state.regionLoginName = name; render(); return; }
     if (!match.active){ state.regionLoginError = 'Dieser Zugang ist deaktiviert.'; state.regionLoginName = name; render(); return; }
-    if (!match.team){ state.regionLoginError = 'Für ' + match.name + ' ist im Admin-Bereich noch kein Team hinterlegt.'; state.regionLoginName = name; render(); return; }
-    state.region = match.team;
-    localStorage.setItem('region', state.region);
+    if (match.role==='employee' && !match.team){ state.regionLoginError = 'Für ' + match.name + ' ist im Admin-Bereich noch kein Team hinterlegt.'; state.regionLoginName = name; render(); return; }
+    if (match.team){ state.region = match.team; localStorage.setItem('region', state.region); }
     state.repName = match.name;
     localStorage.setItem('repName', state.repName);
     state.regionLoginError = ''; state.regionLoginName = '';
