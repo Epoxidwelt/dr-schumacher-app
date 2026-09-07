@@ -35,6 +35,7 @@ def build():
     app_js = (ROOT / "src/app.js").read_text(encoding="utf-8")
     styles_css = (ROOT / "src/styles.css").read_text(encoding="utf-8")
     xlsx_js = (ROOT / "vendor/xlsx.mini.min.js").read_text(encoding="utf-8")
+    leaflet_css = (ROOT / "vendor/leaflet.css").read_text(encoding="utf-8")
     logo_bytes = (ROOT / "public/assets/dr-schumacher-logo.png").read_bytes()
 
     assert "�" not in xlsx_js, "vendor xlsx build contains U+FFFD - Artifact publish will reject it"
@@ -49,9 +50,13 @@ def build():
     html = f"""<title>Dr. Schumacher Produktberater</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
+{leaflet_css}
+</style>
+<style>
 {styles_css}
 </style>
 <div id="app"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
 {xlsx_js}
 </script>
