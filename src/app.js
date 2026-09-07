@@ -2367,14 +2367,15 @@ function oneSeed() {
       {id:'k5', externeNr:'EX-10025', kundenNr:'K-4475', name:'Dentalzentrum Düsseldorf',plz:'40210', ort:'Düsseldorf',strasse:'Königsallee',      hausnummer:'21', bezirk:'Stadtmitte',preisliste:'UVP',  email:'sarah.becker@example.com',    comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-1)},
       {id:'k6', externeNr:'EX-10026', kundenNr:'K-4476', name:'Praxis Rheinblick',       plz:'41460', ort:'Neuss',     strasse:'Further Straße',   hausnummer:'56', bezirk:'Furth',     preisliste:'PL 1', email:'daniel.weber@example.com',    comm:'widerspruch', active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,5)},
       {id:'k7', externeNr:'EX-10027', kundenNr:'K-4477', name:'Dentalzentrum Stuttgart', plz:'70173', ort:'Stuttgart', strasse:'Königstraße',      hausnummer:'9', bezirk:'Mitte',     preisliste:'UVP',  email:'julia.wagner@example.com',    comm:'frei',        active:true, override:null, abc:null,nextFollowUp:null},
-      {id:'k8', externeNr:'EX-10028', kundenNr:'K-4478', name:'Praxis München',          plz:'80331', ort:'München',   strasse:'Sendlinger Straße',hausnummer:'18', bezirk:'Altstadt',  preisliste:'PL 3', email:'michael.fischer@example.com', comm:'bestand',     active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,80)}
+      {id:'k8', externeNr:'EX-10028', kundenNr:'K-4478', name:'Praxis München',          plz:'80331', ort:'München',   strasse:'Sendlinger Straße',hausnummer:'18', bezirk:'Altstadt',  preisliste:'PL 3', email:'michael.fischer@example.com', comm:'bestand',     active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,80)},
+      {id:'k9', externeNr:'EX-10029', kundenNr:'K-4479', name:'Praxis Grenzfall',        plz:'99999', ort:'',          strasse:'',                 hausnummer:'',   bezirk:'',          preisliste:'UVP',  email:'',                            comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null}
     ],
     users:[
-      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           team:null,   territories:[],       active:true},
-      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', team:'nord', territories:['nord'], active:true},
-      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', team:'ost',  territories:['ost'],  active:true},
-      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', team:'west', territories:['west'], active:true},
-      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  team:'sued', territories:['sued'], active:true}
+      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           medNonMed:null,       team:null,   territories:[],       individualPlz:[], active:true},
+      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:'medical',    team:'nord', territories:['nord'], individualPlz:[], active:true},
+      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:'nonmedical', team:'ost',  territories:['ost'],  individualPlz:[], active:true},
+      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:'medical',    team:'west', territories:['west'], individualPlz:[], active:true},
+      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:'nonmedical', team:'sued', territories:['sued'], individualPlz:[], active:true}
     ],
     templates:[
       {id:'t1', name:'Produktneuheit',            promo:true,  subject:'Neu im Sortiment: {{produkt}}',                 body:'wir haben unser Sortiment erweitert. {{produkt}} ist ab sofort lieferbar.\n\nGerne stelle ich Ihnen das Produkt bei Ihrem nächsten Termin persönlich vor.'},
@@ -2394,7 +2395,8 @@ function oneSeed() {
     newContact:null,   // Formularentwurf für "Kontakt hinzufügen" (Admin oder Mitarbeiter)
     importStatus:'',   // Textmeldung nach simuliertem Import
     wizard:null,        // {step, data} während "Mitarbeiter anlegen"
-    ownPwMessage:null
+    ownPwMessage:null,
+    staffTab:{}       // {[userId]: 'gebiete'|'plz'} - welcher Gebiet-Reiter je Mitarbeiter offen ist
   };
 }
 state.one = oneSeed();
@@ -2423,8 +2425,21 @@ function oneVisibleContacts(user, o){
   if (!user || user.role === 'admin') return O.contacts.slice();
   if (!user.active) return [];
   const allowed = new Set(user.territories);
-  return O.contacts.filter(c => { const t = oneTerritoryOfContact(c, O.territories); return t && allowed.has(t.id); });
+  const indivPlz = new Set(user.individualPlz || []);
+  return O.contacts.filter(c => {
+    const t = oneTerritoryOfContact(c, O.territories);
+    if (t && allowed.has(t.id)) return true;
+    return c.plz && indivPlz.has(c.plz);
+  });
 }
+// Ein Kontakt gilt als zugeordnet, sobald ihn ein Gebiet (per PLZ oder Override) trägt
+// oder seine PLZ einem Mitarbeiter direkt als Einzel-PLZ zugewiesen wurde.
+function oneContactIsAssigned(c, o){
+  const O = o || state.one;
+  if (oneTerritoryOfContact(c, O.territories)) return true;
+  return c.plz && O.users.some(u => u.role==='employee' && (u.individualPlz||[]).includes(c.plz));
+}
+function oneMedLabel(m){ return m === 'medical' ? 'Medical' : m === 'nonmedical' ? 'Non-Medical' : '—'; }
 function oneCanAccessContact(user, contactId, o){
   return oneVisibleContacts(user, o).some(c => c.id === contactId);
 }
@@ -2553,6 +2568,25 @@ function oneViewDashboard(){
   `;
 }
 
+function oneStaffGebietTabHtml(u){
+  const O = state.one;
+  const tab = (O.staffTab && O.staffTab[u.id]) || 'gebiete';
+  return `<div class="one-tabs">
+      <button type="button" class="one-tab ${tab==='gebiete'?'on':''}" data-one-act="staff-gebiet-tab" data-one-id="${u.id}" data-one-value="gebiete" ${u.active?'':'disabled'}>Gesamtgebiete</button>
+      <button type="button" class="one-tab ${tab==='plz'?'on':''}" data-one-act="staff-gebiet-tab" data-one-id="${u.id}" data-one-value="plz" ${u.active?'':'disabled'}>Einzelne PLZ</button>
+    </div>
+    ${tab==='gebiete' ? `<div class="one-terr-picker">${O.territories.map(t => {
+        const on = u.territories.includes(t.id);
+        return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}">
+          <input type="checkbox" data-one-terr-toggle="${u.id}" value="${t.id}" ${on?'checked':''} ${u.active?'':'disabled'}>
+          ${escapeHtml(t.name)}</label>`;
+      }).join('')}</div>`
+    : `<div class="one-plz-chip-row">
+        <input type="text" id="staff-plz-input-${u.id}" placeholder="PLZ, z. B. 41234" maxlength="5" style="width:120px" ${u.active?'':'disabled'}>
+        <button type="button" class="one-btn sm" data-one-act="staff-add-plz" data-one-id="${u.id}" ${u.active?'':'disabled'}>+ Hinzufügen</button>
+      </div>
+      <div class="one-plz-chips">${(u.individualPlz||[]).length ? u.individualPlz.map(p => `<span class="one-chip quiet">${escapeHtml(p)}<button type="button" class="one-remove-range" data-one-act="staff-remove-plz" data-one-id="${u.id}" data-one-value="${escapeHtml(p)}">×</button></span>`).join('') : '<span class="muted">Noch keine einzelne PLZ zugeordnet.</span>'}</div>`}`;
+}
 function oneViewStaff(){
   const O = state.one;
   if (O.wizard) return oneViewStaffWizard();
@@ -2561,41 +2595,59 @@ function oneViewStaff(){
   <div class="one-page-head"><div>
     <span class="one-eyebrow">Administration</span>
     <h1>Mitarbeiter</h1>
-    <p>Team, Funktion und Gebiete per Klick zuweisen. Die Kontaktliste des Mitarbeiters ändert sich sofort mit — sichtbar in der Spalte rechts.</p>
+    <p>Team, Funktion, Kundenkreis und Gebiete per Klick zuweisen. Die Kontaktliste des Mitarbeiters ändert sich sofort mit.</p>
   </div><div class="one-spacer"></div>
   <button class="one-btn primary" data-one-act="add-staff">Mitarbeiter anlegen</button></div>
-  <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
-    <thead><tr><th>Mitarbeiter</th><th>Team</th><th>Funktion</th><th style="min-width:290px">Gebiete</th><th>Sieht Kontakte</th><th>Status</th><th></th></tr></thead>
-    <tbody>${emps.map(u => {
-      const vis = oneVisibleContacts(u);
-      return `<tr>
-        <td><div class="strong">${escapeHtml(u.name)}</div><div class="muted mono" style="font-size:12px">${escapeHtml(u.email)}</div></td>
-        <td class="muted">${escapeHtml(oneTeamLabel(u.team))}</td>
-        <td><div class="one-terr-picker">${[['aussendienst','Außendienst'],['innendienst','Innendienst']].map(([k,label]) => {
-            const on = u.funktion === k;
-            return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}">
-              <input type="radio" name="one-funktion-${u.id}" data-one-funktion="${u.id}" value="${k}" ${on?'checked':''} ${u.active?'':'disabled'}>
-              ${label}</label>`;
-          }).join('')}</div></td>
-        <td><div class="one-terr-picker">${O.territories.map(t => {
-            const on = u.territories.includes(t.id);
-            return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}">
-              <input type="checkbox" data-one-terr-toggle="${u.id}" value="${t.id}" ${on?'checked':''} ${u.active?'':'disabled'}>
-              ${escapeHtml(t.name)}</label>`;
-          }).join('')}</div></td>
-        <td class="num strong" style="font-size:16px">${u.active ? vis.length : 0}</td>
-        <td>${u.active ? '<span class="one-chip ok">aktiv</span>' : '<span class="one-chip stop">deaktiviert</span>'}</td>
-        <td style="text-align:right"><button class="one-btn sm ${u.active?'danger':''}" data-one-act="toggle-active" data-one-id="${u.id}">${u.active?'Deaktivieren':'Reaktivieren'}</button></td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table></div></div></div>
+  ${emps.map(u => {
+    const vis = oneVisibleContacts(u);
+    return `<div class="one-panel">
+      <div class="one-panel-head">
+        <h2>${escapeHtml(u.name)}</h2>
+        <span class="muted mono" style="font-size:12px">${escapeHtml(u.email)}</span>
+        <div class="one-spacer"></div>
+        <span class="one-chip ${u.active?'ok':'stop'}">${u.active?'aktiv':'deaktiviert'}</span>
+        <span class="one-chip quiet">${vis.length} Kontakte</span>
+        <button class="one-btn sm ${u.active?'danger':''}" data-one-act="toggle-active" data-one-id="${u.id}">${u.active?'Deaktivieren':'Reaktivieren'}</button>
+      </div>
+      <div class="one-panel-body">
+        <div class="one-staff-grid">
+          <div><div class="one-staff-label">Team</div><select class="f" data-one-team="${u.id}" ${u.active?'':'disabled'}>${ONE_TEAMS.map(t=>`<option value="${t.id}" ${u.team===t.id?'selected':''}>${t.label}</option>`).join('')}</select></div>
+          <div><div class="one-staff-label">Funktion</div><div class="one-terr-picker">${[['aussendienst','Außendienst'],['innendienst','Innendienst']].map(([k,label]) => {
+              const on = u.funktion === k;
+              return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}"><input type="radio" name="one-funktion-${u.id}" data-one-funktion="${u.id}" value="${k}" ${on?'checked':''} ${u.active?'':'disabled'}>${label}</label>`;
+            }).join('')}</div></div>
+          <div><div class="one-staff-label">Kundenkreis</div><div class="one-terr-picker">${[['medical','Medical'],['nonmedical','Non-Medical']].map(([k,label]) => {
+              const on = u.medNonMed === k;
+              return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}"><input type="radio" name="one-medical-${u.id}" data-one-medical="${u.id}" value="${k}" ${on?'checked':''} ${u.active?'':'disabled'}>${label}</label>`;
+            }).join('')}</div></div>
+        </div>
+        <div class="one-staff-label" style="margin-top:16px">Gebiet</div>
+        ${oneStaffGebietTabHtml(u)}
+      </div>
+    </div>`;
+  }).join('')}
   <div class="one-panel"><div class="one-panel-head"><h2>Was beim Wechsel passiert</h2></div><div class="one-panel-body">
     <div class="one-note">Deaktivieren sperrt den Zugang sofort. Das Gebiet bleibt bestehen und wird der Nachfolge zugewiesen — die Kontakte des Gebiets sind damit ohne jede Datenmigration wieder betreut.</div>
     <div class="one-note warn" style="margin-top:10px">Im Prototyp endet die Sperre bei der Oberfläche. Produktiv muss sie Sitzung und Token sofort ungültig machen, sonst arbeitet ein offener Client weiter.</div>
   </div></div>`;
 }
 
-const ONE_WIZARD_STEPS = ['person','team','funktion','gebiet','fertig'];
+const ONE_WIZARD_STEPS = ['person','team','funktion','medical','gebiet','fertig'];
+function oneWizardGebietTabHtml(d, prefix){
+  const tab = d.gebietTab || 'gebiete';
+  const plzList = d.individualPlz || [];
+  return `<div class="one-tabs">
+      <button type="button" class="one-tab ${tab==='gebiete'?'on':''}" data-one-act="${prefix}-tab" data-one-value="gebiete">Gesamtgebiete</button>
+      <button type="button" class="one-tab ${tab==='plz'?'on':''}" data-one-act="${prefix}-tab" data-one-value="plz">Einzelne PLZ</button>
+    </div>
+    ${tab==='gebiete' ? `<div class="one-terr-picker">${state.one.territories.map(t => `<label class="one-terr-opt ${d.territories.includes(t.id)?'on':''}">
+        <input type="checkbox" data-one-act="${prefix}-terr" data-one-value="${t.id}" ${d.territories.includes(t.id)?'checked':''}>${escapeHtml(t.name)}</label>`).join('')}</div>`
+    : `<div class="one-plz-chip-row">
+        <input type="text" id="${prefix}-plz-input" placeholder="PLZ, z. B. 41234" maxlength="5" style="width:120px">
+        <button type="button" class="one-btn sm" data-one-act="${prefix}-add-plz">+ Hinzufügen</button>
+      </div>
+      <div class="one-plz-chips">${plzList.length ? plzList.map(p => `<span class="one-chip quiet">${escapeHtml(p)}<button type="button" class="one-remove-range" data-one-act="${prefix}-remove-plz" data-one-value="${escapeHtml(p)}">×</button></span>`).join('') : '<span class="muted">Noch keine einzelne PLZ zugeordnet.</span>'}</div>`}`;
+}
 function oneViewStaffWizard(){
   const w = state.one.wizard; const step = w.step; const d = w.data;
   const stepIndex = ONE_WIZARD_STEPS.indexOf(step);
@@ -2621,25 +2673,33 @@ function oneViewStaffWizard(){
         <button class="one-choice ${d.funktion==='innendienst'?'on':''}" data-one-act="wizard-funktion" data-one-value="innendienst">Innendienst</button>
       </div>
       <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.funktion?'':'disabled'}>Weiter</button></div>`;
+  } else if (step === 'medical'){
+    body = `<h2>4. Medical oder Non-Medical?</h2>
+      <p>Ordnet ${escapeHtml(d.name)} dem passenden Kundenkreis zu.</p>
+      <div class="one-choices">
+        <button class="one-choice ${d.medNonMed==='medical'?'on':''}" data-one-act="wizard-medical" data-one-value="medical">Medical</button>
+        <button class="one-choice ${d.medNonMed==='nonmedical'?'on':''}" data-one-act="wizard-medical" data-one-value="nonmedical">Non-Medical</button>
+      </div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.medNonMed?'':'disabled'}>Weiter</button></div>`;
   } else if (step === 'gebiet'){
-    body = `<h2>4. Gebiete zuweisen</h2>
-      <p>PLZ-Gebiete, für die ${escapeHtml(d.name)} Kontakte sehen darf. Manuell auswählen — keine Automatik.</p>
-      <div class="one-terr-picker">${state.one.territories.map(t => `<label class="one-terr-opt ${d.territories.includes(t.id)?'on':''}">
-        <input type="checkbox" data-one-act="wizard-terr" data-one-value="${t.id}" ${d.territories.includes(t.id)?'checked':''}>${escapeHtml(t.name)}</label>`).join('')}</div>
+    body = `<h2>5. Gebiete zuweisen</h2>
+      <p>Gesamte Gebiete auswählen oder unter „Einzelne PLZ" gezielt einzelne Postleitzahlen zusätzlich zuordnen.</p>
+      ${oneWizardGebietTabHtml(d, 'wizard')}
       <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next">Weiter</button></div>`;
   } else {
-    body = `<h2>5. Zusammenfassung</h2>
+    body = `<h2>6. Zusammenfassung</h2>
       <div class="one-chain" style="margin:14px 0">
         <div class="one-chain-step"><span class="k">Name</span><span class="v">${escapeHtml(d.name)}</span></div>
         <div class="one-chain-step"><span class="k">Team</span><span class="v">${escapeHtml(oneTeamLabel(d.team))}</span></div>
         <div class="one-chain-step"><span class="k">Funktion</span><span class="v">${escapeHtml(oneFunktionLabel(d.funktion))}</span></div>
-        <div class="one-chain-step is-accent"><span class="k">Gebiete</span><span class="v">${d.territories.length ? d.territories.map(id=>oneTerrById(id).name).join(', ') : 'keine'}</span></div>
+        <div class="one-chain-step"><span class="k">Kundenkreis</span><span class="v">${escapeHtml(oneMedLabel(d.medNonMed))}</span></div>
+        <div class="one-chain-step is-accent"><span class="k">Gebiete</span><span class="v">${d.territories.length ? d.territories.map(id=>oneTerrById(id).name).join(', ') : 'keine'}${d.individualPlz.length ? ' + PLZ ' + d.individualPlz.join(', ') : ''}</span></div>
       </div>
       <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-finish">Mitarbeiter speichern</button></div>`;
   }
   return `<div class="one-page-head"><div><span class="one-eyebrow">Administration · Neuer Mitarbeiter</span><h1>Schritt ${stepIndex+1} von ${ONE_WIZARD_STEPS.length}</h1></div></div>
   <div class="one-panel"><div class="one-panel-body">${progress}${body}</div></div>
-  <div class="one-panel"><div class="one-panel-body"><div class="one-note">Alle Angaben lassen sich in dieser einen Ansicht erledigen — kein Wechsel in eine andere Tabelle nötig, um Team, Funktion oder Gebiet nachzutragen.</div></div></div>`;
+  <div class="one-panel"><div class="one-panel-body"><div class="one-note">Alle Angaben lassen sich in dieser einen Ansicht erledigen — kein Wechsel in eine andere Tabelle nötig, um Team, Funktion, Kundenkreis oder Gebiet nachzutragen.</div></div></div>`;
 }
 
 function oneRangeOverlaps(territories){
@@ -2713,6 +2773,30 @@ function oneContactFormHtml(){
       </div>
     </div></div>`;
 }
+function oneViewUnassignedPanel(){
+  const O = state.one;
+  const unassigned = O.contacts.filter(c => !oneContactIsAssigned(c));
+  if (!unassigned.length){
+    return `<div class="one-panel"><div class="one-panel-body"><div class="one-note">Alle Kontakte sind einem Gebiet zugeordnet.</div></div></div>`;
+  }
+  return `<div class="one-panel">
+    <div class="one-panel-head"><h2>Nicht zugeordnete Kontakte (${unassigned.length})</h2>
+      <p>Die PLZ fehlt oder passt in keinen definierten Bereich. Hier einzeln einem Gebiet zuordnen.</p></div>
+    <div class="one-panel-body flush">${unassigned.map(c => `<div class="one-task-row">
+        <div class="one-task-info">
+          <div><div class="strong">${escapeHtml(c.name)}</div><div class="muted" style="font-size:12.5px">${c.plz ? 'PLZ ' + escapeHtml(c.plz) + (c.ort?', '+escapeHtml(c.ort):'') : 'Keine PLZ hinterlegt'}</div></div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center">
+          <select class="f" id="unassigned-terr-${c.id}" style="width:auto">
+            <option value="">Gebiet wählen …</option>
+            ${O.territories.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}
+          </select>
+          <button class="one-btn sm primary" data-one-act="assign-contact" data-one-id="${c.id}">Zuordnen</button>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
 function oneViewContacts(){
   const O = state.one;
   return `
@@ -2726,6 +2810,7 @@ function oneViewContacts(){
   <button class="one-btn" data-one-act="export">CSV exportieren</button></div>
   ${O.newContact ? oneContactFormHtml() : ''}
   ${O.importStatus ? `<div class="one-panel"><div class="one-panel-body"><div class="one-note">${escapeHtml(O.importStatus)}</div></div></div>` : ''}
+  ${oneViewUnassignedPanel()}
   <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
     <thead><tr><th>Kundennr.</th><th>Name</th><th>Ort</th><th>Gebiet</th><th>Preisliste</th><th>Verantwortlich</th><th>Einstufung</th><th>Wiedervorlage</th><th>Kommunikation</th><th></th></tr></thead>
     <tbody>${O.contacts.map(c => { const resp = oneResponsibleFor(c); return `<tr>
@@ -3257,14 +3342,14 @@ function oneSuggestEmail(name){
   return vorname + '.' + nachname + '@schumacher-online.com';
 }
 function oneStartWizard(){
-  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, territories:[] } };
+  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, medNonMed:null, territories:[], individualPlz:[], gebietTab:'gebiete' } };
 }
 function oneWizardCommit(){
   const O = state.one; const d = O.wizard.data;
   const n = O.users.filter(x=>x.role==='employee').length + 1;
   const id = 'm' + n + '-' + Date.now().toString(36);
-  O.users.push({ id, name:d.name.trim(), email:d.email.trim() || (id+'@example.com'), password:d.password.trim() || '1234', role:'employee', funktion:d.funktion, team:d.team, territories:d.territories.slice(), active:true });
-  oneAudit('Mitarbeiter angelegt', d.name + ' — ' + oneTeamLabel(d.team) + ' · ' + oneFunktionLabel(d.funktion) + ' · ' + (d.territories.length ? d.territories.map(t=>oneTerrById(t).name).join(', ') : 'ohne Gebiet'));
+  O.users.push({ id, name:d.name.trim(), email:d.email.trim() || (id+'@example.com'), password:d.password.trim() || '1234', role:'employee', funktion:d.funktion, medNonMed:d.medNonMed, team:d.team, territories:d.territories.slice(), individualPlz:d.individualPlz.slice(), active:true });
+  oneAudit('Mitarbeiter angelegt', d.name + ' — ' + oneTeamLabel(d.team) + ' · ' + oneFunktionLabel(d.funktion) + ' · ' + oneMedLabel(d.medNonMed) + ' · ' + (d.territories.length ? d.territories.map(t=>oneTerrById(t).name).join(', ') : 'ohne Gebiet'));
   O.wizard = null;
   onePersistUsers();
 }
@@ -3320,6 +3405,20 @@ function bindOne(){
     const u = O.users.find(x => x.id === input.dataset.oneFunktion);
     u.funktion = input.value;
     oneAudit('Funktion geändert', u.name + ' → ' + oneFunktionLabel(u.funktion));
+    onePersistUsers();
+    render();
+  });
+  document.querySelectorAll('[data-one-medical]').forEach(input => input.onchange = () => {
+    const u = O.users.find(x => x.id === input.dataset.oneMedical);
+    u.medNonMed = input.value;
+    oneAudit('Kundenkreis geändert', u.name + ' → ' + oneMedLabel(u.medNonMed));
+    onePersistUsers();
+    render();
+  });
+  document.querySelectorAll('[data-one-team]').forEach(sel => sel.onchange = () => {
+    const u = O.users.find(x => x.id === sel.dataset.oneTeam);
+    u.team = sel.value;
+    oneAudit('Team geändert', u.name + ' → ' + oneTeamLabel(u.team));
     onePersistUsers();
     render();
   });
@@ -3395,6 +3494,37 @@ function bindOne(){
     if (a === 'logout'){ oneAudit('Abgemeldet', oneCurrentUser() ? oneCurrentUser().name : ''); O.loggedInUserId = null; O.loginName=''; O.loginPassword=''; O.forgotMode=false; O.forgotDone=false; render(); return; }
     if (a === 'forgot-password'){ O.forgotMode = true; O.forgotDone = false; render(); return; }
     if (a === 'back-to-login'){ O.forgotMode = false; O.forgotDone = false; O.authError=''; render(); return; }
+    if (a === 'assign-contact'){
+      const c = O.contacts.find(x => x.id === el.dataset.oneId);
+      const sel = document.getElementById('unassigned-terr-'+c.id);
+      const terrId = sel && sel.value;
+      if (!terrId){ return; }
+      c.override = terrId;
+      oneAudit('Kontakt manuell zugeordnet', c.name + ' → ' + oneTerrById(terrId).name);
+      render(); return;
+    }
+    if (a === 'staff-gebiet-tab'){ O.staffTab[el.dataset.oneId] = el.dataset.oneValue; render(); return; }
+    if (a === 'staff-add-plz'){
+      const u = O.users.find(x => x.id === el.dataset.oneId);
+      const inp = document.getElementById('staff-plz-input-'+u.id);
+      const val = (inp && inp.value || '').trim();
+      if (/^\d{5}$/.test(val)){
+        u.individualPlz = u.individualPlz || [];
+        if (!u.individualPlz.includes(val)){
+          u.individualPlz.push(val);
+          oneAudit('Einzelne PLZ zugeordnet', 'PLZ ' + val + ' → ' + u.name);
+          onePersistUsers();
+        }
+      }
+      render(); return;
+    }
+    if (a === 'staff-remove-plz'){
+      const u = O.users.find(x => x.id === el.dataset.oneId);
+      u.individualPlz = (u.individualPlz||[]).filter(p => p !== el.dataset.oneValue);
+      oneAudit('Einzelne PLZ entfernt', 'PLZ ' + el.dataset.oneValue + ' von ' + u.name);
+      onePersistUsers();
+      render(); return;
+    }
     if (a === 'add-range'){
       const terr = oneTerrById(el.dataset.oneId);
       const last = terr.ranges[terr.ranges.length-1];
@@ -3419,9 +3549,21 @@ function bindOne(){
     if (a === 'add-staff'){ oneStartWizard(); render(); return; }
     if (a === 'wizard-team'){ O.wizard.data.team = el.dataset.oneValue; render(); return; }
     if (a === 'wizard-funktion'){ O.wizard.data.funktion = el.dataset.oneValue; render(); return; }
+    if (a === 'wizard-medical'){ O.wizard.data.medNonMed = el.dataset.oneValue; render(); return; }
     if (a === 'wizard-terr'){
       const id = el.dataset.oneValue; const t = O.wizard.data.territories;
       O.wizard.data.territories = t.includes(id) ? t.filter(x=>x!==id) : t.concat([id]);
+      render(); return;
+    }
+    if (a === 'wizard-tab'){ O.wizard.data.gebietTab = el.dataset.oneValue; render(); return; }
+    if (a === 'wizard-add-plz'){
+      const inp = document.getElementById('wizard-plz-input');
+      const val = (inp && inp.value || '').trim();
+      if (/^\d{5}$/.test(val) && !O.wizard.data.individualPlz.includes(val)) O.wizard.data.individualPlz.push(val);
+      render(); return;
+    }
+    if (a === 'wizard-remove-plz'){
+      O.wizard.data.individualPlz = O.wizard.data.individualPlz.filter(p => p !== el.dataset.oneValue);
       render(); return;
     }
     if (a === 'wizard-next'){
