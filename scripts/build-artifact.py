@@ -47,6 +47,7 @@ def build():
     )
 
     html = f"""<title>Dr. Schumacher Produktberater</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 {styles_css}
 </style>

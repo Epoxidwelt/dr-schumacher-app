@@ -368,7 +368,7 @@ function migrateFavorites(raw) {
 const storedProfile = localStorage.getItem('activeProfile') || '';
 if (storedProfile && !localStorage.getItem('priceList')) localStorage.setItem('priceList', 'UVP');
 const state = {
-  screen: storedProfile ? 'menu' : 'profile',
+  screen: storedProfile ? (storedProfile === 'admin' ? 'one' : 'menu') : 'profile',
   activeProfile: storedProfile,
   region: localStorage.getItem('region') || '',
   priceList: localStorage.getItem('priceList') || 'UVP',
@@ -515,6 +515,7 @@ function render() {
   if (state.screen === 'profile') html = profileScreen();
   if (state.screen === 'prices') html = priceScreen();
   if (state.screen === 'region') html = regionScreen();
+  if (state.screen === 'one') html = oneRender();
   if (state.screen === 'menu') html = header() + menuScreen() + bottomNav('home');
   if (state.screen === 'products') html = header(true) + productsScreen() + bottomNav('search');
   if (state.screen === 'detail') html = header(true) + detailScreen() + bottomNav('search');
@@ -1759,7 +1760,7 @@ function bind() {
     state.activeProfile=button.dataset.profile;
     localStorage.setItem('activeProfile',state.activeProfile);
     if (!localStorage.getItem('priceList')) { state.priceList='UVP'; localStorage.setItem('priceList','UVP'); }
-    state.screen = (state.activeProfile==='sales' && !state.region) ? 'region' : 'menu';
+    state.screen = state.activeProfile==='admin' ? 'one' : (state.activeProfile==='sales' && !state.region) ? 'region' : 'menu';
     render();
   });
   document.querySelectorAll('[data-region]').forEach(button => button.onclick = () => {
@@ -1912,6 +1913,7 @@ function bind() {
     if (nav==='settings') state.screen='settings';
     render();
   });
+  bindOne();
 }
 
 function toggleCompare(id) {
@@ -2265,6 +2267,785 @@ async function syncLiveFacts(manual=false) {
     if (manual && status) status.textContent = 'Live-Abgleich fehlgeschlagen: ' + error.message + ' – zuletzt gespeicherter Stand bleibt aktiv.';
     console.warn('Verkaufsargumente-Sync von Google Sheets fehlgeschlagen', error);
   }
+}
+
+/* ================================================================
+   DR. SCHUMACHER ONE — Gebietsrechte-, Kontakt- und E-Mail-Prototyp
+   Nur für die Benutzerrolle "Administrator" erreichbar (state.screen
+   === 'one'). Eigener Namensraum unter state.one, eigenes "one-"
+   Klassenpräfix in styles.css, eigene "data-one-*" Attribute — bewusst
+   getrennt vom Produktkatalog-Teil der App, damit dieses Modul später
+   unabhängig weiterentwickelt oder ausgelagert werden kann.
+   Alle Personen- und Firmendaten unten sind erfundene Demodaten.
+   ================================================================ */
+
+const ONE_TERRITORIES = [
+  { id:'nord', name:'Norden', cls:'nord', ranges:[{from:20000, to:29999}] },
+  { id:'ost',  name:'Osten',  cls:'ost',  ranges:[{from:1000,  to:19999}] },
+  { id:'west', name:'Westen', cls:'west', ranges:[{from:40000, to:49999}] },
+  { id:'sued', name:'Süden',  cls:'sued', ranges:[{from:70000, to:89999}] }
+];
+const ONE_COMM = {
+  frei:       { label:'Einwilligung',  chip:'ok',    hint:'Einwilligung dokumentiert – werbliche Mails zulässig.' },
+  bestand:    { label:'Bestandskunde', chip:'quiet', hint:'§ 7 Abs. 3 UWG – nur eigene ähnliche Produkte, Widerspruch jederzeit möglich.' },
+  widerspruch:{ label:'Widerspruch',   chip:'stop',  hint:'Hat der Werbung widersprochen – nur noch zwingende Service-Informationen.' }
+};
+const ONE_ADMIN_PASSWORD = '1234';
+
+function oneSeed() {
+  return {
+    tenant:{ name:'Dr. Schumacher', short:'DS' },
+    territories: JSON.parse(JSON.stringify(ONE_TERRITORIES)),
+    contacts:[
+      {id:'k1', company:'Dentalzentrum Hamburg',   first:'Anna',    last:'Petersen', email:'anna.petersen@example.com',   plz:'20095', group:'Dental', segment:'Praxis', comm:'frei',        active:true, override:null},
+      {id:'k2', company:'Praxis Nordblick',        first:'Jan',     last:'Hansen',   email:'jan.hansen@example.com',      plz:'24103', group:'Dental', segment:'Praxis', comm:'bestand',     active:true, override:null},
+      {id:'k3', company:'Dentalzentrum Leipzig',   first:'Laura',   last:'Richter',  email:'laura.richter@example.com',   plz:'04109', group:'Dental', segment:'Praxis', comm:'frei',        active:true, override:null},
+      {id:'k4', company:'Praxis Dresden',          first:'Thomas',  last:'Berger',   email:'thomas.berger@example.com',   plz:'01067', group:'Dental', segment:'Praxis', comm:'bestand',     active:true, override:null},
+      {id:'k5', company:'Dentalzentrum Düsseldorf',first:'Sarah',   last:'Becker',   email:'sarah.becker@example.com',    plz:'40210', group:'Dental', segment:'Klinik', comm:'frei',        active:true, override:null},
+      {id:'k6', company:'Praxis Rheinblick',       first:'Daniel',  last:'Weber',    email:'daniel.weber@example.com',    plz:'41460', group:'Dental', segment:'Praxis', comm:'widerspruch', active:true, override:null},
+      {id:'k7', company:'Dentalzentrum Stuttgart', first:'Julia',   last:'Wagner',   email:'julia.wagner@example.com',    plz:'70173', group:'Dental', segment:'Klinik', comm:'frei',        active:true, override:null},
+      {id:'k8', company:'Praxis München',          first:'Michael', last:'Fischer',  email:'michael.fischer@example.com', plz:'80331', group:'Dental', segment:'Praxis', comm:'bestand',     active:true, override:null}
+    ],
+    users:[
+      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', role:'admin',    team:'Zentrale', territories:[],       active:true},
+      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     role:'employee', team:'Dental',   territories:['nord'], active:true},
+      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     role:'employee', team:'Dental',   territories:['ost'],  active:true},
+      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     role:'employee', team:'Dental',   territories:['west'], active:true},
+      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     role:'employee', team:'Dental',   territories:['sued'], active:true}
+    ],
+    templates:[
+      {id:'t1', name:'Produktneuheit',            promo:true,  subject:'Neu im Sortiment: {{produkt}}',                 body:'wir haben unser Sortiment erweitert. {{produkt}} ist ab sofort lieferbar.\n\nGerne stelle ich Ihnen das Produkt bei Ihrem nächsten Termin persönlich vor.'},
+      {id:'t2', name:'Produkt wieder lieferbar',  promo:false, subject:'{{produkt}} ist wieder lieferbar',              body:'{{produkt}} ist ab sofort wieder uneingeschränkt lieferbar.\n\nBestellungen nimmt der Innendienst wie gewohnt entgegen.'},
+      {id:'t3', name:'Neue Zulassung',            promo:false, subject:'Aktualisierte Zulassung: {{produkt}}',          body:'für {{produkt}} liegt eine aktualisierte Zulassung vor. Die überarbeiteten Unterlagen finden Sie im Anhang.'},
+      {id:'t4', name:'Aktion',                    promo:true,  subject:'Aktion: {{produkt}}',                           body:'für {{produkt}} gilt bis zum Quartalsende eine Sonderkondition.\n\nSprechen Sie mich gerne an, wenn Sie ein Angebot wünschen.'},
+      {id:'t5', name:'Anwendungsinformation',     promo:false, subject:'Anwendungshinweis zu {{produkt}}',              body:'zu {{produkt}} gibt es einen aktualisierten Anwendungshinweis, insbesondere zur Einwirkzeit.\n\nDie vollständige Produktinformation finden Sie im Anhang.'},
+      {id:'t6', name:'Veranstaltung',             promo:true,  subject:'Einladung: {{produkt}}',                        body:'wir laden Sie herzlich zu unserer Fachveranstaltung ein.\n\nTermin und Programm entnehmen Sie bitte dem Anhang.'}
+    ],
+    audit:[], auditSeq:0,
+    session:'admin', view:'dashboard',
+    adminUnlocked:false, authError:'',
+    filters:{ q:'', terr:'', comm:'' },
+    selection:[], mailTemplate:'t1', mailProduct:'DESCOSEPT SPEZIAL', mailIntro:'', mailSent:null,
+    probe:{ user:'ma', contact:'k5', result:null },
+    tests:null
+  };
+}
+state.one = oneSeed();
+
+function oneTerritoryOfContact(c, terrs){
+  const T = terrs || state.one.territories;
+  if (c.override) return T.find(t => t.id === c.override) || null;
+  const n = parseInt(c.plz, 10);
+  if (isNaN(n)) return null;
+  for (const t of T) for (const r of t.ranges) if (n >= r.from && n <= r.to) return t;
+  return null;
+}
+function oneVisibleContacts(user, o){
+  const O = o || state.one;
+  if (!user || user.role === 'admin') return O.contacts.slice();
+  if (!user.active) return [];
+  const allowed = new Set(user.territories);
+  return O.contacts.filter(c => { const t = oneTerritoryOfContact(c, O.territories); return t && allowed.has(t.id); });
+}
+function oneCanAccessContact(user, contactId, o){
+  return oneVisibleContacts(user, o).some(c => c.id === contactId);
+}
+function oneCurrentUser(){ return state.one.users.find(u => u.id === state.one.session); }
+function oneTerrById(id){ return state.one.territories.find(t => t.id === id); }
+function oneAudit(action, detail){
+  const u = oneCurrentUser(); const O = state.one;
+  O.audit.unshift({ id:++O.auditSeq, time:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'}), actor:u ? u.name : '—', action, detail });
+  if (O.audit.length > 40) O.audit.pop();
+}
+function oneTerrChip(t){ return t ? `<span class="one-chip ${t.cls}">${escapeHtml(t.name)}</span>` : '<span class="one-chip none">nicht zugeordnet</span>'; }
+function oneCommChip(c){ const m = ONE_COMM[c.comm]; return `<span class="one-chip ${m.chip}">${escapeHtml(m.label)}</span>`; }
+
+const ONE_ADMIN_NAV = [
+  ['dashboard','Dashboard'], ['staff','Mitarbeiter'], ['terr','Gebiete'],
+  ['contacts','Kontakte'], ['templates','E-Mail-Vorlagen'], ['security','Sicherheit'], ['tests','Testfälle']
+];
+const ONE_EMP_NAV = [ ['home','Startseite'], ['mine','Meine Kontakte'], ['mail','E-Mail erstellen'], ['tpl','Vorlagen'] ];
+function oneNavFor(u){ return (u && u.role === 'admin') ? ONE_ADMIN_NAV : ONE_EMP_NAV; }
+
+function oneRailHtml(){
+  const u = oneCurrentUser(); const nav = oneNavFor(u); const O = state.one;
+  const counts = {
+    staff:O.users.filter(x=>x.role==='employee').length, contacts:O.contacts.length,
+    templates:O.templates.length, mine:oneVisibleContacts(u).length, terr:O.territories.length
+  };
+  return '<div class="one-rail-group">'
+    + '<div class="one-rail-title">'+(u.role==='admin'?'Administration':'Mein Bereich')+'</div>'
+    + nav.map(([k,label]) =>
+        '<button data-one-nav="'+k+'" aria-current="'+(O.view===k)+'">'
+        + '<span>'+escapeHtml(label)+'</span>'
+        + (counts[k]!=null ? '<span class="one-count">'+counts[k]+'</span>' : '')
+        + '</button>').join('')
+    + '</div>';
+}
+function oneRoleSelectHtml(){
+  const O = state.one;
+  return O.users.map(u =>
+    '<option value="'+u.id+'"'+(u.id===O.session?' selected':'')+'>'
+    + escapeHtml(u.name) + ' · ' + (u.role==='admin' ? 'Administration'
+        : (u.active ? (u.territories.length ? u.territories.map(t=>oneTerrById(t).name).join(' + ') : 'ohne Gebiet') : 'deaktiviert'))
+    + '</option>').join('');
+}
+
+function oneViewDashboard(){
+  const O = state.one;
+  const unassigned = O.contacts.filter(c => !oneTerritoryOfContact(c));
+  const inactive = O.users.filter(u => u.role==='employee' && !u.active);
+  const byTerr = O.territories.map(t => ({
+    t, n:O.contacts.filter(c => { const x=oneTerritoryOfContact(c); return x && x.id===t.id; }).length,
+    staff:O.users.filter(u => u.role==='employee' && u.active && u.territories.includes(t.id))
+  }));
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>Dashboard</h1>
+    <p>Kontakte gehören zum Gebiet, nicht zur Person. Wer ein Gebiet zugewiesen bekommt, sieht dessen Kontakte — automatisch.</p>
+  </div></div>
+  <div class="one-panel"><div class="one-panel-body" style="padding:0">
+    <div class="one-stats">
+      <div class="one-stat"><div class="k">Kontakte</div><div class="v">${O.contacts.length}</div><div class="s">im Mandanten</div></div>
+      <div class="one-stat"><div class="k">Gebiete</div><div class="v">${O.territories.length}</div><div class="s">über PLZ definiert</div></div>
+      <div class="one-stat"><div class="k">Aktive Mitarbeiter</div><div class="v">${O.users.filter(u=>u.role==='employee'&&u.active).length}</div><div class="s">von ${O.users.filter(u=>u.role==='employee').length} angelegt</div></div>
+      <div class="one-stat"><div class="k">Ohne Gebiet</div><div class="v" style="${unassigned.length?'color:var(--one-warn)':''}">${unassigned.length}</div><div class="s">PLZ in keinem Bereich</div></div>
+    </div>
+  </div></div>
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Zuordnungskette</h2><p>So entsteht jede Sichtbarkeit im System — am Beispiel von Praxis Rheinblick.</p></div>
+    <div class="one-panel-body">
+      <div class="one-chain">
+        <div class="one-chain-step"><span class="k">Kontakt</span><span class="v">Praxis Rheinblick</span></div>
+        <div class="one-chain-step"><span class="k">PLZ</span><span class="v mono">41460</span></div>
+        <div class="one-chain-step is-accent"><span class="k">Gebiet</span><span class="v">Westen</span></div>
+        <div class="one-chain-step"><span class="k">Berechtigung</span><span class="v mono">user_territories</span></div>
+        <div class="one-chain-step"><span class="k">Mitarbeiter</span><span class="v">${
+          (O.users.filter(u=>u.role==='employee'&&u.active&&u.territories.includes('west')).map(u=>escapeHtml(u.name)).join(', ')) || '— niemand berechtigt'
+        }</span></div>
+      </div>
+      <div class="one-note" style="margin-top:14px">Wechselt die Zuständigkeit, ändert der Admin <strong>eine</strong> Berechtigung. Kein einziger Kundendatensatz wird angefasst.</div>
+    </div>
+  </div>
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Gebiete im Überblick</h2></div>
+    <div class="one-panel-body flush"><div class="one-tablewrap"><table>
+      <thead><tr><th>Gebiet</th><th>PLZ-Bereich</th><th>Kontakte</th><th>Berechtigte Mitarbeiter</th></tr></thead>
+      <tbody>${byTerr.map(({t,n,staff}) => `
+        <tr>
+          <td>${oneTerrChip(t)}</td>
+          <td class="num muted">${t.ranges.map(r=>String(r.from).padStart(5,'0')+'–'+String(r.to).padStart(5,'0')).join(', ')}</td>
+          <td class="num strong">${n}</td>
+          <td>${staff.length ? staff.map(u=>escapeHtml(u.name)).join(', ') : '<span class="muted">niemand</span>'}</td>
+        </tr>`).join('')}</tbody>
+    </table></div></div>
+  </div>
+  ${inactive.length ? `<div class="one-panel"><div class="one-panel-head"><h2>Deaktivierte Zugänge</h2></div>
+    <div class="one-panel-body"><div class="one-note warn">${inactive.map(u=>escapeHtml(u.name)).join(', ')} — Zugriff gesperrt. Die zuvor betreuten Kontakte sind unverändert im jeweiligen Gebiet und über die Gebietsberechtigung erreichbar.</div></div></div>` : ''}
+  `;
+}
+
+function oneViewStaff(){
+  const O = state.one;
+  const emps = O.users.filter(u => u.role === 'employee');
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>Mitarbeiter</h1>
+    <p>Gebiete per Mehrfachauswahl zuweisen. Die Kontaktliste des Mitarbeiters ändert sich sofort mit — sichtbar in der Spalte rechts.</p>
+  </div><div class="one-spacer"></div>
+  <button class="one-btn" data-one-act="add-staff">Mitarbeiter anlegen</button></div>
+  <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
+    <thead><tr><th>Mitarbeiter</th><th>Team</th><th style="min-width:290px">Gebiete</th><th>Sieht Kontakte</th><th>Status</th><th></th></tr></thead>
+    <tbody>${emps.map(u => {
+      const vis = oneVisibleContacts(u);
+      return `<tr>
+        <td><div class="strong">${escapeHtml(u.name)}</div><div class="muted mono" style="font-size:12px">${escapeHtml(u.email)}</div></td>
+        <td class="muted">${escapeHtml(u.team)}</td>
+        <td><div class="one-terr-picker">${O.territories.map(t => {
+            const on = u.territories.includes(t.id);
+            return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}">
+              <input type="checkbox" data-one-terr-toggle="${u.id}" value="${t.id}" ${on?'checked':''} ${u.active?'':'disabled'}>
+              ${escapeHtml(t.name)}</label>`;
+          }).join('')}</div></td>
+        <td class="num strong" style="font-size:16px">${u.active ? vis.length : 0}</td>
+        <td>${u.active ? '<span class="one-chip ok">aktiv</span>' : '<span class="one-chip stop">deaktiviert</span>'}</td>
+        <td style="text-align:right"><button class="one-btn sm ${u.active?'danger':''}" data-one-act="toggle-active" data-one-id="${u.id}">${u.active?'Deaktivieren':'Reaktivieren'}</button></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div></div></div>
+  <div class="one-panel"><div class="one-panel-head"><h2>Was beim Wechsel passiert</h2></div><div class="one-panel-body">
+    <div class="one-note">Deaktivieren sperrt den Zugang sofort. Das Gebiet bleibt bestehen und wird der Nachfolge zugewiesen — die Kontakte des Gebiets sind damit ohne jede Datenmigration wieder betreut.</div>
+    <div class="one-note warn" style="margin-top:10px">Im Prototyp endet die Sperre bei der Oberfläche. Produktiv muss sie Sitzung und Token sofort ungültig machen, sonst arbeitet ein offener Client weiter.</div>
+  </div></div>`;
+}
+
+function oneViewTerr(){
+  const O = state.one;
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>Gebiete</h1>
+    <p>PLZ-Bereiche bestimmen, welchem Gebiet ein Kontakt zufällt. Änderungen wirken auf alle Kontakte gleichzeitig.</p>
+  </div></div>
+  <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
+    <thead><tr><th>Gebiet</th><th>PLZ von</th><th>PLZ bis</th><th>Kontakte</th><th>Zugewiesen an</th></tr></thead>
+    <tbody>${O.territories.map(t => {
+      const n = O.contacts.filter(c => { const x=oneTerritoryOfContact(c); return x && x.id===t.id; }).length;
+      const staff = O.users.filter(u=>u.role==='employee'&&u.active&&u.territories.includes(t.id));
+      return `<tr>
+        <td>${oneTerrChip(t)}</td>
+        <td><input type="text" class="mono" style="width:96px" value="${String(t.ranges[0].from).padStart(5,'0')}" data-one-range="${t.id}:from"></td>
+        <td><input type="text" class="mono" style="width:96px" value="${String(t.ranges[0].to).padStart(5,'0')}" data-one-range="${t.id}:to"></td>
+        <td class="num strong">${n}</td>
+        <td>${staff.length ? staff.map(u=>escapeHtml(u.name)).join(', ') : '<span class="muted">niemand</span>'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div></div></div>
+  <div class="one-panel"><div class="one-panel-head"><h2>Offene Punkte für den Produktivbetrieb</h2>
+    <p>Der Prototyp zeigt bewusst einen Bereich je Gebiet. Ein echtes Gebietsmodell braucht mehr.</p></div>
+    <div class="one-panel-body">
+      <div class="one-note warn"><strong>Mehrere Bereiche je Gebiet.</strong> Reale Gebiete sind selten ein zusammenhängender Block — das Schema sieht deshalb <span class="mono">territory_plz_ranges</span> als eigene Tabelle mit n Zeilen je Gebiet vor.</div>
+      <div class="one-note warn"><strong>Überschneidung und Lücke.</strong> Beim Speichern muss geprüft werden, ob sich Bereiche überlappen oder PLZ in keinen Bereich fallen. Solche Kontakte landen sonst still in „nicht zugeordnet" und werden von niemandem betreut.</div>
+      <div class="one-note warn"><strong>Key Accounts.</strong> Ein Konzernkunde gehört häufig nicht zur PLZ-Logik. Dafür ist im Datenmodell <span class="mono">contacts.territory_override_id</span> vorgesehen, das die PLZ-Ableitung gezielt aussticht.</div>
+    </div>
+  </div>`;
+}
+
+function oneViewContacts(){
+  const O = state.one;
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>Kontakte</h1>
+    <p>Der Admin sieht alle Kontakte des Mandanten. Das Gebiet wird bei jeder Anzeige aus der PLZ abgeleitet, nicht gespeichert.</p>
+  </div><div class="one-spacer"></div>
+  <button class="one-btn" data-one-act="export">CSV exportieren</button></div>
+  <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
+    <thead><tr><th>Firma</th><th>Name</th><th>E-Mail</th><th>PLZ</th><th>Abgeleitetes Gebiet</th><th>Kommunikation</th></tr></thead>
+    <tbody>${O.contacts.map(c => `<tr>
+      <td class="strong">${escapeHtml(c.company)}</td>
+      <td>${escapeHtml(c.first)} ${escapeHtml(c.last)}</td>
+      <td class="mono muted" style="font-size:12.5px">${escapeHtml(c.email)}</td>
+      <td class="num">${escapeHtml(c.plz)}</td>
+      <td>${oneTerrChip(oneTerritoryOfContact(c))}</td>
+      <td>${oneCommChip(c)}</td>
+    </tr>`).join('')}</tbody>
+  </table></div></div></div>
+  <div class="one-panel"><div class="one-panel-head"><h2>Datenminimierung</h2></div><div class="one-panel-body">
+    <div class="one-note">Gespeichert wird nur, was den Zweck trägt: Name, geschäftliche E-Mail, PLZ, Firma, Kundengruppe, Segment sowie der Kommunikationsstatus mit Rechtsgrundlage und Datum. Kein Freitextfeld für beliebige Notizen zur Person.</div>
+  </div></div>`;
+}
+
+function oneViewTemplates(){
+  const O = state.one;
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>E-Mail-Vorlagen</h1>
+    <p>Zentral gepflegt. Entscheidend ist die Einstufung werblich / nicht werblich — sie steuert, an wen eine Vorlage überhaupt gesendet werden darf.</p>
+  </div></div>
+  <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
+    <thead><tr><th>Vorlage</th><th>Einstufung</th><th>Betreff</th><th>Zulässig für</th></tr></thead>
+    <tbody>${O.templates.map(t => `<tr>
+      <td class="strong">${escapeHtml(t.name)}</td>
+      <td>${t.promo ? '<span class="one-chip warn">werblich</span>' : '<span class="one-chip quiet">Service-Information</span>'}</td>
+      <td class="muted">${escapeHtml(t.subject)}</td>
+      <td class="muted" style="font-size:12.5px">${t.promo ? 'Einwilligung oder Bestandskunde — nicht bei Widerspruch' : 'alle aktiven Kontakte'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div></div></div>
+  <div class="one-panel"><div class="one-panel-head"><h2>Bearbeitungsrechte</h2></div><div class="one-panel-body">
+    <div class="one-grid-2">
+      <div><div class="strong" style="margin-bottom:4px">Zentral, nicht änderbar</div>
+        <p class="muted" style="margin:0">Betreff, Kernaussage, Pflichtangaben, Abmeldehinweis, rechtliche Einstufung. So bleibt die Aussage über alle Gebiete gleich und prüfbar.</p></div>
+      <div><div class="strong" style="margin-bottom:4px">Vom Außendienst änderbar</div>
+        <p class="muted" style="margin:0">Persönliche Einleitung und Produktbezug. Die Signatur kommt automatisch aus dem Mitarbeiterprofil und ist nicht überschreibbar.</p></div>
+    </div>
+    <div class="one-note warn" style="margin-top:14px">Jede werbliche Vorlage braucht einen funktionierenden Widerspruchsweg im Text. Der Klick darauf muss den Kommunikationsstatus des Kontakts setzen — sonst läuft der Widerspruch ins Leere.</div>
+  </div></div>`;
+}
+
+function oneViewSecurity(){
+  const O = state.one;
+  const probeUser = O.users.find(u=>u.id===O.probe.user);
+  const probeContact = O.contacts.find(c=>c.id===O.probe.contact);
+  const r = O.probe.result;
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>Sicherheit</h1>
+    <p>Zugriffsprüfung und Protokoll. Im Prototyp läuft beides im Browser — produktiv gehört es auf den Server.</p>
+  </div></div>
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Direktzugriff testen</h2>
+      <p>Simuliert den Fall aus dem Sicherheitstest: ein Mitarbeiter ruft über eine manipulierte URL einen Kontakt außerhalb seiner Gebiete auf.</p></div>
+    <div class="one-panel-body">
+      <div class="one-filters">
+        <div class="one-field"><label for="oneProbeUser">Aufrufender Mitarbeiter</label>
+          <select class="f" id="oneProbeUser">${O.users.filter(u=>u.role==='employee').map(u=>
+            '<option value="'+u.id+'"'+(u.id===O.probe.user?' selected':'')+'>'+escapeHtml(u.name)+' ('+(u.territories.map(t=>oneTerrById(t).name).join(' + ')||'ohne Gebiet')+')</option>').join('')}</select></div>
+        <div class="one-field"><label for="oneProbeContact">Angeforderter Kontakt</label>
+          <select class="f" id="oneProbeContact">${O.contacts.map(c=>{
+            const t = oneTerritoryOfContact(c);
+            return '<option value="'+c.id+'"'+(c.id===O.probe.contact?' selected':'')+'>'+escapeHtml(c.company)+' — '+(t?escapeHtml(t.name):'ohne Gebiet')+'</option>';}).join('')}</select></div>
+        <div class="one-field"><button class="one-btn primary" data-one-act="probe" style="width:100%">Zugriff prüfen</button></div>
+      </div>
+      ${r ? `<div style="margin-top:14px">
+        <div class="one-mailprev mono">GET /api/contacts/${escapeHtml(O.probe.contact)}
+Authorization: Bearer &lt;${escapeHtml(probeUser.name)}&gt;
+
+${r.allowed
+  ? 'HTTP 200 OK\n\n{ "company": "'+escapeHtml(probeContact.company)+'", "plz": "'+escapeHtml(probeContact.plz)+'" }'
+  : 'HTTP 404 Not Found\n\n{ "error": "not_found" }'}</div>
+        <div class="one-note ${r.allowed?'':'stop'}" style="margin-top:10px">
+          ${r.allowed
+            ? '<strong>Zugriff erlaubt.</strong> '+escapeHtml(probeContact.company)+' liegt in '+escapeHtml(oneTerritoryOfContact(probeContact).name)+', und dafür besteht eine Berechtigung.'
+            : '<strong>Zugriff verweigert.</strong> '+escapeHtml(probeContact.company)+' liegt außerhalb der Gebiete von '+escapeHtml(probeUser.name)+'.'}
+        </div>
+        ${!r.allowed ? '<div class="one-note" style="margin-top:10px">Bewusst <span class="mono">404</span> statt <span class="mono">403</span>: ein 403 würde bestätigen, dass die ID existiert, und ließe den Datenbestand durchzählen.</div>' : ''}
+      </div>` : ''}
+    </div>
+  </div>
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Was der Prototyp nicht leistet</h2></div>
+    <div class="one-panel-body">
+      <div class="one-note stop"><strong>Diese Prüfung läuft im Browser.</strong> Wer die Entwicklerkonsole öffnet, hebt sie auf. Als Sicherheitsmaßnahme ist sie wertlos — sie zeigt nur, welche Regel der Server durchsetzen muss.</div>
+      <div class="one-note stop"><strong>Das Passwort vor der Administration ist dieselbe Art Attrappe.</strong> Es steht offen im Programmcode dieser Seite und prüft nichts serverseitig — es demonstriert nur die Idee „nur Gerald Gampp kommt hinein". Produktiv gehört hierhin eine echte Anmeldung über das Firmenkonto.</div>
+      <div class="one-note warn"><strong>Empfehlung fürs Produktivsystem:</strong> Row Level Security in PostgreSQL, gebunden an die Sitzung. Dann filtert die Datenbank selbst, und auch ein Fehler in der Anwendungsschicht legt keine fremden Gebiete offen.</div>
+      <div class="one-note"><strong>Ebenfalls offen:</strong> Zwei-Faktor-Anmeldung, Verschlüsselung im Ruhezustand, Sitzungsentzug beim Deaktivieren, Backup- und Restore-Prozess, Protokollierung sensibler Exporte.</div>
+    </div>
+  </div>
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Protokoll</h2><p>Administrative Änderungen dieser Sitzung. Produktiv unveränderlich und mit Zeitstempel, Akteur und Vorher-/Nachher-Wert.</p></div>
+    <div class="one-panel-body flush">
+      ${O.audit.length ? '<div class="one-log">'+O.audit.map(a=>`<div class="one-log-row">
+        <span class="t">${escapeHtml(a.time)}</span><span class="a">${escapeHtml(a.actor)}</span>
+        <span>${escapeHtml(a.action)} <span class="muted">${escapeHtml(a.detail)}</span></span></div>`).join('')+'</div>'
+      : '<div class="one-empty"><strong>Noch keine Einträge</strong>Ändern Sie eine Gebietszuweisung, um das Protokoll zu füllen.</div>'}
+    </div>
+  </div>`;
+}
+
+function oneRunTests(){
+  const results = [];
+  const names = (list) => list.map(c=>c.first+' '+c.last).sort().join(', ') || '—';
+  {
+    const O = oneSeed(); const c = O.users.find(u=>u.id==='mc');
+    const vis = oneVisibleContacts(c, O); const got = names(vis); const want = 'Daniel Weber, Sarah Becker';
+    results.push({ name:'Testfall 1 — Mitarbeiter C, Gebiet Westen', steps:[
+      { ok:vis.length===2, txt:'Sichtbare Kontakte: <b>'+vis.length+'</b> (erwartet 2)' },
+      { ok:got===want, txt:'Es erscheinen: <b>'+got+'</b>' },
+      { ok:!vis.some(x=>['k1','k2','k3','k4','k7','k8'].includes(x.id)), txt:'Kein Kontakt aus Norden, Osten oder Süden sichtbar' }
+    ]});
+  }
+  {
+    const O = oneSeed(); const c = O.users.find(u=>u.id==='mc');
+    const before = names(oneVisibleContacts(c, O));
+    c.territories = ['nord'];
+    const after = oneVisibleContacts(c, O);
+    const contactsUntouched = JSON.stringify(O.contacts) === JSON.stringify(oneSeed().contacts);
+    results.push({ name:'Testfall 2 — Gebiet von Westen auf Norden umstellen', steps:[
+      { ok:before==='Daniel Weber, Sarah Becker', txt:'Vorher: <b>'+before+'</b>' },
+      { ok:names(after)==='Anna Petersen, Jan Hansen', txt:'Nachher: <b>'+names(after)+'</b>' },
+      { ok:!after.some(x=>['k5','k6'].includes(x.id)), txt:'Die Kontakte aus Westen sind nicht mehr sichtbar' },
+      { ok:contactsUntouched, txt:'Kein Kundendatensatz wurde verändert — nur die Berechtigung' }
+    ]});
+  }
+  {
+    const O = oneSeed(); const a = O.users.find(u=>u.id==='ma');
+    a.territories = ['nord','west'];
+    const both = oneVisibleContacts(a, O);
+    a.territories = ['west'];
+    const onlyWest = oneVisibleContacts(a, O);
+    results.push({ name:'Testfall 3 — Norden + Westen, danach Norden entziehen', steps:[
+      { ok:both.length===4, txt:'Mit beiden Gebieten: <b>'+both.length+'</b> Kontakte (erwartet 4)' },
+      { ok:names(both)==='Anna Petersen, Daniel Weber, Jan Hansen, Sarah Becker', txt:'Nämlich: <b>'+names(both)+'</b>' },
+      { ok:onlyWest.length===2 && names(onlyWest)==='Daniel Weber, Sarah Becker', txt:'Nach Entzug von Norden: <b>'+names(onlyWest)+'</b>' }
+    ]});
+  }
+  {
+    const O = oneSeed(); const c = O.users.find(u=>u.id==='mc');
+    c.active = false;
+    const afterOff = oneVisibleContacts(c, O);
+    O.users.push({ id:'me', name:'Mitarbeiter E', email:'me@example.com', role:'employee', team:'Dental', territories:['west'], active:true });
+    const e = O.users.find(u=>u.id==='me');
+    const eSees = oneVisibleContacts(e, O);
+    const contactsUntouched = JSON.stringify(O.contacts) === JSON.stringify(oneSeed().contacts);
+    results.push({ name:'Testfall 4 — C verlässt das Unternehmen, E übernimmt Westen', steps:[
+      { ok:afterOff.length===0, txt:'C nach Deaktivierung: <b>'+afterOff.length+'</b> Kontakte' },
+      { ok:names(eSees)==='Daniel Weber, Sarah Becker', txt:'E sieht nach Gebietszuweisung: <b>'+names(eSees)+'</b>' },
+      { ok:contactsUntouched, txt:'Keine Übertragung einzelner Kunden von C auf E nötig' }
+    ]});
+  }
+  state.one.tests = results;
+}
+
+function oneViewTests(){
+  const r = state.one.tests;
+  const total = r ? r.reduce((a,t)=>a+t.steps.length,0) : 0;
+  const passed = r ? r.reduce((a,t)=>a+t.steps.filter(s=>s.ok).length,0) : 0;
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>Testfälle</h1>
+    <p>Die vier Abnahmefälle laufen gegen dieselbe Logik wie die Oberfläche — auf einer Kopie, der Demostand bleibt unberührt.</p>
+  </div><div class="one-spacer"></div>
+  <button class="one-btn primary" data-one-act="run-tests">${r?'Erneut ausführen':'Testfälle ausführen'}</button></div>
+  ${r ? `<div class="one-panel" style="margin-bottom:16px"><div class="one-panel-body" style="display:flex; align-items:center; gap:12px">
+      <span class="one-chip ${passed===total?'ok':'stop'}">${passed===total?'alle bestanden':'Abweichung'}</span>
+      <span class="mono strong">${passed}/${total}</span><span class="muted">Prüfungen erfolgreich</span>
+    </div></div>
+    ${r.map(t=>{
+      const ok = t.steps.every(s=>s.ok);
+      return `<div class="one-test">
+        <div class="one-test-head"><span class="n">${escapeHtml(t.name)}</span>
+          <span class="one-chip ${ok?'ok':'stop'}">${ok?'bestanden':'fehlgeschlagen'}</span></div>
+        <div class="one-test-body">${t.steps.map(s=>`<div class="one-test-step ${s.ok?'pass':'fail'}">
+          <span class="m">${s.ok?'✓':'✕'}</span><span class="x">${s.txt}</span></div>`).join('')}</div>
+      </div>`;
+    }).join('')}`
+  : `<div class="one-panel"><div class="one-empty"><strong>Noch nicht ausgeführt</strong>Die Testfälle prüfen Sichtbarkeit, Gebietswechsel, Mehrfachgebiete und den Mitarbeiterwechsel.</div></div>`}`;
+}
+
+function oneViewHome(){
+  const u = oneCurrentUser();
+  const vis = oneVisibleContacts(u);
+  if (!u.active) return `<div class="one-page-head"><div><span class="one-eyebrow">Mein Bereich</span><h1>Zugang gesperrt</h1></div></div>
+    <div class="one-panel"><div class="one-panel-body"><div class="one-note stop"><strong>Dieser Zugang ist deaktiviert.</strong> Es werden keine Kontakte geladen. Die Kunden bleiben im Gebiet und werden über die Gebietsberechtigung weiter betreut.</div></div></div>`;
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Mein Bereich</span>
+    <h1>${escapeHtml(u.name)}</h1>
+    <p>Ihre Gebiete sind hinterlegt — Sie müssen nichts auswählen. Die Kontaktliste lädt automatisch.</p>
+  </div></div>
+  <div class="one-emp-hero">
+    <div class="one-emp-card"><div class="k">Meine Gebiete</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap">${u.territories.length ? u.territories.map(t=>oneTerrChip(oneTerrById(t))).join('') : '<span class="one-chip none">keines zugewiesen</span>'}</div></div>
+    <div class="one-emp-card"><div class="k">Meine Kontakte</div><div class="big">${vis.length}</div></div>
+    <div class="one-emp-card"><div class="k">Team</div><div style="font-size:17px; font-weight:600; margin-top:2px">${escapeHtml(u.team)}</div></div>
+  </div>
+  <div class="one-panel"><div class="one-panel-head"><h2>Schnellaktionen</h2></div><div class="one-panel-body">
+    <div class="one-quick">
+      <button data-one-nav="mine"><span class="t">Meine Kontakte</span><span class="d">${vis.length} Kontakte ansehen und filtern</span></button>
+      <button data-one-nav="mail"><span class="t">E-Mail erstellen</span><span class="d">Vorlage wählen, prüfen, senden</span></button>
+      <button data-one-nav="tpl"><span class="t">Vorlagen</span><span class="d">${state.one.templates.length} zentrale Textbausteine</span></button>
+    </div>
+  </div></div>`;
+}
+
+function oneFilteredMine(){
+  const u = oneCurrentUser(); const O = state.one;
+  let list = oneVisibleContacts(u);
+  const f = O.filters;
+  if (f.terr) list = list.filter(c => { const t=oneTerritoryOfContact(c); return t && t.id===f.terr; });
+  if (f.comm) list = list.filter(c => c.comm === f.comm);
+  if (f.q.trim()){
+    const q = f.q.trim().toLowerCase();
+    list = list.filter(c => (c.company+' '+c.first+' '+c.last+' '+c.plz+' '+c.email).toLowerCase().includes(q));
+  }
+  return list;
+}
+
+function oneViewMine(){
+  const u = oneCurrentUser(); const O = state.one;
+  if (!u.active) return oneViewHome();
+  const list = oneFilteredMine();
+  const allVis = oneVisibleContacts(u);
+  const sel = new Set(O.selection);
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Mein Bereich</span>
+    <h1>Meine Kontakte</h1>
+    <p>Gebiete: ${u.territories.map(t=>escapeHtml(oneTerrById(t).name)).join(' · ') || 'keine'} — ${allVis.length} Kontakte freigegeben.</p>
+  </div></div>
+  <div class="one-panel">
+    <div class="one-panel-body">
+      <div class="one-filters">
+        <div class="one-field"><label for="oneFq">Suche</label>
+          <input type="search" id="oneFq" placeholder="Firma, Name, PLZ" value="${escapeHtml(O.filters.q)}"></div>
+        <div class="one-field"><label for="oneFterr">Gebiet</label>
+          <select class="f" id="oneFterr"><option value="">alle meine Gebiete</option>${
+            u.territories.map(t=>'<option value="'+t+'"'+(O.filters.terr===t?' selected':'')+'>'+escapeHtml(oneTerrById(t).name)+'</option>').join('')}</select></div>
+        <div class="one-field"><label for="oneFcomm">Kommunikationsstatus</label>
+          <select class="f" id="oneFcomm"><option value="">alle</option>${
+            Object.entries(ONE_COMM).map(([k,v])=>'<option value="'+k+'"'+(O.filters.comm===k?' selected':'')+'>'+escapeHtml(v.label)+'</option>').join('')}</select></div>
+        <div class="one-field"><button class="one-btn" data-one-act="select-visible" style="width:100%">Alle sichtbaren auswählen</button></div>
+      </div>
+    </div>
+    <div class="one-panel-body flush" style="border-top:1px solid var(--one-line)">
+      ${list.length ? `<div class="one-tablewrap"><table>
+        <thead><tr><th style="width:38px"></th><th>Firma</th><th>Name</th><th>E-Mail</th><th>PLZ</th><th>Gebiet</th><th>Kommunikation</th></tr></thead>
+        <tbody>${list.map(c=>`<tr>
+          <td><input type="checkbox" data-one-pick="${c.id}" ${sel.has(c.id)?'checked':''} style="width:16px;height:16px;accent-color:var(--one-accent)"></td>
+          <td class="strong">${escapeHtml(c.company)}</td>
+          <td>${escapeHtml(c.first)} ${escapeHtml(c.last)}</td>
+          <td class="mono muted" style="font-size:12.5px">${escapeHtml(c.email)}</td>
+          <td class="num">${escapeHtml(c.plz)}</td>
+          <td>${oneTerrChip(oneTerritoryOfContact(c))}</td>
+          <td>${oneCommChip(c)}</td>
+        </tr>`).join('')}</tbody></table></div>`
+      : `<div class="one-empty"><strong>Keine Kontakte</strong>${allVis.length ? 'Kein Treffer für diesen Filter.' : 'Für Ihre Gebiete ist derzeit kein Kontakt freigegeben.'}</div>`}
+    </div>
+    ${O.selection.length ? `<div class="one-panel-body" style="border-top:1px solid var(--one-line); display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+      <span class="one-chip quiet">${O.selection.length} ausgewählt</span>
+      <button class="one-btn primary" data-one-nav="mail">E-Mail erstellen</button>
+      <button class="one-btn" data-one-act="clear-sel">Auswahl aufheben</button>
+    </div>` : ''}
+  </div>
+  <div class="one-panel"><div class="one-panel-body">
+    <div class="one-note">Kontakte anderer Gebiete sind nicht nur ausgeblendet — sie werden auch über Suche, Filter und Direktaufruf nicht gefunden. Die Prüfung dafür gehört auf den Server; im Prototyp ist sie simuliert.</div>
+  </div></div>`;
+}
+
+function oneViewMail(){
+  const u = oneCurrentUser(); const O = state.one;
+  if (!u.active) return oneViewHome();
+  const tpl = O.templates.find(t => t.id === O.mailTemplate) || O.templates[0];
+  const chosen = O.contacts.filter(c => O.selection.includes(c.id) && oneCanAccessContact(u, c.id));
+  const eligible = chosen.filter(c => !(tpl.promo && c.comm === 'widerspruch'));
+  const blocked  = chosen.filter(c =>   tpl.promo && c.comm === 'widerspruch');
+  const sample = eligible[0];
+  const body = (name) =>
+    'Hallo ' + name + ',\n\n' +
+    tpl.body.replace(/\{\{produkt\}\}/g, O.mailProduct || '{{produkt}}') +
+    (O.mailIntro.trim() ? '\n\n' + O.mailIntro.trim() : '') +
+    '\n\nMit freundlichen Grüßen\n' + u.name + '\nDr. Schumacher — Außendienst ' +
+    (u.territories.map(t=>oneTerrById(t).name).join(', ') || '') +
+    '\n\n—\nSie erhalten diese Nachricht als Kunde von Dr. Schumacher. ' +
+    'Sie können der Verwendung Ihrer Adresse für Werbung jederzeit widersprechen: [Abmeldelink]';
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Mein Bereich</span>
+    <h1>E-Mail erstellen</h1>
+    <p>Jeder Empfänger bekommt eine eigene Nachricht. Keine Sammel-Adresszeile, kein sichtbarer Verteiler.</p>
+  </div></div>
+  ${!chosen.length ? `<div class="one-panel"><div class="one-empty"><strong>Keine Empfänger ausgewählt</strong>
+    Wählen Sie zuerst unter „Meine Kontakte" aus, wen Sie anschreiben möchten.
+    <div style="margin-top:12px"><button class="one-btn primary" data-one-nav="mine">Zu meinen Kontakten</button></div></div></div>` : `
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Vorlage und Inhalt</h2></div>
+    <div class="one-panel-body">
+      <div class="one-filters" style="margin-bottom:12px">
+        <div class="one-field"><label for="oneTplSel">Vorlage</label>
+          <select class="f" id="oneTplSel">${O.templates.map(t=>'<option value="'+t.id+'"'+(t.id===tpl.id?' selected':'')+'>'+escapeHtml(t.name)+(t.promo?' (werblich)':'')+'</option>').join('')}</select></div>
+        <div class="one-field"><label for="oneProdInp">Produkt</label>
+          <input type="text" id="oneProdInp" value="${escapeHtml(O.mailProduct)}"></div>
+      </div>
+      <div class="one-field"><label for="oneIntroInp">Persönliche Ergänzung (optional)</label>
+        <textarea id="oneIntroInp" placeholder="Ein Satz Bezug zum letzten Gespräch — der zentrale Text bleibt unverändert.">${escapeHtml(O.mailIntro)}</textarea></div>
+      <div class="one-note ${tpl.promo?'warn':''}" style="margin-top:12px">
+        ${tpl.promo
+          ? '<strong>Werbliche Nachricht.</strong> Zulässig nur bei Einwilligung oder als Bestandskundenwerbung für eigene ähnliche Produkte (§ 7 Abs. 3 UWG). Kontakte mit Widerspruch werden automatisch ausgeschlossen.'
+          : '<strong>Service-Information.</strong> Kein werblicher Charakter — nach derzeitiger Einstufung an alle aktiven Kontakte zulässig. Die Einstufung gehört rechtlich geprüft.'}
+      </div>
+    </div>
+  </div>
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Empfänger prüfen</h2>
+      <p>${eligible.length} Nachricht${eligible.length===1?'':'en'} werden erzeugt${blocked.length?', '+blocked.length+' Kontakt'+(blocked.length===1?'':'e')+' ausgeschlossen':''}.</p></div>
+    <div class="one-panel-body flush">
+      ${chosen.map(c=>{
+        const stop = tpl.promo && c.comm==='widerspruch';
+        return `<div class="one-recipient">
+          <span><span class="strong">${escapeHtml(c.company)}</span> <span class="muted">· ${escapeHtml(c.first)} ${escapeHtml(c.last)}</span>
+            <span class="mono muted" style="font-size:12px"> · ${escapeHtml(c.email)}</span></span>
+          <span style="display:flex; gap:6px; align-items:center">${oneCommChip(c)}
+            ${stop ? '<span class="one-chip stop">ausgeschlossen</span>' : '<span class="one-chip ok">wird gesendet</span>'}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    ${blocked.length ? `<div class="one-panel-body" style="border-top:1px solid var(--one-line)">
+      <div class="one-note stop"><strong>${blocked.length} Kontakt${blocked.length===1?'':'e'} vom Versand ausgenommen.</strong>
+      ${blocked.map(c=>escapeHtml(c.first)+' '+escapeHtml(c.last)).join(', ')} hat der werblichen Ansprache widersprochen. Das System lässt den Versand hier nicht zu — die Sperre darf nicht am Mitarbeiter hängen.</div>
+    </div>` : ''}
+  </div>
+  <div class="one-panel">
+    <div class="one-panel-head"><h2>Vorschau und Versand</h2></div>
+    <div class="one-panel-body">
+      <div class="one-mailrow">
+        <div>
+          ${sample ? `<div class="muted" style="font-size:12px; margin-bottom:6px">Nachricht 1 von ${eligible.length} — so sieht sie beim Empfänger aus:</div>
+          <div class="one-mailprev"><span class="mono muted">An: ${escapeHtml(sample.email)}
+Betreff: ${escapeHtml(tpl.subject.replace(/\{\{produkt\}\}/g, O.mailProduct||'{{produkt}}'))}</span>
+
+${escapeHtml(body(sample.first+' '+sample.last))}</div>`
+          : '<div class="one-note stop">Kein zulässiger Empfänger übrig.</div>'}
+        </div>
+        <div>
+          <div class="one-note"><strong>Versandweg.</strong> Einzelversand über Microsoft Graph aus dem Postfach von ${escapeHtml(u.name)}. Die Nachricht liegt danach in den gesendeten Elementen — die Antwort des Kunden geht direkt an den Außendienst.</div>
+          <div class="one-note warn" style="margin-top:10px"><strong>Kein BCC-Sammelversand.</strong> Eine Mail je Empfänger, jeweils mit genau einer Adresse im An-Feld. Damit kann keine Kundenadresse bei einem anderen Kunden auftauchen.</div>
+          <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap">
+            <button class="one-btn primary" data-one-act="send" ${eligible.length?'':'disabled'}>${eligible.length} Nachricht${eligible.length===1?'':'en'} senden</button>
+            <button class="one-btn" data-one-act="clear-sel">Abbrechen</button>
+          </div>
+          ${O.mailSent ? `<div class="one-note" style="margin-top:12px; border-left-color:var(--one-ok); background:var(--one-ok-soft)">
+            <strong>${O.mailSent.count} Einzelnachricht${O.mailSent.count===1?'':'en'} in die Warteschlange gestellt.</strong>
+            Vorlage „${escapeHtml(O.mailSent.tpl)}", ausgelöst ${escapeHtml(O.mailSent.time)} Uhr. Im Prototyp wird nichts tatsächlich versendet.</div>` : ''}
+        </div>
+      </div>
+    </div>
+  </div>`}`;
+}
+
+function oneViewTpl(){
+  const O = state.one;
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Mein Bereich</span>
+    <h1>Vorlagen</h1>
+    <p>Zentral gepflegt. Sie ergänzen den persönlichen Bezug — Kernaussage und Pflichtangaben bleiben unverändert.</p>
+  </div></div>
+  <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
+    <thead><tr><th>Vorlage</th><th>Einstufung</th><th>Betreff</th></tr></thead>
+    <tbody>${O.templates.map(t=>`<tr>
+      <td class="strong">${escapeHtml(t.name)}</td>
+      <td>${t.promo?'<span class="one-chip warn">werblich</span>':'<span class="one-chip quiet">Service-Information</span>'}</td>
+      <td class="muted">${escapeHtml(t.subject)}</td></tr>`).join('')}</tbody>
+  </table></div></div></div>
+  <div class="one-panel"><div class="one-panel-body"><div class="one-note">Werbliche Vorlagen erreichen nur Kontakte mit Einwilligung oder Bestandskundenstatus. Wer widersprochen hat, wird vom System ausgeschlossen — unabhängig davon, wer den Versand auslöst.</div></div></div>`;
+}
+
+const ONE_VIEWS = {
+  dashboard:oneViewDashboard, staff:oneViewStaff, terr:oneViewTerr, contacts:oneViewContacts,
+  templates:oneViewTemplates, security:oneViewSecurity, tests:oneViewTests,
+  home:oneViewHome, mine:oneViewMine, mail:oneViewMail, tpl:oneViewTpl
+};
+
+function oneIsAdminLocked(){ const u = oneCurrentUser(); return !!(u && u.role === 'admin' && !state.one.adminUnlocked); }
+
+function oneViewAdminLock(){
+  const u = oneCurrentUser();
+  return `<div class="one-lockwrap"><div class="one-lockcard">
+    <div class="one-lock-icon">🔒</div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>${escapeHtml(u.name)}</h1>
+    <p>Nur mit Administratorpasswort zugänglich.</p>
+    <form id="oneLockForm" autocomplete="off">
+      <input type="password" id="oneLockPw" placeholder="Passwort" autocomplete="new-password">
+      <button class="one-btn primary" type="submit">Anmelden</button>
+    </form>
+    ${state.one.authError ? `<div class="one-note stop" style="margin-top:14px">${escapeHtml(state.one.authError)}</div>` : ''}
+    <div class="one-note warn" style="margin-top:16px; text-align:left">
+      <strong>Simulation für die Präsentation.</strong> Die Prüfung läuft im Browser und ist kein Sicherheitsmerkmal. Produktiv gehört hierhin eine echte Anmeldung — Single Sign-On über das Firmenkonto plus Zwei-Faktor, serverseitig geprüft.
+    </div>
+  </div></div>`;
+}
+
+function oneRender(){
+  const O = state.one;
+  const u = oneCurrentUser();
+  const locked = oneIsAdminLocked();
+  const roleSelectHtml = `<select class="one-role" id="oneRoleSel">${oneRoleSelectHtml()}</select>`;
+  const topbar = `<div class="one-topbar">
+    <div class="one-brand"><div class="one-brand-mark">DS</div><div class="one-brand-name">Dr. Schumacher <span>ONE</span></div></div>
+    <button class="one-exit" data-one-act="exit">← Produktberater</button>
+    <span class="one-proto-chip">Prototyp · Rechte simuliert</span>
+    <div class="one-spacer"></div>
+    <div class="one-who"><label for="oneRoleSel">Angemeldet als</label>${roleSelectHtml}</div>
+  </div>`;
+  if (locked) return `<div class="one-app">${topbar}<div class="one-shell one-locked">${oneViewAdminLock()}</div></div>`;
+  const allowed = oneNavFor(u).map(n=>n[0]);
+  if (!allowed.includes(O.view)) O.view = allowed[0];
+  const main = (ONE_VIEWS[O.view] || oneViewDashboard)();
+  return `<div class="one-app">${topbar}<div class="one-shell"><nav class="one-rail">${oneRailHtml()}</nav><main class="one-main">${main}</main></div></div>`;
+}
+
+function bindOne(){
+  if (state.screen !== 'one') return;
+  const O = state.one;
+
+  document.querySelectorAll('[data-one-nav]').forEach(el => el.onclick = () => { O.view = el.dataset.oneNav; render(); });
+
+  const roleSel = document.getElementById('oneRoleSel');
+  if (roleSel) roleSel.onchange = (e) => {
+    O.session = e.target.value; O.selection = []; O.mailSent = null; O.filters = { q:'', terr:'', comm:'' };
+    O.view = oneNavFor(oneCurrentUser())[0][0];
+    render();
+  };
+
+  const lockForm = document.getElementById('oneLockForm');
+  if (lockForm) lockForm.onsubmit = (e) => {
+    e.preventDefault();
+    const val = (document.getElementById('oneLockPw') || {}).value || '';
+    if (val === ONE_ADMIN_PASSWORD){ O.adminUnlocked = true; O.authError = ''; oneAudit('Admin-Zugang freigeschaltet', oneCurrentUser().name); }
+    else { O.authError = 'Falsches Passwort.'; }
+    render();
+  };
+  const lockPw = document.getElementById('oneLockPw');
+  if (lockPw) lockPw.focus();
+
+  document.querySelectorAll('[data-one-terr-toggle]').forEach(input => input.onchange = () => {
+    const u = O.users.find(x => x.id === input.dataset.oneTerrToggle);
+    const id = input.value; const had = u.territories.includes(id);
+    u.territories = had ? u.territories.filter(x => x !== id) : u.territories.concat([id]);
+    oneAudit(had ? 'Gebiet entzogen' : 'Gebiet zugewiesen', oneTerrById(id).name + ' → ' + u.name + ' (sieht jetzt ' + oneVisibleContacts(u).length + ' Kontakte)');
+    render();
+  });
+  document.querySelectorAll('[data-one-range]').forEach(input => input.onchange = () => {
+    const [tid, side] = input.dataset.oneRange.split(':'); const terr = oneTerrById(tid); const v = parseInt(input.value, 10);
+    if (!isNaN(v)){ terr.ranges[0][side] = v; oneAudit('PLZ-Bereich geändert', terr.name + ' ' + side + ' = ' + String(v).padStart(5,'0')); }
+    render();
+  });
+  const probeUserSel = document.getElementById('oneProbeUser');
+  if (probeUserSel) probeUserSel.onchange = (e) => { O.probe.user = e.target.value; O.probe.result = null; render(); };
+  const probeContactSel = document.getElementById('oneProbeContact');
+  if (probeContactSel) probeContactSel.onchange = (e) => { O.probe.contact = e.target.value; O.probe.result = null; render(); };
+  const fterr = document.getElementById('oneFterr');
+  if (fterr) fterr.onchange = (e) => { O.filters.terr = e.target.value; render(); };
+  const fcomm = document.getElementById('oneFcomm');
+  if (fcomm) fcomm.onchange = (e) => { O.filters.comm = e.target.value; render(); };
+  const tplSel = document.getElementById('oneTplSel');
+  if (tplSel) tplSel.onchange = (e) => { O.mailTemplate = e.target.value; O.mailSent = null; render(); };
+  document.querySelectorAll('[data-one-pick]').forEach(cb => cb.onchange = () => {
+    const id = cb.dataset.onePick;
+    O.selection = cb.checked ? O.selection.concat([id]) : O.selection.filter(x => x !== id);
+    O.mailSent = null; render();
+  });
+
+  const fq = document.getElementById('oneFq');
+  if (fq) fq.oninput = (e) => { O.filters.q = e.target.value; render(); };
+  const prodInp = document.getElementById('oneProdInp');
+  if (prodInp) prodInp.oninput = (e) => { O.mailProduct = e.target.value; };
+  const introInp = document.getElementById('oneIntroInp');
+  if (introInp) introInp.oninput = (e) => { O.mailIntro = e.target.value; };
+
+  document.querySelectorAll('[data-one-act]').forEach(el => el.onclick = () => {
+    const a = el.dataset.oneAct;
+    if (a === 'exit'){ state.screen = 'menu'; render(); return; }
+    if (a === 'toggle-active'){
+      const u = O.users.find(x => x.id === el.dataset.oneId);
+      u.active = !u.active;
+      oneAudit(u.active ? 'Mitarbeiter reaktiviert' : 'Mitarbeiter deaktiviert', u.name);
+      if (!u.active && O.session === u.id) O.view = 'home';
+      render(); return;
+    }
+    if (a === 'add-staff'){
+      const n = O.users.filter(x=>x.role==='employee').length;
+      const letter = String.fromCharCode(65 + n); const id = 'm' + letter.toLowerCase();
+      O.users.push({ id, name:'Mitarbeiter '+letter, email:id+'@example.com', role:'employee', team:'Dental', territories:[], active:true });
+      oneAudit('Mitarbeiter angelegt', 'Mitarbeiter '+letter+' — noch ohne Gebiet');
+      render(); return;
+    }
+    if (a === 'probe'){
+      const u = O.users.find(x => x.id === O.probe.user);
+      O.probe.result = { allowed: oneCanAccessContact(u, O.probe.contact) };
+      oneAudit('Zugriffsprüfung', u.name + ' → ' + (O.contacts.find(c=>c.id===O.probe.contact)||{}).company + ' — ' + (O.probe.result.allowed ? 'erlaubt' : 'verweigert'));
+      render(); return;
+    }
+    if (a === 'run-tests'){ oneRunTests(); render(); return; }
+    if (a === 'export'){ oneAudit('CSV-Export', O.contacts.length + ' Kontakte — im Produktivsystem protokoll- und rechtepflichtig'); render(); return; }
+    if (a === 'select-visible'){ O.selection = oneFilteredMine().map(c => c.id); render(); return; }
+    if (a === 'clear-sel'){ O.selection = []; O.mailSent = null; render(); return; }
+    if (a === 'send'){
+      const u = oneCurrentUser(); const tpl = O.templates.find(t => t.id === O.mailTemplate);
+      const chosen = O.contacts.filter(c => O.selection.includes(c.id) && oneCanAccessContact(u, c.id));
+      const eligible = chosen.filter(c => !(tpl.promo && c.comm === 'widerspruch'));
+      O.mailSent = { count:eligible.length, tpl:tpl.name, time:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) };
+      oneAudit('E-Mail-Versand', eligible.length + '× „' + tpl.name + '" als Einzelnachricht');
+      render(); return;
+    }
+  });
 }
 
 render();
