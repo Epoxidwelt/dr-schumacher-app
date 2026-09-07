@@ -424,7 +424,8 @@ const state = {
   messeScanPreview: null,
   summaryStep: null,
   summaryPendingRecipient: null,
-  newCustomer: null
+  newCustomer: null,
+  inviteWelcome: null
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -562,6 +563,7 @@ function render() {
 function profileScreen() {
   return `<main class="price-shell profile-shell"><section class="price-panel profile-panel">
     <img class="welcome-logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher">
+    ${state.inviteWelcome ? `<div class="invite-welcome">Zugang für <strong>${escapeHtml(state.inviteWelcome)}</strong> auf diesem Gerät eingerichtet. Weiter unten mit „Außendienst" und Ihrem Namen/Passwort anmelden.</div>` : ''}
     <span class="eyebrow">Interne Nutzung</span><h1>Wie möchten Sie die App verwenden?</h1>
     <p>Wählen Sie Ihre Rolle. Die Auswahl steuert die sichtbaren Funktionen auf diesem Gerät.</p>
     <div class="profile-options">${USER_PROFILES.map(profile=>`<button class="profile-option ${state.activeProfile===profile.id?'selected':''}" data-profile="${profile.id}"><span class="profile-avatar">${profile.id==='sales'?'AD':profile.id==='inside'?'ID':'A'}</span><span><strong>${profile.name}</strong><small>${profile.description}</small></span><b>›</b></button>`).join('')}</div>
@@ -2159,6 +2161,7 @@ function bind() {
     state.activeProfile=button.dataset.profile;
     localStorage.setItem('activeProfile',state.activeProfile);
     if (!localStorage.getItem('priceList')) { state.priceList='UVP'; localStorage.setItem('priceList','UVP'); }
+    state.inviteWelcome = null;
     state.screen = state.activeProfile==='admin' ? 'one' : (state.activeProfile==='sales' && !state.region) ? 'region' : 'menu';
     render();
   });
@@ -2795,6 +2798,53 @@ state.one = oneSeed();
 })();
 function onePersistUsers(){ try { localStorage.setItem('oneUsers', JSON.stringify(state.one.users)); } catch (e) {} }
 
+// Mitarbeiter-Zugänge liegen nur in localStorage — also getrennt pro Gerät. Ein auf dem
+// Admin-Gerät angelegter Kollege existiert auf dessen eigenem Handy zunächst nicht. Der
+// Einladungslink trägt die vollständigen Zugangsdaten codiert in der URL und schreibt sie
+// beim einmaligen Öffnen in den lokalen Speicher DIESES Geräts — kein Server nötig, aber auch
+// keine echte Zugriffskontrolle: Wer den Link kennt, kennt das (ohnehin nur lokal gespeicherte)
+// Passwort. Für echte Kundendaten ist das kein Ersatz für ein serverseitiges Konto (siehe
+// Fachkonzept, Abschnitt 18).
+function oneEncodeInvite(user){
+  return btoa(unescape(encodeURIComponent(JSON.stringify(user))));
+}
+function oneDecodeInvite(str){
+  return JSON.parse(decodeURIComponent(escape(atob(str))));
+}
+function oneInviteLink(user){
+  const base = location.href.split('?')[0].split('#')[0];
+  return base + '?invite=' + oneEncodeInvite(user);
+}
+function oneInviteMailto(user){
+  const link = oneInviteLink(user);
+  const lines = [
+    `Hallo ${user.name},`,
+    '',
+    'bitte öffnen Sie diesen Link einmalig auf Ihrem eigenen Handy oder Rechner, um Ihren Zugang für den Dr. Schumacher Produktberater einzurichten:',
+    '',
+    link,
+    '',
+    `Danach können Sie sich dort jederzeit mit Ihrem Namen (${user.name}) und Ihrem Passwort anmelden.`
+  ];
+  openMailto('Ihr Zugang für den Dr. Schumacher Produktberater', lines.join('\n'), user.email || '');
+}
+(function oneInviteBootstrap(){
+  try {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get('invite');
+    if (!raw) return;
+    const invited = oneDecodeInvite(raw);
+    if (!invited || !invited.name || !invited.password) return;
+    const idx = state.one.users.findIndex(u => u.id === invited.id);
+    if (idx >= 0) state.one.users[idx] = invited; else state.one.users.push(invited);
+    onePersistUsers();
+    state.inviteWelcome = invited.name;
+    params.delete('invite');
+    const rest = params.toString();
+    history.replaceState(null, '', location.pathname + (rest ? '?' + rest : ''));
+  } catch (e) { console.warn('Einladungslink konnte nicht verarbeitet werden', e); }
+})();
+
 function oneTerritoryOfContact(c, terrs){
   const T = terrs || state.one.territories;
   if (c.override) return T.find(t => t.id === c.override) || null;
@@ -3023,6 +3073,7 @@ function oneViewStaff(){
         <div class="one-spacer"></div>
         <span class="one-chip ${u.active?'ok':'stop'}">${u.active?'aktiv':'deaktiviert'}</span>
         <span class="one-chip quiet">${vis.length} Kontakte</span>
+        <button class="one-btn sm" data-one-act="invite-staff" data-one-id="${u.id}" title="Zugangslink an dieses Gerät des Mitarbeiters senden — nur so kennt sein eigenes Handy den Zugang, da nichts serverseitig synchronisiert wird">Zugang per E-Mail senden</button>
         <button class="one-btn sm ${u.active?'danger':''}" data-one-act="toggle-active" data-one-id="${u.id}">${u.active?'Deaktivieren':'Reaktivieren'}</button>
         <button class="one-btn sm danger" data-one-act="delete-staff" data-one-id="${u.id}">Löschen</button>
       </div>
@@ -3962,6 +4013,12 @@ function bindOne(){
       onePersistUsers();
       if (!u.active && O.loggedInUserId === u.id) O.loggedInUserId = null;
       render(); return;
+    }
+    if (a === 'invite-staff'){
+      const u = O.users.find(x => x.id === el.dataset.oneId);
+      if (!u) return;
+      oneInviteMailto(u);
+      return;
     }
     if (a === 'delete-staff'){
       const u = O.users.find(x => x.id === el.dataset.oneId);
