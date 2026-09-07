@@ -2173,9 +2173,7 @@ function bind() {
     if (!match){ state.regionLoginError = 'Name oder Passwort unbekannt.'; state.regionLoginName = name; render(); return; }
     if (!match.active){ state.regionLoginError = 'Dieser Zugang ist deaktiviert.'; state.regionLoginName = name; render(); return; }
     if (match.role==='employee' && !match.team){ state.regionLoginError = 'Für ' + match.name + ' ist im Admin-Bereich noch kein Team hinterlegt.'; state.regionLoginName = name; render(); return; }
-    if (match.team){ state.region = match.team; localStorage.setItem('region', state.region); }
-    state.repName = match.name;
-    localStorage.setItem('repName', state.repName);
+    oneApplyLogin(match);
     state.regionLoginError = ''; state.regionLoginName = '';
     const returnTo = state.previousScreen;
     state.previousScreen = null;
@@ -2797,6 +2795,37 @@ state.one = oneSeed();
   } catch (e) { console.warn('Gespeicherte ONE-Mitarbeiter konnten nicht geladen werden', e); }
 })();
 function onePersistUsers(){ try { localStorage.setItem('oneUsers', JSON.stringify(state.one.users)); } catch (e) {} }
+
+// Eine Anmeldung gilt für die ganze App — Produktberater und ONE teilen sich dieselbe Identität,
+// damit niemand beim Wechsel zwischen den beiden Bereichen ein zweites Mal Name/Passwort
+// eintragen muss. Login und Logout laufen deshalb immer über diese zwei Funktionen, nie direkt
+// über state.region/state.repName/state.one.loggedInUserId.
+function oneApplyLogin(user){
+  state.one.loggedInUserId = user.id;
+  try { localStorage.setItem('oneLoggedInUserId', user.id); } catch (e) {}
+  if (user.team){ state.region = user.team; localStorage.setItem('region', state.region); }
+  state.repName = user.name;
+  localStorage.setItem('repName', state.repName);
+}
+function oneApplyLogout(){
+  state.one.loggedInUserId = null;
+  state.region = '';
+  state.repName = '';
+  try {
+    localStorage.removeItem('oneLoggedInUserId');
+    localStorage.removeItem('region');
+    localStorage.removeItem('repName');
+  } catch (e) {}
+}
+(function oneRestoreSession(){
+  try {
+    const savedId = localStorage.getItem('oneLoggedInUserId');
+    if (!savedId) return;
+    const match = state.one.users.find(u => u.id === savedId && u.active);
+    if (match) state.one.loggedInUserId = savedId;
+    else localStorage.removeItem('oneLoggedInUserId');
+  } catch (e) {}
+})();
 
 // Mitarbeiter-Zugänge liegen nur in localStorage — also getrennt pro Gerät. Ein auf dem
 // Admin-Gerät angelegter Kollege existiert auf dessen eigenem Handy zunächst nicht. Der
@@ -3829,7 +3858,8 @@ function bindOne(){
     const match = O.users.find(u => u.name.trim().toLowerCase() === name.trim().toLowerCase() && u.password === pw);
     if (!match){ O.authError = 'Name oder Passwort unbekannt.'; O.loginName = name; render(); return; }
     if (!match.active){ O.authError = 'Dieser Zugang ist deaktiviert.'; O.loginName = name; render(); return; }
-    O.loggedInUserId = match.id; O.authError = ''; O.loginName = ''; O.loginPassword = '';
+    oneApplyLogin(match);
+    O.authError = ''; O.loginName = ''; O.loginPassword = '';
     O.view = oneNavFor(match)[0][0];
     oneAudit('Angemeldet', match.name);
     render();
@@ -3957,7 +3987,7 @@ function bindOne(){
   document.querySelectorAll('[data-one-act]').forEach(el => el.onclick = () => {
     const a = el.dataset.oneAct;
     if (a === 'exit'){ state.screen = 'menu'; render(); return; }
-    if (a === 'logout'){ oneAudit('Abgemeldet', oneCurrentUser() ? oneCurrentUser().name : ''); O.loggedInUserId = null; O.loginName=''; O.loginPassword=''; O.forgotMode=false; O.forgotDone=false; render(); return; }
+    if (a === 'logout'){ oneAudit('Abgemeldet', oneCurrentUser() ? oneCurrentUser().name : ''); oneApplyLogout(); O.loginName=''; O.loginPassword=''; O.forgotMode=false; O.forgotDone=false; render(); return; }
     if (a === 'forgot-password'){ O.forgotMode = true; O.forgotDone = false; render(); return; }
     if (a === 'back-to-login'){ O.forgotMode = false; O.forgotDone = false; O.authError=''; render(); return; }
     if (a === 'assign-contact'){
