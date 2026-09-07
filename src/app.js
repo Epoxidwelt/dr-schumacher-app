@@ -371,6 +371,8 @@ const state = {
   screen: storedProfile ? (storedProfile === 'admin' ? 'one' : 'menu') : 'profile',
   activeProfile: storedProfile,
   region: localStorage.getItem('region') || '',
+  repName: localStorage.getItem('repName') || '',
+  regionLoginName: '', regionLoginError: '',
   priceList: localStorage.getItem('priceList') || 'UVP',
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
@@ -564,10 +566,15 @@ function regionScreen() {
     <section class="price-panel">
       <img class="welcome-logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher">
       <span class="eyebrow">Außendienst</span>
-      <h1>Welchem Team gehören Sie an?</h1>
-      <p>Die Auswahl legt fest, an welches Innendienst-Team interne E-Mails automatisch adressiert werden. Kann später jederzeit geändert werden.</p>
-      <div class="price-options">${REGIONS.map(r => `<button class="price-option ${state.region===r.key?'selected':''}" data-region="${r.key}"><span>${r.label}</span><small>Team ${r.label}</small></button>`).join('')}</div>
-      <p class="privacy-note">Die Zuordnung bleibt lokal auf diesem Gerät gespeichert.</p>
+      <h1>Anmelden</h1>
+      <p>Mit Vor- und Nachnamen sowie Passwort. Das Team ist im Admin-Bereich bereits hinterlegt und wird automatisch übernommen — keine manuelle Auswahl mehr nötig.</p>
+      <form id="regionLoginForm" class="region-login-form" autocomplete="off">
+        <input type="text" id="regionLoginName" placeholder="Vor- und Nachname" value="${escapeHtml(state.regionLoginName||'')}" autocomplete="username">
+        <input type="password" id="regionLoginPw" placeholder="Passwort" autocomplete="current-password">
+        <button class="primary-button" type="submit">Anmelden</button>
+      </form>
+      ${state.regionLoginError ? `<p class="region-login-error">${escapeHtml(state.regionLoginError)}</p>` : ''}
+      <p class="privacy-note">Zugangsdaten werden vom Admin unter „Dr. Schumacher ONE → Mitarbeiter" vergeben.</p>
     </section>
   </main>`;
 }
@@ -1676,7 +1683,7 @@ function settingsScreen() {
   const factsMeta = state.factsImportMeta || {};
   const factsMetaText = factsMeta.date ? `Zuletzt aktualisiert: ${escapeHtml(factsMeta.date)} · ${factsMeta.rows || 0} Produkte` : (FACTS_SHEET_CSV_URL ? 'Noch nicht synchronisiert' : 'Keine Tabelle hinterlegt');
   return `<main class="page settings-page"><div class="section-heading"><div><span class="eyebrow">Verwaltung</span><h1>Einstellungen</h1></div></div>
-    <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${state.activeProfile==='sales'?`<button data-action="region"><span><strong>Team-Region wechseln</strong><small>${state.region?'Aktuell: Team '+regionLabel(state.region):'Noch nicht gewählt'}</small></span><b>›</b></button>`:''}${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
+    <section class="settings-card"><button data-action="profile"><span><strong>Benutzerrolle wechseln</strong><small>Aktuell: ${currentProfile().name}</small></span><b>›</b></button><button data-action="customer-mode"><span><strong>Kundengespräch-Modus</strong><small>${state.customerMode?'Aktiv – Preise sind verborgen':'Inaktiv – Preise sind sichtbar'}</small></span><b>${state.customerMode?'✓':'›'}</b></button><button data-action="prices"><span><strong>Preisliste wechseln</strong><small>Aktuell: ${state.priceList}</small></span><b>›</b></button>${state.activeProfile==='sales'?`<button data-action="region"><span><strong>Anmeldung / Team</strong><small>${state.region?(state.repName?escapeHtml(state.repName)+' · ':'')+'Team '+regionLabel(state.region):'Noch nicht angemeldet'}</small></span><b>›</b></button>`:''}${can('prices')?`<button data-action="sync-prices"><span><strong>Preise jetzt aktualisieren</strong><small>Lädt den aktuellen Stand aus der Google-Tabelle</small></span><b>⟳</b></button><div id="importStatus" class="import-status"><strong>${isLive?'Live aus Google Sheets':(meta.file?escapeHtml(meta.file):'Manueller Import')}</strong><br>${metaText}</div><label class="file-row"><span><strong>Preise manuell aus Datei importieren</strong><small>.xlsx, .xls oder .csv – überschreibt den Live-Stand bis zur nächsten Aktualisierung</small></span><b>Datei auswählen</b><input id="excel" type="file" accept=".xlsx,.xls,.csv"></label><button data-action="export-prices"><span><strong>Preisstand sichern</strong><small>Lokale JSON-Sicherung herunterladen</small></span><b>↓</b></button><button data-action="clear-prices"><span><strong>Lokale Preise löschen</strong><small>Entfernt nur die Daten auf diesem Gerät</small></span><b>×</b></button>`:'<div class="permission-note"><strong>Preisverwaltung ausgeblendet</strong><span>Für diese Rolle ist kein Import oder Löschen von Preislisten vorgesehen.</span></div>'}</section>
     ${can('prices') && rep ? `<section class="settings-card import-report"><div class="report-head"><strong>Abgleich Preisliste ↔ Produkte</strong><span>${rep.matched} von ${rep.referenced} Gebinden mit Preis · ${rep.sheetRows} Artikelnummern in der Liste</span></div>
       ${rep.missing.length ? `<details><summary>${rep.missing.length} Gebinde ohne Preis in der Liste</summary><div>${rep.missing.map(escapeHtml).join('<br>')}</div></details>` : '<div class="report-ok">Alle Gebinde der App haben einen Preis.</div>'}
       ${rep.unknown.length ? `<details><summary>${rep.unknown.length} Artikelnummern, die die App nicht kennt</summary><div>${rep.unknown.map(escapeHtml).join('<br>')}</div></details>` : '<div class="report-ok">Jede Artikelnummer der Liste ist einem Produkt zugeordnet.</div>'}
@@ -1802,9 +1809,19 @@ function bind() {
     state.screen = state.activeProfile==='admin' ? 'one' : (state.activeProfile==='sales' && !state.region) ? 'region' : 'menu';
     render();
   });
-  document.querySelectorAll('[data-region]').forEach(button => button.onclick = () => {
-    state.region = button.dataset.region;
+  $('#regionLoginForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = ($('#regionLoginName')||{}).value || '';
+    const pw = ($('#regionLoginPw')||{}).value || '';
+    const match = (state.one.users||[]).find(u => u.role==='employee' && u.name.trim().toLowerCase() === name.trim().toLowerCase() && u.password === pw);
+    if (!match){ state.regionLoginError = 'Name oder Passwort unbekannt.'; state.regionLoginName = name; render(); return; }
+    if (!match.active){ state.regionLoginError = 'Dieser Zugang ist deaktiviert.'; state.regionLoginName = name; render(); return; }
+    if (!match.team){ state.regionLoginError = 'Für ' + match.name + ' ist im Admin-Bereich noch kein Team hinterlegt.'; state.regionLoginName = name; render(); return; }
+    state.region = match.team;
     localStorage.setItem('region', state.region);
+    state.repName = match.name;
+    localStorage.setItem('repName', state.repName);
+    state.regionLoginError = ''; state.regionLoginName = '';
     const returnTo = state.previousScreen;
     state.previousScreen = null;
     state.screen = (returnTo && returnTo !== 'region' && returnTo !== 'profile') ? returnTo : 'menu';
@@ -2382,6 +2399,17 @@ function oneSeed() {
   };
 }
 state.one = oneSeed();
+// Mitarbeiter-Zugänge (Name, Passwort, Team, Funktion, Gebiete) bleiben auf diesem Gerät
+// erhalten, damit ein vom Admin angelegter Kollege sich auch nach einem Neuladen anmelden
+// kann. oneSeed() selbst bleibt unverändert, weil die Testfälle den unberührten Ausgangsstand
+// brauchen. Kontakte/Vorlagen/Protokoll starten dagegen bewusst jedes Mal neu (Simulation).
+(function onePersistedInit(){
+  try {
+    const saved = JSON.parse(localStorage.getItem('oneUsers') || 'null');
+    if (Array.isArray(saved) && saved.length) state.one.users = saved;
+  } catch (e) { console.warn('Gespeicherte ONE-Mitarbeiter konnten nicht geladen werden', e); }
+})();
+function onePersistUsers(){ try { localStorage.setItem('oneUsers', JSON.stringify(state.one.users)); } catch (e) {} }
 
 function oneTerritoryOfContact(c, terrs){
   const T = terrs || state.one.territories;
@@ -3239,6 +3267,7 @@ function oneWizardCommit(){
   O.users.push({ id, name:d.name.trim(), email:d.email.trim() || (id+'@example.com'), password:d.password.trim() || '1234', role:'employee', funktion:d.funktion, team:d.team, territories:d.territories.slice(), active:true });
   oneAudit('Mitarbeiter angelegt', d.name + ' — ' + oneTeamLabel(d.team) + ' · ' + oneFunktionLabel(d.funktion) + ' · ' + (d.territories.length ? d.territories.map(t=>oneTerrById(t).name).join(', ') : 'ohne Gebiet'));
   O.wizard = null;
+  onePersistUsers();
 }
 
 function bindOne(){
@@ -3285,12 +3314,14 @@ function bindOne(){
     const id = input.value; const had = u.territories.includes(id);
     u.territories = had ? u.territories.filter(x => x !== id) : u.territories.concat([id]);
     oneAudit(had ? 'Gebiet entzogen' : 'Gebiet zugewiesen', oneTerrById(id).name + ' → ' + u.name + ' (sieht jetzt ' + oneVisibleContacts(u).length + ' Kontakte)');
+    onePersistUsers();
     render();
   });
   document.querySelectorAll('[data-one-funktion]').forEach(input => input.onchange = () => {
     const u = O.users.find(x => x.id === input.dataset.oneFunktion);
     u.funktion = input.value;
     oneAudit('Funktion geändert', u.name + ' → ' + oneFunktionLabel(u.funktion));
+    onePersistUsers();
     render();
   });
   document.querySelectorAll('[data-one-range]').forEach(input => input.onchange = () => {
@@ -3382,6 +3413,7 @@ function bindOne(){
       const u = O.users.find(x => x.id === el.dataset.oneId);
       u.active = !u.active;
       oneAudit(u.active ? 'Mitarbeiter reaktiviert' : 'Mitarbeiter deaktiviert', u.name);
+      onePersistUsers();
       if (!u.active && O.loggedInUserId === u.id) O.loggedInUserId = null;
       render(); return;
     }
@@ -3438,7 +3470,7 @@ function bindOne(){
       const next = (document.getElementById('oneOwnPwNew')||{}).value || '';
       if (current !== u.password){ O.ownPwMessage = { ok:false, text:'Aktuelles Passwort ist falsch.' }; }
       else if (!next.trim()){ O.ownPwMessage = { ok:false, text:'Neues Passwort darf nicht leer sein.' }; }
-      else { u.password = next.trim(); O.ownPwMessage = { ok:true, text:'Passwort geändert.' }; oneAudit('Passwort geändert', u.name + ' (selbst)'); }
+      else { u.password = next.trim(); O.ownPwMessage = { ok:true, text:'Passwort geändert.' }; oneAudit('Passwort geändert', u.name + ' (selbst)'); onePersistUsers(); }
       render(); return;
     }
     if (a === 'reset-password'){
@@ -3448,6 +3480,7 @@ function bindOne(){
       target.password = val.trim();
       oneAudit('Passwort zurückgesetzt', target.name + ' (durch ' + oneCurrentUser().name + ')');
       O.ownPwMessage = { ok:true, text:'Neues Passwort für ' + target.name + ' gesetzt.' };
+      onePersistUsers();
       render(); return;
     }
     if (a === 'export'){ oneAudit('CSV-Export', O.contacts.length + ' Kontakte — im Produktivsystem protokoll- und rechtepflichtig'); render(); return; }
