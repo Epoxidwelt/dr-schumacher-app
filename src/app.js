@@ -2290,28 +2290,36 @@ const ONE_COMM = {
   bestand:    { label:'Bestandskunde', chip:'quiet', hint:'§ 7 Abs. 3 UWG – nur eigene ähnliche Produkte, Widerspruch jederzeit möglich.' },
   widerspruch:{ label:'Widerspruch',   chip:'stop',  hint:'Hat der Werbung widersprochen – nur noch zwingende Service-Informationen.' }
 };
-const ONE_ADMIN_PASSWORD = '1234';
+
+const ONE_CADENCE_DAYS = { A:60, B:90, C:120 };
+const ONE_TEAMS = [
+  {id:'nord', label:'Nord'}, {id:'sued', label:'Süd'}, {id:'ost', label:'Ost'}, {id:'west', label:'West'}
+];
+function oneAddDays(base, days){ const d = new Date(base + 'T12:00:00'); d.setDate(d.getDate() + days); return d.toISOString().slice(0,10); }
+function oneToday(){ return new Date().toISOString().slice(0,10); }
+function oneCadenceFollowUp(tier, fromDate){ return tier ? oneAddDays(fromDate || oneToday(), ONE_CADENCE_DAYS[tier]) : null; }
 
 function oneSeed() {
+  const today = oneToday();
   return {
     tenant:{ name:'Dr. Schumacher', short:'DS' },
     territories: JSON.parse(JSON.stringify(ONE_TERRITORIES)),
     contacts:[
-      {id:'k1', company:'Dentalzentrum Hamburg',   first:'Anna',    last:'Petersen', email:'anna.petersen@example.com',   plz:'20095', group:'Dental', segment:'Praxis', comm:'frei',        active:true, override:null},
-      {id:'k2', company:'Praxis Nordblick',        first:'Jan',     last:'Hansen',   email:'jan.hansen@example.com',      plz:'24103', group:'Dental', segment:'Praxis', comm:'bestand',     active:true, override:null},
-      {id:'k3', company:'Dentalzentrum Leipzig',   first:'Laura',   last:'Richter',  email:'laura.richter@example.com',   plz:'04109', group:'Dental', segment:'Praxis', comm:'frei',        active:true, override:null},
-      {id:'k4', company:'Praxis Dresden',          first:'Thomas',  last:'Berger',   email:'thomas.berger@example.com',   plz:'01067', group:'Dental', segment:'Praxis', comm:'bestand',     active:true, override:null},
-      {id:'k5', company:'Dentalzentrum Düsseldorf',first:'Sarah',   last:'Becker',   email:'sarah.becker@example.com',    plz:'40210', group:'Dental', segment:'Klinik', comm:'frei',        active:true, override:null},
-      {id:'k6', company:'Praxis Rheinblick',       first:'Daniel',  last:'Weber',    email:'daniel.weber@example.com',    plz:'41460', group:'Dental', segment:'Praxis', comm:'widerspruch', active:true, override:null},
-      {id:'k7', company:'Dentalzentrum Stuttgart', first:'Julia',   last:'Wagner',   email:'julia.wagner@example.com',    plz:'70173', group:'Dental', segment:'Klinik', comm:'frei',        active:true, override:null},
-      {id:'k8', company:'Praxis München',          first:'Michael', last:'Fischer',  email:'michael.fischer@example.com', plz:'80331', group:'Dental', segment:'Praxis', comm:'bestand',     active:true, override:null}
+      {id:'k1', externeNr:'EX-10021', kundenNr:'K-4471', name:'Dentalzentrum Hamburg',   plz:'20095', ort:'Hamburg',   strasse:'Mönckebergstraße', hausnummer:'12', bezirk:'Altstadt',  preisliste:'UVP',  email:'anna.petersen@example.com',   comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-3)},
+      {id:'k2', externeNr:'EX-10022', kundenNr:'K-4472', name:'Praxis Nordblick',        plz:'24103', ort:'Kiel',      strasse:'Holstenstraße',    hausnummer:'44', bezirk:'Zentrum',   preisliste:'PL 1', email:'jan.hansen@example.com',      comm:'bestand',     active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,12)},
+      {id:'k3', externeNr:'EX-10023', kundenNr:'K-4473', name:'Dentalzentrum Leipzig',   plz:'04109', ort:'Leipzig',   strasse:'Grimmaische Straße',hausnummer:'7', bezirk:'Mitte',     preisliste:'UVP',  email:'laura.richter@example.com',   comm:'frei',        active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,40)},
+      {id:'k4', externeNr:'EX-10024', kundenNr:'K-4474', name:'Praxis Dresden',          plz:'01067', ort:'Dresden',   strasse:'Prager Straße',    hausnummer:'3', bezirk:'Altstadt',  preisliste:'PL 2', email:'thomas.berger@example.com',   comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null},
+      {id:'k5', externeNr:'EX-10025', kundenNr:'K-4475', name:'Dentalzentrum Düsseldorf',plz:'40210', ort:'Düsseldorf',strasse:'Königsallee',      hausnummer:'21', bezirk:'Stadtmitte',preisliste:'UVP',  email:'sarah.becker@example.com',    comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-1)},
+      {id:'k6', externeNr:'EX-10026', kundenNr:'K-4476', name:'Praxis Rheinblick',       plz:'41460', ort:'Neuss',     strasse:'Further Straße',   hausnummer:'56', bezirk:'Furth',     preisliste:'PL 1', email:'daniel.weber@example.com',    comm:'widerspruch', active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,5)},
+      {id:'k7', externeNr:'EX-10027', kundenNr:'K-4477', name:'Dentalzentrum Stuttgart', plz:'70173', ort:'Stuttgart', strasse:'Königstraße',      hausnummer:'9', bezirk:'Mitte',     preisliste:'UVP',  email:'julia.wagner@example.com',    comm:'frei',        active:true, override:null, abc:null,nextFollowUp:null},
+      {id:'k8', externeNr:'EX-10028', kundenNr:'K-4478', name:'Praxis München',          plz:'80331', ort:'München',   strasse:'Sendlinger Straße',hausnummer:'18', bezirk:'Altstadt',  preisliste:'PL 3', email:'michael.fischer@example.com', comm:'bestand',     active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,80)}
     ],
     users:[
-      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', role:'admin',    team:'Zentrale', territories:[],       active:true},
-      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     role:'employee', team:'Dental',   territories:['nord'], active:true},
-      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     role:'employee', team:'Dental',   territories:['ost'],  active:true},
-      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     role:'employee', team:'Dental',   territories:['west'], active:true},
-      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     role:'employee', team:'Dental',   territories:['sued'], active:true}
+      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           team:null,   territories:[],       active:true},
+      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', team:'nord', territories:['nord'], active:true},
+      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', team:'ost',  territories:['ost'],  active:true},
+      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', team:'west', territories:['west'], active:true},
+      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  team:'sued', territories:['sued'], active:true}
     ],
     templates:[
       {id:'t1', name:'Produktneuheit',            promo:true,  subject:'Neu im Sortiment: {{produkt}}',                 body:'wir haben unser Sortiment erweitert. {{produkt}} ist ab sofort lieferbar.\n\nGerne stelle ich Ihnen das Produkt bei Ihrem nächsten Termin persönlich vor.'},
@@ -2322,12 +2330,15 @@ function oneSeed() {
       {id:'t6', name:'Veranstaltung',             promo:true,  subject:'Einladung: {{produkt}}',                        body:'wir laden Sie herzlich zu unserer Fachveranstaltung ein.\n\nTermin und Programm entnehmen Sie bitte dem Anhang.'}
     ],
     audit:[], auditSeq:0,
-    session:'admin', view:'dashboard',
-    adminUnlocked:false, authError:'',
+    loggedInUserId:null, loginName:'', loginPassword:'', loginError:'', forgotMode:false, forgotDone:false,
+    view:'dashboard',
     filters:{ q:'', terr:'', comm:'' },
     selection:[], mailTemplate:'t1', mailProduct:'DESCOSEPT SPEZIAL', mailIntro:'', mailSent:null,
     probe:{ user:'ma', contact:'k5', result:null },
-    tests:null
+    tests:null,
+    newContact:null,   // Formularentwurf für "Kontakt hinzufügen" (Admin oder Mitarbeiter)
+    importStatus:'',   // Textmeldung nach simuliertem Import
+    wizard:null         // {step, data} während "Mitarbeiter anlegen"
   };
 }
 state.one = oneSeed();
@@ -2350,8 +2361,42 @@ function oneVisibleContacts(user, o){
 function oneCanAccessContact(user, contactId, o){
   return oneVisibleContacts(user, o).some(c => c.id === contactId);
 }
-function oneCurrentUser(){ return state.one.users.find(u => u.id === state.one.session); }
+function oneCurrentUser(){ return state.one.users.find(u => u.id === state.one.loggedInUserId) || null; }
 function oneTerrById(id){ return state.one.territories.find(t => t.id === id); }
+function oneTeamLabel(id){ const t = ONE_TEAMS.find(x=>x.id===id); return t ? t.label : '—'; }
+function oneFunktionLabel(f){ return f === 'innendienst' ? 'Innendienst' : f === 'aussendienst' ? 'Außendienst' : '—'; }
+function oneResponsibleFor(c){
+  const t = oneTerritoryOfContact(c);
+  if (!t) return null;
+  return state.one.users.find(u => u.role==='employee' && u.active && u.territories.includes(t.id)) || null;
+}
+function oneAbcChip(c){
+  if (!c.abc) return '<span class="one-chip quiet">–</span>';
+  const cls = c.abc==='A' ? 'ok' : c.abc==='B' ? 'warn' : 'quiet';
+  return `<span class="one-chip ${cls}">${c.abc}-Kunde</span>`;
+}
+function oneDueBadge(c){
+  if (!c.nextFollowUp) return '';
+  const days = Math.round((new Date(c.nextFollowUp+'T12:00:00') - new Date(oneToday()+'T12:00:00')) / 86400000);
+  if (days < 0) return `<span class="one-chip stop">überfällig seit ${Math.abs(days)} Tag${Math.abs(days)===1?'':'en'}</span>`;
+  if (days === 0) return '<span class="one-chip warn">heute fällig</span>';
+  return `<span class="one-chip quiet">in ${days} Tag${days===1?'':'en'}</span>`;
+}
+function oneQuickActionsHtml(contactId){
+  return `<div class="one-quick-actions">
+    <button class="one-btn sm" data-one-followup="${contactId}:day">+1 Tag</button>
+    <button class="one-btn sm" data-one-followup="${contactId}:month">+1 Monat</button>
+    <button class="one-btn sm" data-one-followup="${contactId}:rhythm">Rhythmus</button>
+  </div>`;
+}
+function oneAdjustFollowUp(contactId, mode){
+  const c = state.one.contacts.find(x=>x.id===contactId);
+  if (!c) return;
+  if (mode==='day') c.nextFollowUp = oneAddDays(c.nextFollowUp || oneToday(), 1);
+  else if (mode==='month') c.nextFollowUp = oneAddDays(c.nextFollowUp || oneToday(), 30);
+  else if (mode==='rhythm') c.nextFollowUp = oneCadenceFollowUp(c.abc, oneToday());
+  oneAudit('Wiedervorlage verschoben', c.name + ' → ' + (c.nextFollowUp || 'kein Termin') + ' (' + mode + ')');
+}
 function oneAudit(action, detail){
   const u = oneCurrentUser(); const O = state.one;
   O.audit.unshift({ id:++O.auditSeq, time:new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'}), actor:u ? u.name : '—', action, detail });
@@ -2364,33 +2409,28 @@ const ONE_ADMIN_NAV = [
   ['dashboard','Dashboard'], ['staff','Mitarbeiter'], ['terr','Gebiete'],
   ['contacts','Kontakte'], ['templates','E-Mail-Vorlagen'], ['security','Sicherheit'], ['tests','Testfälle']
 ];
-const ONE_EMP_NAV = [ ['home','Startseite'], ['mine','Meine Kontakte'], ['mail','E-Mail erstellen'], ['tpl','Vorlagen'] ];
+const ONE_EMP_NAV = [ ['home','Startseite'], ['mine','Meine Kontakte'], ['tasks','Aufgaben'], ['mail','E-Mail erstellen'], ['tpl','Vorlagen'] ];
 function oneNavFor(u){ return (u && u.role === 'admin') ? ONE_ADMIN_NAV : ONE_EMP_NAV; }
 
+function oneDueContacts(u){
+  return oneVisibleContacts(u).filter(c => c.nextFollowUp && c.nextFollowUp <= oneToday());
+}
 function oneRailHtml(){
   const u = oneCurrentUser(); const nav = oneNavFor(u); const O = state.one;
   const counts = {
     staff:O.users.filter(x=>x.role==='employee').length, contacts:O.contacts.length,
-    templates:O.templates.length, mine:oneVisibleContacts(u).length, terr:O.territories.length
+    templates:O.templates.length, mine:oneVisibleContacts(u).length, terr:O.territories.length,
+    tasks:oneDueContacts(u).length
   };
   return '<div class="one-rail-group">'
     + '<div class="one-rail-title">'+(u.role==='admin'?'Administration':'Mein Bereich')+'</div>'
     + nav.map(([k,label]) =>
         '<button data-one-nav="'+k+'" aria-current="'+(O.view===k)+'">'
         + '<span>'+escapeHtml(label)+'</span>'
-        + (counts[k]!=null ? '<span class="one-count">'+counts[k]+'</span>' : '')
+        + (counts[k]!=null ? '<span class="one-count'+(k==='tasks'&&counts[k]>0?' due':'')+'">'+counts[k]+'</span>' : '')
         + '</button>').join('')
     + '</div>';
 }
-function oneRoleSelectHtml(){
-  const O = state.one;
-  return O.users.map(u =>
-    '<option value="'+u.id+'"'+(u.id===O.session?' selected':'')+'>'
-    + escapeHtml(u.name) + ' · ' + (u.role==='admin' ? 'Administration'
-        : (u.active ? (u.territories.length ? u.territories.map(t=>oneTerrById(t).name).join(' + ') : 'ohne Gebiet') : 'deaktiviert'))
-    + '</option>').join('');
-}
-
 function oneViewDashboard(){
   const O = state.one;
   const unassigned = O.contacts.filter(c => !oneTerritoryOfContact(c));
@@ -2448,21 +2488,28 @@ function oneViewDashboard(){
 
 function oneViewStaff(){
   const O = state.one;
+  if (O.wizard) return oneViewStaffWizard();
   const emps = O.users.filter(u => u.role === 'employee');
   return `
   <div class="one-page-head"><div>
     <span class="one-eyebrow">Administration</span>
     <h1>Mitarbeiter</h1>
-    <p>Gebiete per Mehrfachauswahl zuweisen. Die Kontaktliste des Mitarbeiters ändert sich sofort mit — sichtbar in der Spalte rechts.</p>
+    <p>Team, Funktion und Gebiete per Klick zuweisen. Die Kontaktliste des Mitarbeiters ändert sich sofort mit — sichtbar in der Spalte rechts.</p>
   </div><div class="one-spacer"></div>
-  <button class="one-btn" data-one-act="add-staff">Mitarbeiter anlegen</button></div>
+  <button class="one-btn primary" data-one-act="add-staff">Mitarbeiter anlegen</button></div>
   <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
-    <thead><tr><th>Mitarbeiter</th><th>Team</th><th style="min-width:290px">Gebiete</th><th>Sieht Kontakte</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Mitarbeiter</th><th>Team</th><th>Funktion</th><th style="min-width:290px">Gebiete</th><th>Sieht Kontakte</th><th>Status</th><th></th></tr></thead>
     <tbody>${emps.map(u => {
       const vis = oneVisibleContacts(u);
       return `<tr>
         <td><div class="strong">${escapeHtml(u.name)}</div><div class="muted mono" style="font-size:12px">${escapeHtml(u.email)}</div></td>
-        <td class="muted">${escapeHtml(u.team)}</td>
+        <td class="muted">${escapeHtml(oneTeamLabel(u.team))}</td>
+        <td><div class="one-terr-picker">${[['aussendienst','Außendienst'],['innendienst','Innendienst']].map(([k,label]) => {
+            const on = u.funktion === k;
+            return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}">
+              <input type="radio" name="one-funktion-${u.id}" data-one-funktion="${u.id}" value="${k}" ${on?'checked':''} ${u.active?'':'disabled'}>
+              ${label}</label>`;
+          }).join('')}</div></td>
         <td><div class="one-terr-picker">${O.territories.map(t => {
             const on = u.territories.includes(t.id);
             return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}">
@@ -2479,6 +2526,53 @@ function oneViewStaff(){
     <div class="one-note">Deaktivieren sperrt den Zugang sofort. Das Gebiet bleibt bestehen und wird der Nachfolge zugewiesen — die Kontakte des Gebiets sind damit ohne jede Datenmigration wieder betreut.</div>
     <div class="one-note warn" style="margin-top:10px">Im Prototyp endet die Sperre bei der Oberfläche. Produktiv muss sie Sitzung und Token sofort ungültig machen, sonst arbeitet ein offener Client weiter.</div>
   </div></div>`;
+}
+
+const ONE_WIZARD_STEPS = ['person','team','funktion','gebiet','fertig'];
+function oneViewStaffWizard(){
+  const w = state.one.wizard; const step = w.step; const d = w.data;
+  const stepIndex = ONE_WIZARD_STEPS.indexOf(step);
+  const progress = `<div class="one-wizard-steps">${ONE_WIZARD_STEPS.map((s,i) => `<span class="one-wizard-dot ${i===stepIndex?'active':i<stepIndex?'done':''}"></span>`).join('')}</div>`;
+  let body = '';
+  if (step === 'person'){
+    body = `<h2>1. Name und Zugang</h2>
+      <p>Damit sich der Mitarbeiter selbst anmelden kann.</p>
+      <label class="one-wfield">Name<input type="text" id="oneWizName" value="${escapeHtml(d.name)}" placeholder="z. B. Petra Klein"></label>
+      <label class="one-wfield">E-Mail<input type="text" id="oneWizEmail" value="${escapeHtml(d.email)}" placeholder="petra.klein@schumacher-online.com"></label>
+      <label class="one-wfield">Passwort<input type="text" id="oneWizPassword" value="${escapeHtml(d.password)}" placeholder="wird beim ersten Login geändert"></label>
+      <div class="one-wizard-actions"><button class="one-btn primary" data-one-act="wizard-next" ${d.name.trim()?'':'disabled'}>Weiter</button></div>`;
+  } else if (step === 'team'){
+    body = `<h2>2. Team zuordnen</h2>
+      <p>Regionales Team, dem ${escapeHtml(d.name)} angehört.</p>
+      <div class="one-choices">${ONE_TEAMS.map(t => `<button class="one-choice ${d.team===t.id?'on':''}" data-one-act="wizard-team" data-one-value="${t.id}">${t.label}</button>`).join('')}</div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.team?'':'disabled'}>Weiter</button></div>`;
+  } else if (step === 'funktion'){
+    body = `<h2>3. Funktion zuordnen</h2>
+      <p>Bestimmt, welchen Bereich der App ${escapeHtml(d.name)} sieht.</p>
+      <div class="one-choices">
+        <button class="one-choice ${d.funktion==='aussendienst'?'on':''}" data-one-act="wizard-funktion" data-one-value="aussendienst">Außendienst</button>
+        <button class="one-choice ${d.funktion==='innendienst'?'on':''}" data-one-act="wizard-funktion" data-one-value="innendienst">Innendienst</button>
+      </div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.funktion?'':'disabled'}>Weiter</button></div>`;
+  } else if (step === 'gebiet'){
+    body = `<h2>4. Gebiete zuweisen</h2>
+      <p>PLZ-Gebiete, für die ${escapeHtml(d.name)} Kontakte sehen darf. Manuell auswählen — keine Automatik.</p>
+      <div class="one-terr-picker">${state.one.territories.map(t => `<label class="one-terr-opt ${d.territories.includes(t.id)?'on':''}">
+        <input type="checkbox" data-one-act="wizard-terr" data-one-value="${t.id}" ${d.territories.includes(t.id)?'checked':''}>${escapeHtml(t.name)}</label>`).join('')}</div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next">Weiter</button></div>`;
+  } else {
+    body = `<h2>5. Zusammenfassung</h2>
+      <div class="one-chain" style="margin:14px 0">
+        <div class="one-chain-step"><span class="k">Name</span><span class="v">${escapeHtml(d.name)}</span></div>
+        <div class="one-chain-step"><span class="k">Team</span><span class="v">${escapeHtml(oneTeamLabel(d.team))}</span></div>
+        <div class="one-chain-step"><span class="k">Funktion</span><span class="v">${escapeHtml(oneFunktionLabel(d.funktion))}</span></div>
+        <div class="one-chain-step is-accent"><span class="k">Gebiete</span><span class="v">${d.territories.length ? d.territories.map(id=>oneTerrById(id).name).join(', ') : 'keine'}</span></div>
+      </div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-finish">Mitarbeiter speichern</button></div>`;
+  }
+  return `<div class="one-page-head"><div><span class="one-eyebrow">Administration · Neuer Mitarbeiter</span><h1>Schritt ${stepIndex+1} von ${ONE_WIZARD_STEPS.length}</h1></div></div>
+  <div class="one-panel"><div class="one-panel-body">${progress}${body}</div></div>
+  <div class="one-panel"><div class="one-panel-body"><div class="one-note">Alle Angaben lassen sich in dieser einen Ansicht erledigen — kein Wechsel in eine andere Tabelle nötig, um Team, Funktion oder Gebiet nachzutragen.</div></div></div>`;
 }
 
 function oneViewTerr(){
@@ -2513,28 +2607,59 @@ function oneViewTerr(){
   </div>`;
 }
 
+function oneNewContactDraft(){
+  return { externeNr:'', kundenNr:'', name:'', plz:'', ort:'', strasse:'', hausnummer:'', bezirk:'', preisliste:'UVP', email:'' };
+}
+function oneContactFormHtml(){
+  const d = state.one.newContact;
+  const fields = [
+    ['externeNr','Externe Nummer'], ['kundenNr','Kundennummer'], ['name','Name'],
+    ['plz','PLZ'], ['ort','Ort'], ['strasse','Straße'], ['hausnummer','Hausnummer'],
+    ['bezirk','Bezirk'], ['email','E-Mail']
+  ];
+  return `<div class="one-panel"><div class="one-panel-head"><h2>Kontakt hinzufügen</h2><p>Gebiet und Verantwortlicher werden automatisch aus der PLZ abgeleitet.</p></div>
+    <div class="one-panel-body">
+      <div class="one-filters">
+        ${fields.map(([k,label]) => `<div class="one-field"><label for="oneNC-${k}">${label}</label><input type="text" id="oneNC-${k}" data-one-nc="${k}" value="${escapeHtml(d[k])}"></div>`).join('')}
+        <div class="one-field"><label for="oneNC-preisliste">Preisliste</label><select class="f" id="oneNC-preisliste" data-one-nc="preisliste">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(p=>`<option ${d.preisliste===p?'selected':''}>${p}</option>`).join('')}</select></div>
+      </div>
+      <div class="one-wizard-actions" style="margin-top:14px">
+        <button class="one-btn" data-one-act="cancel-new-contact">Abbrechen</button>
+        <button class="one-btn primary" data-one-act="save-new-contact" ${d.name.trim() && d.plz.trim() ? '' : 'disabled'}>Kontakt speichern</button>
+      </div>
+    </div></div>`;
+}
 function oneViewContacts(){
   const O = state.one;
   return `
   <div class="one-page-head"><div>
     <span class="one-eyebrow">Administration</span>
     <h1>Kontakte</h1>
-    <p>Der Admin sieht alle Kontakte des Mandanten. Das Gebiet wird bei jeder Anzeige aus der PLZ abgeleitet, nicht gespeichert.</p>
+    <p>Der Admin sieht alle Kontakte des Mandanten. Gebiet und Verantwortlicher werden bei jeder Anzeige aus der PLZ abgeleitet, nicht gespeichert.</p>
   </div><div class="one-spacer"></div>
+  <button class="one-btn" data-one-act="new-contact">+ Kontakt</button>
+  <button class="one-btn" data-one-act="import">Kontakte importieren</button>
   <button class="one-btn" data-one-act="export">CSV exportieren</button></div>
+  ${O.newContact ? oneContactFormHtml() : ''}
+  ${O.importStatus ? `<div class="one-panel"><div class="one-panel-body"><div class="one-note">${escapeHtml(O.importStatus)}</div></div></div>` : ''}
   <div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
-    <thead><tr><th>Firma</th><th>Name</th><th>E-Mail</th><th>PLZ</th><th>Abgeleitetes Gebiet</th><th>Kommunikation</th></tr></thead>
-    <tbody>${O.contacts.map(c => `<tr>
-      <td class="strong">${escapeHtml(c.company)}</td>
-      <td>${escapeHtml(c.first)} ${escapeHtml(c.last)}</td>
-      <td class="mono muted" style="font-size:12.5px">${escapeHtml(c.email)}</td>
-      <td class="num">${escapeHtml(c.plz)}</td>
+    <thead><tr><th>Kundennr.</th><th>Name</th><th>Ort</th><th>Gebiet</th><th>Preisliste</th><th>Verantwortlich</th><th>Einstufung</th><th>Wiedervorlage</th><th>Kommunikation</th><th></th></tr></thead>
+    <tbody>${O.contacts.map(c => { const resp = oneResponsibleFor(c); return `<tr>
+      <td class="mono muted">${escapeHtml(c.kundenNr)}</td>
+      <td class="strong">${escapeHtml(c.name)}</td>
+      <td class="muted">${escapeHtml(c.plz)} ${escapeHtml(c.ort)}</td>
       <td>${oneTerrChip(oneTerritoryOfContact(c))}</td>
+      <td class="muted">${escapeHtml(c.preisliste)}</td>
+      <td class="muted">${resp ? escapeHtml(resp.name) : '—'}</td>
+      <td>${oneAbcChip(c)}</td>
+      <td>${oneDueBadge(c) || '<span class="muted">—</span>'}</td>
       <td>${oneCommChip(c)}</td>
-    </tr>`).join('')}</tbody>
+      <td>${oneQuickActionsHtml(c.id)}</td>
+    </tr>`; }).join('')}</tbody>
   </table></div></div></div>
   <div class="one-panel"><div class="one-panel-head"><h2>Datenminimierung</h2></div><div class="one-panel-body">
-    <div class="one-note">Gespeichert wird nur, was den Zweck trägt: Name, geschäftliche E-Mail, PLZ, Firma, Kundengruppe, Segment sowie der Kommunikationsstatus mit Rechtsgrundlage und Datum. Kein Freitextfeld für beliebige Notizen zur Person.</div>
+    <div class="one-note">Gespeichert wird nur, was den Zweck trägt: Kontaktdaten, Preisliste, Kommunikationsstatus mit Rechtsgrundlage. Kein Freitextfeld für beliebige Notizen zur Person.</div>
+    <div class="one-note warn" style="margin-top:10px"><strong>„Kontakte importieren" ist simuliert.</strong> Ein echter Massenimport braucht Spalten-Zuordnung, Validierung und eine Datenbank-Anbindung — hier zeigt der Klick nur, dass die Funktion vorgesehen und Admin-exklusiv ist.</div>
   </div></div>`;
 }
 
@@ -2588,7 +2713,7 @@ function oneViewSecurity(){
         <div class="one-field"><label for="oneProbeContact">Angeforderter Kontakt</label>
           <select class="f" id="oneProbeContact">${O.contacts.map(c=>{
             const t = oneTerritoryOfContact(c);
-            return '<option value="'+c.id+'"'+(c.id===O.probe.contact?' selected':'')+'>'+escapeHtml(c.company)+' — '+(t?escapeHtml(t.name):'ohne Gebiet')+'</option>';}).join('')}</select></div>
+            return '<option value="'+c.id+'"'+(c.id===O.probe.contact?' selected':'')+'>'+escapeHtml(c.name)+' — '+(t?escapeHtml(t.name):'ohne Gebiet')+'</option>';}).join('')}</select></div>
         <div class="one-field"><button class="one-btn primary" data-one-act="probe" style="width:100%">Zugriff prüfen</button></div>
       </div>
       ${r ? `<div style="margin-top:14px">
@@ -2596,12 +2721,12 @@ function oneViewSecurity(){
 Authorization: Bearer &lt;${escapeHtml(probeUser.name)}&gt;
 
 ${r.allowed
-  ? 'HTTP 200 OK\n\n{ "company": "'+escapeHtml(probeContact.company)+'", "plz": "'+escapeHtml(probeContact.plz)+'" }'
+  ? 'HTTP 200 OK\n\n{ "name": "'+escapeHtml(probeContact.name)+'", "plz": "'+escapeHtml(probeContact.plz)+'" }'
   : 'HTTP 404 Not Found\n\n{ "error": "not_found" }'}</div>
         <div class="one-note ${r.allowed?'':'stop'}" style="margin-top:10px">
           ${r.allowed
-            ? '<strong>Zugriff erlaubt.</strong> '+escapeHtml(probeContact.company)+' liegt in '+escapeHtml(oneTerritoryOfContact(probeContact).name)+', und dafür besteht eine Berechtigung.'
-            : '<strong>Zugriff verweigert.</strong> '+escapeHtml(probeContact.company)+' liegt außerhalb der Gebiete von '+escapeHtml(probeUser.name)+'.'}
+            ? '<strong>Zugriff erlaubt.</strong> '+escapeHtml(probeContact.name)+' liegt in '+escapeHtml(oneTerritoryOfContact(probeContact).name)+', und dafür besteht eine Berechtigung.'
+            : '<strong>Zugriff verweigert.</strong> '+escapeHtml(probeContact.name)+' liegt außerhalb der Gebiete von '+escapeHtml(probeUser.name)+'.'}
         </div>
         ${!r.allowed ? '<div class="one-note" style="margin-top:10px">Bewusst <span class="mono">404</span> statt <span class="mono">403</span>: ein 403 würde bestätigen, dass die ID existiert, und ließe den Datenbestand durchzählen.</div>' : ''}
       </div>` : ''}
@@ -2611,7 +2736,7 @@ ${r.allowed
     <div class="one-panel-head"><h2>Was der Prototyp nicht leistet</h2></div>
     <div class="one-panel-body">
       <div class="one-note stop"><strong>Diese Prüfung läuft im Browser.</strong> Wer die Entwicklerkonsole öffnet, hebt sie auf. Als Sicherheitsmaßnahme ist sie wertlos — sie zeigt nur, welche Regel der Server durchsetzen muss.</div>
-      <div class="one-note stop"><strong>Das Passwort vor der Administration ist dieselbe Art Attrappe.</strong> Es steht offen im Programmcode dieser Seite und prüft nichts serverseitig — es demonstriert nur die Idee „nur Gerald Gampp kommt hinein". Produktiv gehört hierhin eine echte Anmeldung über das Firmenkonto.</div>
+      <div class="one-note stop"><strong>Die Anmeldung ist dieselbe Art Attrappe.</strong> Name und Passwort werden im Browser gegen eine offen im Programmcode liegende Liste geprüft — das demonstriert nur, dass jeder Zugang persönlich ist und eine Funktion trägt. Produktiv gehört hierhin eine echte Anmeldung über das Firmenkonto.</div>
       <div class="one-note warn"><strong>Empfehlung fürs Produktivsystem:</strong> Row Level Security in PostgreSQL, gebunden an die Sitzung. Dann filtert die Datenbank selbst, und auch ein Fehler in der Anwendungsschicht legt keine fremden Gebiete offen.</div>
       <div class="one-note"><strong>Ebenfalls offen:</strong> Zwei-Faktor-Anmeldung, Verschlüsselung im Ruhezustand, Sitzungsentzug beim Deaktivieren, Backup- und Restore-Prozess, Protokollierung sensibler Exporte.</div>
     </div>
@@ -2629,13 +2754,15 @@ ${r.allowed
 
 function oneRunTests(){
   const results = [];
-  const names = (list) => list.map(c=>c.first+' '+c.last).sort().join(', ') || '—';
+  const names = (list) => list.map(c=>c.name).sort().join(', ') || '—';
+  const WEST = 'Dentalzentrum Düsseldorf, Praxis Rheinblick';
+  const NORD = 'Dentalzentrum Hamburg, Praxis Nordblick';
   {
     const O = oneSeed(); const c = O.users.find(u=>u.id==='mc');
-    const vis = oneVisibleContacts(c, O); const got = names(vis); const want = 'Daniel Weber, Sarah Becker';
+    const vis = oneVisibleContacts(c, O); const got = names(vis);
     results.push({ name:'Testfall 1 — Mitarbeiter C, Gebiet Westen', steps:[
       { ok:vis.length===2, txt:'Sichtbare Kontakte: <b>'+vis.length+'</b> (erwartet 2)' },
-      { ok:got===want, txt:'Es erscheinen: <b>'+got+'</b>' },
+      { ok:got===WEST, txt:'Es erscheinen: <b>'+got+'</b>' },
       { ok:!vis.some(x=>['k1','k2','k3','k4','k7','k8'].includes(x.id)), txt:'Kein Kontakt aus Norden, Osten oder Süden sichtbar' }
     ]});
   }
@@ -2646,8 +2773,8 @@ function oneRunTests(){
     const after = oneVisibleContacts(c, O);
     const contactsUntouched = JSON.stringify(O.contacts) === JSON.stringify(oneSeed().contacts);
     results.push({ name:'Testfall 2 — Gebiet von Westen auf Norden umstellen', steps:[
-      { ok:before==='Daniel Weber, Sarah Becker', txt:'Vorher: <b>'+before+'</b>' },
-      { ok:names(after)==='Anna Petersen, Jan Hansen', txt:'Nachher: <b>'+names(after)+'</b>' },
+      { ok:before===WEST, txt:'Vorher: <b>'+before+'</b>' },
+      { ok:names(after)===NORD, txt:'Nachher: <b>'+names(after)+'</b>' },
       { ok:!after.some(x=>['k5','k6'].includes(x.id)), txt:'Die Kontakte aus Westen sind nicht mehr sichtbar' },
       { ok:contactsUntouched, txt:'Kein Kundendatensatz wurde verändert — nur die Berechtigung' }
     ]});
@@ -2660,21 +2787,21 @@ function oneRunTests(){
     const onlyWest = oneVisibleContacts(a, O);
     results.push({ name:'Testfall 3 — Norden + Westen, danach Norden entziehen', steps:[
       { ok:both.length===4, txt:'Mit beiden Gebieten: <b>'+both.length+'</b> Kontakte (erwartet 4)' },
-      { ok:names(both)==='Anna Petersen, Daniel Weber, Jan Hansen, Sarah Becker', txt:'Nämlich: <b>'+names(both)+'</b>' },
-      { ok:onlyWest.length===2 && names(onlyWest)==='Daniel Weber, Sarah Becker', txt:'Nach Entzug von Norden: <b>'+names(onlyWest)+'</b>' }
+      { ok:names(both)==='Dentalzentrum Düsseldorf, Dentalzentrum Hamburg, Praxis Nordblick, Praxis Rheinblick', txt:'Nämlich: <b>'+names(both)+'</b>' },
+      { ok:onlyWest.length===2 && names(onlyWest)===WEST, txt:'Nach Entzug von Norden: <b>'+names(onlyWest)+'</b>' }
     ]});
   }
   {
     const O = oneSeed(); const c = O.users.find(u=>u.id==='mc');
     c.active = false;
     const afterOff = oneVisibleContacts(c, O);
-    O.users.push({ id:'me', name:'Mitarbeiter E', email:'me@example.com', role:'employee', team:'Dental', territories:['west'], active:true });
+    O.users.push({ id:'me', name:'Mitarbeiter E', email:'me@example.com', password:'1234', role:'employee', funktion:'aussendienst', team:'west', territories:['west'], active:true });
     const e = O.users.find(u=>u.id==='me');
     const eSees = oneVisibleContacts(e, O);
     const contactsUntouched = JSON.stringify(O.contacts) === JSON.stringify(oneSeed().contacts);
     results.push({ name:'Testfall 4 — C verlässt das Unternehmen, E übernimmt Westen', steps:[
       { ok:afterOff.length===0, txt:'C nach Deaktivierung: <b>'+afterOff.length+'</b> Kontakte' },
-      { ok:names(eSees)==='Daniel Weber, Sarah Becker', txt:'E sieht nach Gebietszuweisung: <b>'+names(eSees)+'</b>' },
+      { ok:names(eSees)===WEST, txt:'E sieht nach Gebietszuweisung: <b>'+names(eSees)+'</b>' },
       { ok:contactsUntouched, txt:'Keine Übertragung einzelner Kunden von C auf E nötig' }
     ]});
   }
@@ -2713,6 +2840,7 @@ function oneViewHome(){
   const vis = oneVisibleContacts(u);
   if (!u.active) return `<div class="one-page-head"><div><span class="one-eyebrow">Mein Bereich</span><h1>Zugang gesperrt</h1></div></div>
     <div class="one-panel"><div class="one-panel-body"><div class="one-note stop"><strong>Dieser Zugang ist deaktiviert.</strong> Es werden keine Kontakte geladen. Die Kunden bleiben im Gebiet und werden über die Gebietsberechtigung weiter betreut.</div></div></div>`;
+  const due = oneDueContacts(u);
   return `
   <div class="one-page-head"><div>
     <span class="one-eyebrow">Mein Bereich</span>
@@ -2723,15 +2851,40 @@ function oneViewHome(){
     <div class="one-emp-card"><div class="k">Meine Gebiete</div>
       <div style="display:flex; gap:6px; flex-wrap:wrap">${u.territories.length ? u.territories.map(t=>oneTerrChip(oneTerrById(t))).join('') : '<span class="one-chip none">keines zugewiesen</span>'}</div></div>
     <div class="one-emp-card"><div class="k">Meine Kontakte</div><div class="big">${vis.length}</div></div>
-    <div class="one-emp-card"><div class="k">Team</div><div style="font-size:17px; font-weight:600; margin-top:2px">${escapeHtml(u.team)}</div></div>
+    <div class="one-emp-card"><div class="k">Fällige Wiedervorlagen</div><div class="big" style="${due.length?'color:var(--one-warn)':''}">${due.length}</div></div>
+    <div class="one-emp-card"><div class="k">Team</div><div style="font-size:17px; font-weight:600; margin-top:2px">${escapeHtml(oneTeamLabel(u.team))} · ${escapeHtml(oneFunktionLabel(u.funktion))}</div></div>
   </div>
   <div class="one-panel"><div class="one-panel-head"><h2>Schnellaktionen</h2></div><div class="one-panel-body">
     <div class="one-quick">
       <button data-one-nav="mine"><span class="t">Meine Kontakte</span><span class="d">${vis.length} Kontakte ansehen und filtern</span></button>
+      <button data-one-nav="tasks"><span class="t">Aufgaben</span><span class="d">${due.length} fällige Wiedervorlage${due.length===1?'':'n'}</span></button>
       <button data-one-nav="mail"><span class="t">E-Mail erstellen</span><span class="d">Vorlage wählen, prüfen, senden</span></button>
       <button data-one-nav="tpl"><span class="t">Vorlagen</span><span class="d">${state.one.templates.length} zentrale Textbausteine</span></button>
     </div>
   </div></div>`;
+}
+
+function oneViewTasks(){
+  const u = oneCurrentUser();
+  if (!u.active) return oneViewHome();
+  const due = oneDueContacts(u).sort((a,b)=>a.nextFollowUp.localeCompare(b.nextFollowUp));
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Mein Bereich</span>
+    <h1>Aufgaben</h1>
+    <p>A-Kunden alle 2 Monate, B-Kunden alle 3 Monate, C-Kunden alle 4 Monate — automatisch als Erinnerung, sobald der Termin erreicht ist.</p>
+  </div></div>
+  <div class="one-panel"><div class="one-panel-body flush">
+    ${due.length ? due.map(c => `<div class="one-task-row">
+      <div class="one-task-info">
+        ${oneAbcChip(c)}
+        <div><div class="strong">${escapeHtml(c.name)}</div><div class="muted" style="font-size:12.5px">${escapeHtml(c.plz)} ${escapeHtml(c.ort)} · ${oneTerrChip(oneTerritoryOfContact(c))}</div></div>
+        ${oneDueBadge(c)}
+      </div>
+      ${oneQuickActionsHtml(c.id)}
+    </div>`).join('') : '<div class="one-empty"><strong>Keine fälligen Wiedervorlagen</strong>Alle A-/B-/C-Kunden sind aktuell betreut.</div>'}
+  </div></div>
+  <div class="one-panel"><div class="one-panel-body"><div class="one-note">Die drei Buttons verschieben die Wiedervorlage sofort — ohne die Ansicht zu wechseln. „Rhythmus" setzt sie auf den vollen Turnus der Einstufung zurück (A/B/C), gerechnet ab heute.</div></div></div>`;
 }
 
 function oneFilteredMine(){
@@ -2742,7 +2895,7 @@ function oneFilteredMine(){
   if (f.comm) list = list.filter(c => c.comm === f.comm);
   if (f.q.trim()){
     const q = f.q.trim().toLowerCase();
-    list = list.filter(c => (c.company+' '+c.first+' '+c.last+' '+c.plz+' '+c.email).toLowerCase().includes(q));
+    list = list.filter(c => (c.name+' '+c.kundenNr+' '+c.plz+' '+c.ort+' '+c.email).toLowerCase().includes(q));
   }
   return list;
 }
@@ -2758,7 +2911,9 @@ function oneViewMine(){
     <span class="one-eyebrow">Mein Bereich</span>
     <h1>Meine Kontakte</h1>
     <p>Gebiete: ${u.territories.map(t=>escapeHtml(oneTerrById(t).name)).join(' · ') || 'keine'} — ${allVis.length} Kontakte freigegeben.</p>
-  </div></div>
+  </div><div class="one-spacer"></div>
+  <button class="one-btn" data-one-act="new-contact">+ Kontakt hinzufügen</button></div>
+  ${O.newContact ? oneContactFormHtml() : ''}
   <div class="one-panel">
     <div class="one-panel-body">
       <div class="one-filters">
@@ -2775,15 +2930,17 @@ function oneViewMine(){
     </div>
     <div class="one-panel-body flush" style="border-top:1px solid var(--one-line)">
       ${list.length ? `<div class="one-tablewrap"><table>
-        <thead><tr><th style="width:38px"></th><th>Firma</th><th>Name</th><th>E-Mail</th><th>PLZ</th><th>Gebiet</th><th>Kommunikation</th></tr></thead>
+        <thead><tr><th style="width:38px"></th><th>Kundennr.</th><th>Name</th><th>Ort</th><th>Preisliste</th><th>Einstufung</th><th>Wiedervorlage</th><th>Kommunikation</th><th></th></tr></thead>
         <tbody>${list.map(c=>`<tr>
           <td><input type="checkbox" data-one-pick="${c.id}" ${sel.has(c.id)?'checked':''} style="width:16px;height:16px;accent-color:var(--one-accent)"></td>
-          <td class="strong">${escapeHtml(c.company)}</td>
-          <td>${escapeHtml(c.first)} ${escapeHtml(c.last)}</td>
-          <td class="mono muted" style="font-size:12.5px">${escapeHtml(c.email)}</td>
-          <td class="num">${escapeHtml(c.plz)}</td>
-          <td>${oneTerrChip(oneTerritoryOfContact(c))}</td>
+          <td class="mono muted">${escapeHtml(c.kundenNr)}</td>
+          <td class="strong">${escapeHtml(c.name)}</td>
+          <td class="muted">${escapeHtml(c.plz)} ${escapeHtml(c.ort)}</td>
+          <td class="muted">${escapeHtml(c.preisliste)}</td>
+          <td><div class="one-abc-picker">${['A','B','C'].map(t=>`<button class="one-abc-opt ${c.abc===t?'on '+t:''}" data-one-abc="${c.id}:${t}">${t}</button>`).join('')}</div></td>
+          <td>${oneDueBadge(c) || '<span class="muted">—</span>'}</td>
           <td>${oneCommChip(c)}</td>
+          <td>${oneQuickActionsHtml(c.id)}</td>
         </tr>`).join('')}</tbody></table></div>`
       : `<div class="one-empty"><strong>Keine Kontakte</strong>${allVis.length ? 'Kein Treffer für diesen Filter.' : 'Für Ihre Gebiete ist derzeit kein Kontakt freigegeben.'}</div>`}
     </div>
@@ -2848,7 +3005,7 @@ function oneViewMail(){
       ${chosen.map(c=>{
         const stop = tpl.promo && c.comm==='widerspruch';
         return `<div class="one-recipient">
-          <span><span class="strong">${escapeHtml(c.company)}</span> <span class="muted">· ${escapeHtml(c.first)} ${escapeHtml(c.last)}</span>
+          <span><span class="strong">${escapeHtml(c.name)}</span>
             <span class="mono muted" style="font-size:12px"> · ${escapeHtml(c.email)}</span></span>
           <span style="display:flex; gap:6px; align-items:center">${oneCommChip(c)}
             ${stop ? '<span class="one-chip stop">ausgeschlossen</span>' : '<span class="one-chip ok">wird gesendet</span>'}</span>
@@ -2857,7 +3014,7 @@ function oneViewMail(){
     </div>
     ${blocked.length ? `<div class="one-panel-body" style="border-top:1px solid var(--one-line)">
       <div class="one-note stop"><strong>${blocked.length} Kontakt${blocked.length===1?'':'e'} vom Versand ausgenommen.</strong>
-      ${blocked.map(c=>escapeHtml(c.first)+' '+escapeHtml(c.last)).join(', ')} hat der werblichen Ansprache widersprochen. Das System lässt den Versand hier nicht zu — die Sperre darf nicht am Mitarbeiter hängen.</div>
+      ${blocked.map(c=>escapeHtml(c.name)).join(', ')} hat der werblichen Ansprache widersprochen. Das System lässt den Versand hier nicht zu — die Sperre darf nicht am Mitarbeiter hängen.</div>
     </div>` : ''}
   </div>
   <div class="one-panel">
@@ -2869,7 +3026,7 @@ function oneViewMail(){
           <div class="one-mailprev"><span class="mono muted">An: ${escapeHtml(sample.email)}
 Betreff: ${escapeHtml(tpl.subject.replace(/\{\{produkt\}\}/g, O.mailProduct||'{{produkt}}'))}</span>
 
-${escapeHtml(body(sample.first+' '+sample.last))}</div>`
+${escapeHtml(body(sample.name))}</div>`
           : '<div class="one-note stop">Kein zulässiger Empfänger übrig.</div>'}
         </div>
         <div>
@@ -2909,25 +3066,44 @@ function oneViewTpl(){
 const ONE_VIEWS = {
   dashboard:oneViewDashboard, staff:oneViewStaff, terr:oneViewTerr, contacts:oneViewContacts,
   templates:oneViewTemplates, security:oneViewSecurity, tests:oneViewTests,
-  home:oneViewHome, mine:oneViewMine, mail:oneViewMail, tpl:oneViewTpl
+  home:oneViewHome, mine:oneViewMine, tasks:oneViewTasks, mail:oneViewMail, tpl:oneViewTpl
 };
 
-function oneIsAdminLocked(){ const u = oneCurrentUser(); return !!(u && u.role === 'admin' && !state.one.adminUnlocked); }
-
-function oneViewAdminLock(){
-  const u = oneCurrentUser();
+function oneViewLogin(){
+  const O = state.one;
+  if (O.forgotMode){
+    return `<div class="one-lockwrap"><div class="one-lockcard">
+      <div class="one-lock-icon">✉️</div>
+      <span class="one-eyebrow">Passwort vergessen</span>
+      <h1>Zugang wiederherstellen</h1>
+      ${O.forgotDone
+        ? `<div class="one-note" style="text-align:left">Wenn der Name hinterlegt ist, wurde soeben eine E-Mail mit einem Link zum Zurücksetzen verschickt. Bitte Postfach prüfen.</div>`
+        : `<p>Name eingeben — bei einem echten Zugang würde ein Link an die hinterlegte geschäftliche E-Mail-Adresse gehen.</p>
+           <form id="oneForgotForm" autocomplete="off">
+             <input type="text" id="oneForgotName" placeholder="Name, z. B. Mitarbeiter A" autocomplete="off">
+             <button class="one-btn primary" type="submit">Link anfordern</button>
+           </form>`}
+      <div class="one-wizard-actions" style="margin-top:16px"><button class="one-btn" data-one-act="back-to-login" style="width:100%">Zurück zur Anmeldung</button></div>
+      <div class="one-note warn" style="margin-top:16px; text-align:left">
+        <strong>Nur zur Veranschaulichung.</strong> Es wird keine echte E-Mail verschickt — das gehört zu den Funktionen, die für den Produktivbetrieb noch fehlen.
+      </div>
+    </div></div>`;
+  }
   return `<div class="one-lockwrap"><div class="one-lockcard">
     <div class="one-lock-icon">🔒</div>
-    <span class="one-eyebrow">Administration</span>
-    <h1>${escapeHtml(u.name)}</h1>
-    <p>Nur mit Administratorpasswort zugänglich.</p>
-    <form id="oneLockForm" autocomplete="off">
-      <input type="password" id="oneLockPw" placeholder="Passwort" autocomplete="new-password">
+    <span class="one-eyebrow">Dr. Schumacher ONE</span>
+    <h1>Anmelden</h1>
+    <p>Mit Namen und Passwort — die zugewiesene Funktion (Innendienst/Außendienst/Administration) ist danach automatisch aktiv.</p>
+    <form id="oneLoginForm" autocomplete="off">
+      <input type="text" id="oneLoginName" placeholder="Name" value="${escapeHtml(O.loginName)}" autocomplete="username">
+      <input type="password" id="oneLoginPw" placeholder="Passwort" autocomplete="current-password">
       <button class="one-btn primary" type="submit">Anmelden</button>
     </form>
-    ${state.one.authError ? `<div class="one-note stop" style="margin-top:14px">${escapeHtml(state.one.authError)}</div>` : ''}
+    <button class="one-forgot-link" data-one-act="forgot-password">Passwort vergessen?</button>
+    ${O.authError ? `<div class="one-note stop" style="margin-top:10px">${escapeHtml(O.authError)}</div>` : ''}
     <div class="one-note warn" style="margin-top:16px; text-align:left">
       <strong>Simulation für die Präsentation.</strong> Die Prüfung läuft im Browser und ist kein Sicherheitsmerkmal. Produktiv gehört hierhin eine echte Anmeldung — Single Sign-On über das Firmenkonto plus Zwei-Faktor, serverseitig geprüft.
+      Demo-Zugänge: Name aus der Mitarbeiterliste (z. B. „Gerald Gampp" oder „Mitarbeiter A"), Passwort <span class="mono">1234</span>.
     </div>
   </div></div>`;
 }
@@ -2935,20 +3111,30 @@ function oneViewAdminLock(){
 function oneRender(){
   const O = state.one;
   const u = oneCurrentUser();
-  const locked = oneIsAdminLocked();
-  const roleSelectHtml = `<select class="one-role" id="oneRoleSel">${oneRoleSelectHtml()}</select>`;
   const topbar = `<div class="one-topbar">
     <div class="one-brand"><div class="one-brand-mark">DS</div><div class="one-brand-name">Dr. Schumacher <span>ONE</span></div></div>
     <button class="one-exit" data-one-act="exit">← Produktberater</button>
     <span class="one-proto-chip">Prototyp · Rechte simuliert</span>
     <div class="one-spacer"></div>
-    <div class="one-who"><label for="oneRoleSel">Angemeldet als</label>${roleSelectHtml}</div>
+    ${u ? `<div class="one-who"><span>${escapeHtml(u.name)} · ${u.role==='admin'?'Administration':oneFunktionLabel(u.funktion)}</span><button class="one-btn sm" data-one-act="logout">Abmelden</button></div>` : ''}
   </div>`;
-  if (locked) return `<div class="one-app">${topbar}<div class="one-shell one-locked">${oneViewAdminLock()}</div></div>`;
+  if (!u) return `<div class="one-app">${topbar}<div class="one-shell one-locked">${oneViewLogin()}</div></div>`;
   const allowed = oneNavFor(u).map(n=>n[0]);
   if (!allowed.includes(O.view)) O.view = allowed[0];
   const main = (ONE_VIEWS[O.view] || oneViewDashboard)();
   return `<div class="one-app">${topbar}<div class="one-shell"><nav class="one-rail">${oneRailHtml()}</nav><main class="one-main">${main}</main></div></div>`;
+}
+
+function oneStartWizard(){
+  state.one.wizard = { step:'person', data:{ name:'', email:'', password:'1234', team:null, funktion:null, territories:[] } };
+}
+function oneWizardCommit(){
+  const O = state.one; const d = O.wizard.data;
+  const n = O.users.filter(x=>x.role==='employee').length + 1;
+  const id = 'm' + n + '-' + Date.now().toString(36);
+  O.users.push({ id, name:d.name.trim(), email:d.email.trim() || (id+'@example.com'), password:d.password.trim() || '1234', role:'employee', funktion:d.funktion, team:d.team, territories:d.territories.slice(), active:true });
+  oneAudit('Mitarbeiter angelegt', d.name + ' — ' + oneTeamLabel(d.team) + ' · ' + oneFunktionLabel(d.funktion) + ' · ' + (d.territories.length ? d.territories.map(t=>oneTerrById(t).name).join(', ') : 'ohne Gebiet'));
+  O.wizard = null;
 }
 
 function bindOne(){
@@ -2957,29 +3143,45 @@ function bindOne(){
 
   document.querySelectorAll('[data-one-nav]').forEach(el => el.onclick = () => { O.view = el.dataset.oneNav; render(); });
 
-  const roleSel = document.getElementById('oneRoleSel');
-  if (roleSel) roleSel.onchange = (e) => {
-    O.session = e.target.value; O.selection = []; O.mailSent = null; O.filters = { q:'', terr:'', comm:'' };
-    O.view = oneNavFor(oneCurrentUser())[0][0];
-    render();
-  };
-
-  const lockForm = document.getElementById('oneLockForm');
-  if (lockForm) lockForm.onsubmit = (e) => {
+  const loginForm = document.getElementById('oneLoginForm');
+  if (loginForm) loginForm.onsubmit = (e) => {
     e.preventDefault();
-    const val = (document.getElementById('oneLockPw') || {}).value || '';
-    if (val === ONE_ADMIN_PASSWORD){ O.adminUnlocked = true; O.authError = ''; oneAudit('Admin-Zugang freigeschaltet', oneCurrentUser().name); }
-    else { O.authError = 'Falsches Passwort.'; }
+    const name = (document.getElementById('oneLoginName') || {}).value || '';
+    const pw = (document.getElementById('oneLoginPw') || {}).value || '';
+    const match = O.users.find(u => u.name.trim().toLowerCase() === name.trim().toLowerCase() && u.password === pw);
+    if (!match){ O.authError = 'Name oder Passwort unbekannt.'; O.loginName = name; render(); return; }
+    if (!match.active){ O.authError = 'Dieser Zugang ist deaktiviert.'; O.loginName = name; render(); return; }
+    O.loggedInUserId = match.id; O.authError = ''; O.loginName = ''; O.loginPassword = '';
+    O.view = oneNavFor(match)[0][0];
+    oneAudit('Angemeldet', match.name);
     render();
   };
-  const lockPw = document.getElementById('oneLockPw');
-  if (lockPw) lockPw.focus();
+  const loginNameEl = document.getElementById('oneLoginName');
+  if (loginNameEl && !loginNameEl.value) loginNameEl.focus();
+
+  const forgotForm = document.getElementById('oneForgotForm');
+  if (forgotForm) forgotForm.onsubmit = (e) => { e.preventDefault(); O.forgotDone = true; render(); };
+
+  if (O.wizard && O.wizard.step === 'person'){
+    const wn = document.getElementById('oneWizName');
+    if (wn) wn.oninput = (e) => { O.wizard.data.name = e.target.value; render(); };
+    const we = document.getElementById('oneWizEmail');
+    if (we) we.oninput = (e) => { O.wizard.data.email = e.target.value; };
+    const wp = document.getElementById('oneWizPassword');
+    if (wp) wp.oninput = (e) => { O.wizard.data.password = e.target.value; };
+  }
 
   document.querySelectorAll('[data-one-terr-toggle]').forEach(input => input.onchange = () => {
     const u = O.users.find(x => x.id === input.dataset.oneTerrToggle);
     const id = input.value; const had = u.territories.includes(id);
     u.territories = had ? u.territories.filter(x => x !== id) : u.territories.concat([id]);
     oneAudit(had ? 'Gebiet entzogen' : 'Gebiet zugewiesen', oneTerrById(id).name + ' → ' + u.name + ' (sieht jetzt ' + oneVisibleContacts(u).length + ' Kontakte)');
+    render();
+  });
+  document.querySelectorAll('[data-one-funktion]').forEach(input => input.onchange = () => {
+    const u = O.users.find(x => x.id === input.dataset.oneFunktion);
+    u.funktion = input.value;
+    oneAudit('Funktion geändert', u.name + ' → ' + oneFunktionLabel(u.funktion));
     render();
   });
   document.querySelectorAll('[data-one-range]').forEach(input => input.onchange = () => {
@@ -3009,28 +3211,82 @@ function bindOne(){
   if (prodInp) prodInp.oninput = (e) => { O.mailProduct = e.target.value; };
   const introInp = document.getElementById('oneIntroInp');
   if (introInp) introInp.oninput = (e) => { O.mailIntro = e.target.value; };
+  document.querySelectorAll('[data-one-nc]').forEach(el => {
+    const handler = () => { O.newContact[el.dataset.oneNc] = el.value; render(); };
+    el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', handler);
+  });
+
+  document.querySelectorAll('[data-one-followup]').forEach(btn => btn.onclick = () => {
+    const [id, mode] = btn.dataset.oneFollowup.split(':');
+    oneAdjustFollowUp(id, mode);
+    render();
+  });
+  document.querySelectorAll('[data-one-abc]').forEach(btn => btn.onclick = () => {
+    const [id, tier] = btn.dataset.oneAbc.split(':');
+    const c = O.contacts.find(x=>x.id===id);
+    const already = c.abc === tier;
+    c.abc = already ? null : tier;
+    c.nextFollowUp = c.abc ? oneCadenceFollowUp(c.abc, oneToday()) : null;
+    oneAudit('Einstufung geändert', c.name + ' → ' + (c.abc ? c.abc+'-Kunde' : 'keine'));
+    render();
+  });
 
   document.querySelectorAll('[data-one-act]').forEach(el => el.onclick = () => {
     const a = el.dataset.oneAct;
     if (a === 'exit'){ state.screen = 'menu'; render(); return; }
+    if (a === 'logout'){ oneAudit('Abgemeldet', oneCurrentUser() ? oneCurrentUser().name : ''); O.loggedInUserId = null; O.loginName=''; O.loginPassword=''; O.forgotMode=false; O.forgotDone=false; render(); return; }
+    if (a === 'forgot-password'){ O.forgotMode = true; O.forgotDone = false; render(); return; }
+    if (a === 'back-to-login'){ O.forgotMode = false; O.forgotDone = false; O.authError=''; render(); return; }
     if (a === 'toggle-active'){
       const u = O.users.find(x => x.id === el.dataset.oneId);
       u.active = !u.active;
       oneAudit(u.active ? 'Mitarbeiter reaktiviert' : 'Mitarbeiter deaktiviert', u.name);
-      if (!u.active && O.session === u.id) O.view = 'home';
+      if (!u.active && O.loggedInUserId === u.id) O.loggedInUserId = null;
       render(); return;
     }
-    if (a === 'add-staff'){
-      const n = O.users.filter(x=>x.role==='employee').length;
-      const letter = String.fromCharCode(65 + n); const id = 'm' + letter.toLowerCase();
-      O.users.push({ id, name:'Mitarbeiter '+letter, email:id+'@example.com', role:'employee', team:'Dental', territories:[], active:true });
-      oneAudit('Mitarbeiter angelegt', 'Mitarbeiter '+letter+' — noch ohne Gebiet');
+    if (a === 'add-staff'){ oneStartWizard(); render(); return; }
+    if (a === 'wizard-team'){ O.wizard.data.team = el.dataset.oneValue; render(); return; }
+    if (a === 'wizard-funktion'){ O.wizard.data.funktion = el.dataset.oneValue; render(); return; }
+    if (a === 'wizard-terr'){
+      const id = el.dataset.oneValue; const t = O.wizard.data.territories;
+      O.wizard.data.territories = t.includes(id) ? t.filter(x=>x!==id) : t.concat([id]);
+      render(); return;
+    }
+    if (a === 'wizard-next'){
+      const i = ONE_WIZARD_STEPS.indexOf(O.wizard.step);
+      if (O.wizard.step === 'person'){
+        O.wizard.data.name = (document.getElementById('oneWizName')||{}).value || '';
+        O.wizard.data.email = (document.getElementById('oneWizEmail')||{}).value || '';
+        O.wizard.data.password = (document.getElementById('oneWizPassword')||{}).value || '1234';
+      }
+      O.wizard.step = ONE_WIZARD_STEPS[Math.min(i+1, ONE_WIZARD_STEPS.length-1)];
+      render(); return;
+    }
+    if (a === 'wizard-back'){
+      const i = ONE_WIZARD_STEPS.indexOf(O.wizard.step);
+      if (i === 0){ O.wizard = null; } else { O.wizard.step = ONE_WIZARD_STEPS[i-1]; }
+      render(); return;
+    }
+    if (a === 'wizard-finish'){ oneWizardCommit(); render(); return; }
+    if (a === 'new-contact'){ O.newContact = oneNewContactDraft(); render(); return; }
+    if (a === 'cancel-new-contact'){ O.newContact = null; render(); return; }
+    if (a === 'save-new-contact'){
+      const d = O.newContact;
+      const id = 'k' + Date.now().toString(36);
+      O.contacts.push({ id, externeNr:d.externeNr.trim(), kundenNr:d.kundenNr.trim(), name:d.name.trim(), plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(), bezirk:d.bezirk.trim(), preisliste:d.preisliste, email:d.email.trim(), comm:'bestand', active:true, override:null, abc:null, nextFollowUp:null });
+      oneAudit('Kontakt angelegt', d.name + ' (' + (oneCurrentUser()||{}).name + ')');
+      O.newContact = null;
+      render(); return;
+    }
+    if (a === 'import'){
+      O.importStatus = 'Simulation: In einem echten System würde hier eine Datei ausgewählt, Spalten zugeordnet und geprüft. Kein Kontakt wurde importiert.';
+      oneAudit('Import angestoßen', '(simuliert, kein echter Import)');
       render(); return;
     }
     if (a === 'probe'){
       const u = O.users.find(x => x.id === O.probe.user);
       O.probe.result = { allowed: oneCanAccessContact(u, O.probe.contact) };
-      oneAudit('Zugriffsprüfung', u.name + ' → ' + (O.contacts.find(c=>c.id===O.probe.contact)||{}).company + ' — ' + (O.probe.result.allowed ? 'erlaubt' : 'verweigert'));
+      oneAudit('Zugriffsprüfung', u.name + ' → ' + (O.contacts.find(c=>c.id===O.probe.contact)||{}).name + ' — ' + (O.probe.result.allowed ? 'erlaubt' : 'verweigert'));
       render(); return;
     }
     if (a === 'run-tests'){ oneRunTests(); render(); return; }
