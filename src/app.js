@@ -1430,11 +1430,11 @@ function summaryScreen(){
     <div><h2>Mit Stern markiert (${chosen.length})</h2><div class="product-list">${chosen.map(e=>summaryChosenCard(e)).join('')||'<div class="empty-state"><h2>Noch keine Produkte markiert</h2><p>Tippen Sie im Gespräch bei einem Produkt auf den Stern, oder wählen Sie rechts direkt aus.</p></div>'}</div></div>
     <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="summarySearch" value="${escapeHtml(state.summaryQuery||'')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p=>summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
   </section>
-  <div class="offer-actions summary-send"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
   <section class="new-customer-cta">
     <div><strong>Kunde noch nicht im System?</strong><small>Bei einer Kaltakquise können Sie den Kunden hier direkt anlegen – Name, Anschrift, Telefon und E-Mail genügen.</small></div>
     <button class="secondary-button compact" data-action="new-customer-open">${icon('pm')}<span>Neuen Kunden anlegen</span></button>
   </section>
+  <div class="offer-actions summary-send"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
   </main>`;
 }
 function summaryProductCard(p){const selected=state.favorites.some(f=>f.id===p.id);return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button data-favorite="${p.id}">${selected?'−':'+'}</button></article>`}
