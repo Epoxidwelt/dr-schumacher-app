@@ -2538,7 +2538,7 @@ function oneViewStaffWizard(){
     body = `<h2>1. Name und Zugang</h2>
       <p>Damit sich der Mitarbeiter selbst anmelden kann.</p>
       <label class="one-wfield">Name<input type="text" id="oneWizName" value="${escapeHtml(d.name)}" placeholder="z. B. Petra Klein"></label>
-      <label class="one-wfield">E-Mail<input type="text" id="oneWizEmail" value="${escapeHtml(d.email)}" placeholder="petra.klein@schumacher-online.com"></label>
+      <label class="one-wfield">E-Mail <span class="muted" style="font-weight:400">— Vorschlag aus dem Namen, bei Bedarf ändern</span><input type="text" id="oneWizEmail" value="${escapeHtml(d.email)}" placeholder="wird aus dem Namen vorgeschlagen"></label>
       <label class="one-wfield">Passwort<input type="text" id="oneWizPassword" value="${escapeHtml(d.password)}" placeholder="wird beim ersten Login geändert"></label>
       <div class="one-wizard-actions"><button class="one-btn primary" data-one-act="wizard-next" ${d.name.trim()?'':'disabled'}>Weiter</button></div>`;
   } else if (step === 'team'){
@@ -3125,8 +3125,19 @@ function oneRender(){
   return `<div class="one-app">${topbar}<div class="one-shell"><nav class="one-rail">${oneRailHtml()}</nav><main class="one-main">${main}</main></div></div>`;
 }
 
+function oneSuggestEmail(name){
+  const clean = (s) => s.toLowerCase()
+    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+    .replace(/[^a-z0-9]/g,'');
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts.length === 1 ? clean(parts[0]) + '@schumacher-online.com' : '';
+  const vorname = clean(parts[0]);
+  const nachname = clean(parts[parts.length-1]);
+  if (!vorname || !nachname) return '';
+  return vorname + '.' + nachname + '@schumacher-online.com';
+}
 function oneStartWizard(){
-  state.one.wizard = { step:'person', data:{ name:'', email:'', password:'1234', team:null, funktion:null, territories:[] } };
+  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, territories:[] } };
 }
 function oneWizardCommit(){
   const O = state.one; const d = O.wizard.data;
@@ -3164,9 +3175,14 @@ function bindOne(){
 
   if (O.wizard && O.wizard.step === 'person'){
     const wn = document.getElementById('oneWizName');
-    if (wn) wn.oninput = (e) => { O.wizard.data.name = e.target.value; render(); };
+    if (wn) wn.oninput = (e) => {
+      const d = O.wizard.data;
+      d.name = e.target.value;
+      if (!d.emailTouched) d.email = oneSuggestEmail(d.name);
+      render();
+    };
     const we = document.getElementById('oneWizEmail');
-    if (we) we.oninput = (e) => { O.wizard.data.email = e.target.value; };
+    if (we) we.oninput = (e) => { O.wizard.data.email = e.target.value; O.wizard.data.emailTouched = true; };
     const wp = document.getElementById('oneWizPassword');
     if (wp) wp.oninput = (e) => { O.wizard.data.password = e.target.value; };
   }
