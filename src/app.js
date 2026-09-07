@@ -2263,7 +2263,11 @@ function bind() {
   });
   $('[data-action="new-customer-open"]')?.addEventListener('click', () => { state.newCustomer = {step:'form', draft:newCustomerDraftDefault(), contactId:null}; render(); });
   $('[data-action="new-customer-cancel"]')?.addEventListener('click', () => { state.newCustomer = null; render(); });
-  document.querySelectorAll('[data-nc-field]').forEach(input => input.addEventListener('input', e => { state.newCustomer.draft[e.target.dataset.ncField] = e.target.value; render(); }));
+  document.querySelectorAll('[data-nc-field]').forEach(input => input.addEventListener('input', e => {
+    state.newCustomer.draft[e.target.dataset.ncField] = e.target.value;
+    const saveBtn = $('[data-action="new-customer-save"]');
+    if (saveBtn) saveBtn.disabled = !newCustomerValid(state.newCustomer.draft);
+  }));
   $('[data-action="new-customer-save"]')?.addEventListener('click', () => { newCustomerSave(); render(); });
   $('[data-action="new-customer-send-innendienst"]')?.addEventListener('click', () => sendNewCustomerInnendienstEmail());
   $('[data-action="new-customer-next"]')?.addEventListener('click', () => { state.newCustomer.step = 'summaryAsk'; render(); });
@@ -3857,7 +3861,11 @@ function bindOne(){
   const introInp = document.getElementById('oneIntroInp');
   if (introInp) introInp.oninput = (e) => { O.mailIntro = e.target.value; };
   document.querySelectorAll('[data-one-nc]').forEach(el => {
-    const handler = () => { O.newContact[el.dataset.oneNc] = el.value; render(); };
+    const handler = () => {
+      O.newContact[el.dataset.oneNc] = el.value;
+      const saveBtn = document.querySelector('[data-one-act="save-new-contact"]');
+      if (saveBtn) saveBtn.disabled = !(O.newContact.name.trim() && O.newContact.plz.trim());
+    };
     el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', handler);
   });
   const scanInput = document.getElementById('oneScanInput');
