@@ -2371,11 +2371,11 @@ function oneSeed() {
       {id:'k9', externeNr:'EX-10029', kundenNr:'K-4479', name:'Praxis Grenzfall',        plz:'99999', ort:'',          strasse:'',                 hausnummer:'',   bezirk:'',          preisliste:'UVP',  email:'',                            comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null}
     ],
     users:[
-      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           medNonMed:null,       team:null,   territories:[],       individualPlz:[], active:true},
-      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:'medical',    team:'nord', territories:['nord'], individualPlz:[], active:true},
-      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:'nonmedical', team:'ost',  territories:['ost'],  individualPlz:[], active:true},
-      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:'medical',    team:'west', territories:['west'], individualPlz:[], active:true},
-      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:'nonmedical', team:'sued', territories:['sued'], individualPlz:[], active:true}
+      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlz:[], active:true},
+      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical'],               team:'nord', territories:['nord'], individualPlz:[], active:true},
+      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['nonmedical'],            team:'ost',  territories:['ost'],  individualPlz:[], active:true},
+      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlz:[], active:true},
+      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:['nonmedical'],            team:'sued', territories:['sued'], individualPlz:[], active:true}
     ],
     templates:[
       {id:'t1', name:'Produktneuheit',            promo:true,  subject:'Neu im Sortiment: {{produkt}}',                 body:'wir haben unser Sortiment erweitert. {{produkt}} ist ab sofort lieferbar.\n\nGerne stelle ich Ihnen das Produkt bei Ihrem nächsten Termin persönlich vor.'},
@@ -2439,7 +2439,8 @@ function oneContactIsAssigned(c, o){
   if (oneTerritoryOfContact(c, O.territories)) return true;
   return c.plz && O.users.some(u => u.role==='employee' && (u.individualPlz||[]).includes(c.plz));
 }
-function oneMedLabel(m){ return m === 'medical' ? 'Medical' : m === 'nonmedical' ? 'Non-Medical' : '—'; }
+const ONE_MED_LABELS = { medical:'Medical', nonmedical:'Non-Medical' };
+function oneMedLabel(list){ return (list && list.length) ? list.map(k=>ONE_MED_LABELS[k]).join(', ') : '—'; }
 function oneCanAccessContact(user, contactId, o){
   return oneVisibleContacts(user, o).some(c => c.id === contactId);
 }
@@ -2617,8 +2618,8 @@ function oneViewStaff(){
               return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}"><input type="radio" name="one-funktion-${u.id}" data-one-funktion="${u.id}" value="${k}" ${on?'checked':''} ${u.active?'':'disabled'}>${label}</label>`;
             }).join('')}</div></div>
           <div><div class="one-staff-label">Kundenkreis</div><div class="one-terr-picker">${[['medical','Medical'],['nonmedical','Non-Medical']].map(([k,label]) => {
-              const on = u.medNonMed === k;
-              return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}"><input type="radio" name="one-medical-${u.id}" data-one-medical="${u.id}" value="${k}" ${on?'checked':''} ${u.active?'':'disabled'}>${label}</label>`;
+              const on = (u.medNonMed||[]).includes(k);
+              return `<label class="one-terr-opt ${on?'on':''} ${u.active?'':'disabled'}"><input type="checkbox" data-one-medical="${u.id}" value="${k}" ${on?'checked':''} ${u.active?'':'disabled'}>${label}</label>`;
             }).join('')}</div></div>
         </div>
         <div class="one-staff-label" style="margin-top:16px">Gebiet</div>
@@ -2674,13 +2675,13 @@ function oneViewStaffWizard(){
       </div>
       <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.funktion?'':'disabled'}>Weiter</button></div>`;
   } else if (step === 'medical'){
-    body = `<h2>4. Medical oder Non-Medical?</h2>
-      <p>Ordnet ${escapeHtml(d.name)} dem passenden Kundenkreis zu.</p>
+    body = `<h2>4. Medical und/oder Non-Medical?</h2>
+      <p>Ordnet ${escapeHtml(d.name)} dem passenden Kundenkreis zu — beides zusammen ist möglich.</p>
       <div class="one-choices">
-        <button class="one-choice ${d.medNonMed==='medical'?'on':''}" data-one-act="wizard-medical" data-one-value="medical">Medical</button>
-        <button class="one-choice ${d.medNonMed==='nonmedical'?'on':''}" data-one-act="wizard-medical" data-one-value="nonmedical">Non-Medical</button>
+        <button class="one-choice ${d.medNonMed.includes('medical')?'on':''}" data-one-act="wizard-medical" data-one-value="medical">Medical</button>
+        <button class="one-choice ${d.medNonMed.includes('nonmedical')?'on':''}" data-one-act="wizard-medical" data-one-value="nonmedical">Non-Medical</button>
       </div>
-      <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.medNonMed?'':'disabled'}>Weiter</button></div>`;
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="wizard-back">Zurück</button><button class="one-btn primary" data-one-act="wizard-next" ${d.medNonMed.length?'':'disabled'}>Weiter</button></div>`;
   } else if (step === 'gebiet'){
     body = `<h2>5. Gebiete zuweisen</h2>
       <p>Gesamte Gebiete auswählen oder unter „Einzelne PLZ" gezielt einzelne Postleitzahlen zusätzlich zuordnen.</p>
@@ -3342,13 +3343,13 @@ function oneSuggestEmail(name){
   return vorname + '.' + nachname + '@schumacher-online.com';
 }
 function oneStartWizard(){
-  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, medNonMed:null, territories:[], individualPlz:[], gebietTab:'gebiete' } };
+  state.one.wizard = { step:'person', data:{ name:'', email:'', emailTouched:false, password:'1234', team:null, funktion:null, medNonMed:[], territories:[], individualPlz:[], gebietTab:'gebiete' } };
 }
 function oneWizardCommit(){
   const O = state.one; const d = O.wizard.data;
   const n = O.users.filter(x=>x.role==='employee').length + 1;
   const id = 'm' + n + '-' + Date.now().toString(36);
-  O.users.push({ id, name:d.name.trim(), email:d.email.trim() || (id+'@example.com'), password:d.password.trim() || '1234', role:'employee', funktion:d.funktion, medNonMed:d.medNonMed, team:d.team, territories:d.territories.slice(), individualPlz:d.individualPlz.slice(), active:true });
+  O.users.push({ id, name:d.name.trim(), email:d.email.trim() || (id+'@example.com'), password:d.password.trim() || '1234', role:'employee', funktion:d.funktion, medNonMed:d.medNonMed.slice(), team:d.team, territories:d.territories.slice(), individualPlz:d.individualPlz.slice(), active:true });
   oneAudit('Mitarbeiter angelegt', d.name + ' — ' + oneTeamLabel(d.team) + ' · ' + oneFunktionLabel(d.funktion) + ' · ' + oneMedLabel(d.medNonMed) + ' · ' + (d.territories.length ? d.territories.map(t=>oneTerrById(t).name).join(', ') : 'ohne Gebiet'));
   O.wizard = null;
   onePersistUsers();
@@ -3410,7 +3411,8 @@ function bindOne(){
   });
   document.querySelectorAll('[data-one-medical]').forEach(input => input.onchange = () => {
     const u = O.users.find(x => x.id === input.dataset.oneMedical);
-    u.medNonMed = input.value;
+    const v = input.value; u.medNonMed = u.medNonMed || [];
+    u.medNonMed = u.medNonMed.includes(v) ? u.medNonMed.filter(x=>x!==v) : u.medNonMed.concat([v]);
     oneAudit('Kundenkreis geändert', u.name + ' → ' + oneMedLabel(u.medNonMed));
     onePersistUsers();
     render();
@@ -3549,7 +3551,11 @@ function bindOne(){
     if (a === 'add-staff'){ oneStartWizard(); render(); return; }
     if (a === 'wizard-team'){ O.wizard.data.team = el.dataset.oneValue; render(); return; }
     if (a === 'wizard-funktion'){ O.wizard.data.funktion = el.dataset.oneValue; render(); return; }
-    if (a === 'wizard-medical'){ O.wizard.data.medNonMed = el.dataset.oneValue; render(); return; }
+    if (a === 'wizard-medical'){
+      const v = el.dataset.oneValue; const list = O.wizard.data.medNonMed;
+      O.wizard.data.medNonMed = list.includes(v) ? list.filter(x=>x!==v) : list.concat([v]);
+      render(); return;
+    }
     if (a === 'wizard-terr'){
       const id = el.dataset.oneValue; const t = O.wizard.data.territories;
       O.wizard.data.territories = t.includes(id) ? t.filter(x=>x!==id) : t.concat([id]);
