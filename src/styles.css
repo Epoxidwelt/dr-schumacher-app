@@ -254,6 +254,14 @@
 .one-choice{flex:1; min-width:140px; padding:16px; border:2px solid var(--one-line-2); border-radius:var(--one-radius); background:var(--one-surface); font-weight:700; font-size:15px; cursor:pointer; color:var(--one-ink)}
 .one-choice:hover{border-color:var(--one-accent)}
 .one-choice.on{border-color:var(--one-accent); background:var(--one-accent-soft); color:var(--one-accent)}
+.one-scan-row{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:16px; border-bottom:1px dashed var(--one-line-2)}
+.one-scan-row .one-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8}
+.one-plz-range-row{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.one-plz-range-row input{width:96px}
+.one-remove-range{background:none; border:0; color:var(--one-stop); font-weight:700; cursor:pointer; padding:4px 8px; font-size:16px; line-height:1}
+.one-add-range{margin-top:4px}
+.one-settings-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid var(--one-line)}
+.one-settings-row:last-child{border-bottom:0}
 
 @media(max-width:820px){
   .one-shell{grid-template-columns:1fr}
