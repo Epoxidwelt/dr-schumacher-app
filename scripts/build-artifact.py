@@ -24,12 +24,36 @@ Notes:
   break parsing. Claude's Artifact hosting sets this correctly; a bare
   `python3 -m http.server` typically does not, which is a trap when
   testing locally - use scripts/serve-utf8.py instead for local checks.
+- The Artifact sandbox's CSP silently blocks fetch() to any host outside
+  its script/style allowlist - docs.google.com is not on it, so the
+  live price sync in src/app.js (syncLivePrices) can never succeed
+  inside a published Artifact, and with no prior localStorage cache
+  (a fresh origin per Artifact) every price would show blank there. To
+  avoid that, this script fetches the current price sheet CSV at BUILD
+  TIME and embeds it as BAKED_PRICE_CSV; src/app.js falls back to
+  parsing that embedded snapshot only if the live fetch fails and no
+  price data is cached yet - see the catch block in syncLivePrices().
+  This is a point-in-time snapshot, not a live sync: rebuild and
+  republish the artifact whenever prices change meaningfully.
 """
 import base64
+import datetime
+import json
 import pathlib
 import sys
+import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+PRICE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1z_FuQiBslt71eLzNA-6cstToQp86PKud_7HXY8JK0eQ/export?format=csv&gid=1702267749"
+
+def fetch_price_csv():
+    try:
+        with urllib.request.urlopen(PRICE_SHEET_CSV_URL, timeout=20) as resp:
+            return resp.read().decode("utf-8")
+    except Exception as e:
+        print(f"warning: could not fetch live price sheet for baked fallback ({e}); "
+              f"artifact will ship without an offline price snapshot", file=sys.stderr)
+        return None
 
 def build():
     app_js = (ROOT / "src/app.js").read_text(encoding="utf-8")
@@ -37,6 +61,7 @@ def build():
     xlsx_js = (ROOT / "vendor/xlsx.mini.min.js").read_text(encoding="utf-8")
     leaflet_css = (ROOT / "vendor/leaflet.css").read_text(encoding="utf-8")
     logo_bytes = (ROOT / "public/assets/dr-schumacher-logo.png").read_bytes()
+    price_csv = fetch_price_csv()
 
     assert "�" not in xlsx_js, "vendor xlsx build contains U+FFFD - Artifact publish will reject it"
 
@@ -46,6 +71,15 @@ def build():
         "if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});",
         "",
     )
+
+    if price_csv:
+        build_date = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+        baked_price_script = (
+            f"<script>const BAKED_PRICE_CSV = {json.dumps(price_csv)};"
+            f"const BAKED_PRICE_DATE = {json.dumps(build_date)};</script>\n"
+        )
+    else:
+        baked_price_script = ""
 
     html = f"""<title>Dr. Schumacher Produktberater</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -60,7 +94,7 @@ def build():
 <script>
 {xlsx_js}
 </script>
-<script>
+{baked_price_script}<script>
 {app_js}
 </script>
 """

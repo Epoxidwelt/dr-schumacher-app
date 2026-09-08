@@ -2685,6 +2685,22 @@ async function syncLivePrices(manual=false) {
   } catch (error) {
     if (manual && status) status.textContent = 'Live-Abgleich fehlgeschlagen: ' + error.message + ' – zuletzt gespeicherter Preisstand bleibt aktiv.';
     console.warn('Preis-Sync von Google Sheets fehlgeschlagen', error);
+    // In Umgebungen, die keinen Netzwerkzugriff auf externe Domains erlauben (z. B. die
+    // Claude-Artifact-Vorschau), schlägt der Live-Abgleich immer fehl. Ohne vorherigen
+    // Sync bliebe priceByArt dann dauerhaft leer. BAKED_PRICE_CSV wird nur vom
+    // Artifact-Build (scripts/build-artifact.py) eingebettet und liefert wenigstens
+    // einen Preisstand vom Build-Zeitpunkt statt gar keiner Preise.
+    if (!Object.keys(state.priceByArt).length && typeof BAKED_PRICE_CSV !== 'undefined' && typeof XLSX !== 'undefined') {
+      try {
+        const workbook = XLSX.read(BAKED_PRICE_CSV, {type:'string'});
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {defval:''});
+        const byArt = parsePriceRows(rows);
+        if (Object.keys(byArt).length) {
+          applyPriceImport(byArt, {file:'Eingebetteter Preisstand (kein Live-Zugriff möglich)', date: (typeof BAKED_PRICE_DATE !== 'undefined' && BAKED_PRICE_DATE) || '', ts:Date.now(), rows:Object.keys(byArt).length, source:'baked'});
+          if (['settings','detail','products','menu'].includes(state.screen)) render();
+        }
+      } catch (e2) { console.warn('Eingebetteter Preisstand konnte nicht geladen werden', e2); }
+    }
   }
 }
 async function syncLiveFacts(manual=false) {
