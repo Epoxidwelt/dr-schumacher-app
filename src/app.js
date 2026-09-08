@@ -1320,6 +1320,7 @@ function newCustomerSave(){
   };
   if (existing){
     Object.assign(existing, fields);
+    onePersistContacts();
     return;
   }
   const id = 'k' + Date.now().toString(36);
@@ -1330,6 +1331,7 @@ function newCustomerSave(){
     ...fields
   };
   state.one.contacts.push(contact);
+  onePersistContacts();
   oneAudit(state.summaryKaltakquise ? 'Kaltakquise-Kontakt angelegt' : 'Kontakt angelegt (Kaltakquise)', contact.name + (state.repName ? ' — angelegt von ' + state.repName : ''));
   nc.contactId = id;
 }
@@ -1466,7 +1468,7 @@ function occasionPromptModal() {
     return `<div class="modal-overlay">
       <div class="modal-card">
         ${modalCloseBtn()}
-        <span class="eyebrow">Letzter Schritt</span>
+        <span class="eyebrow">${newCustomerContact() ? 'Vorletzter Schritt' : 'Letzter Schritt'}</span>
         <h2>Benötigen Sie noch einen CRM-Eintrag?</h2>
         <p>Wir fassen die besprochenen Produkte automatisch zusammen und schicken Ihnen den Eintrag als Gesprächsnotiz per E-Mail zu.</p>
         <div class="modal-actions">
@@ -1480,12 +1482,26 @@ function occasionPromptModal() {
     return `<div class="modal-overlay">
       <div class="modal-card">
         ${modalCloseBtn()}
-        <span class="eyebrow">Letzter Schritt</span>
+        <span class="eyebrow">${newCustomerContact() ? 'Vorletzter Schritt' : 'Letzter Schritt'}</span>
         <h2>Möchten Sie auch eine Kundenzusammenfassung senden?</h2>
         <p>Die besprochenen Produkte werden dem Kunden dann direkt per E-Mail mit den Vorteilen zusammengefasst.</p>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="kunde-entry-no">Nein, fertig</button>
           <button class="primary-button compact" data-action="kunde-entry-yes">${icon('talk')}<span>Ja, senden</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'innendienstask') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Letzter Schritt</span>
+        <h2>Kontaktdaten an Innendienst senden?</h2>
+        <p>Der Innendienst kann den Neukunden dann mit allen erfassten Daten direkt im CRM-System anlegen.</p>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="innendienst-ask-no">Nein, fertig</button>
+          <button class="primary-button compact" data-action="innendienst-ask-yes">${icon('talk')}<span>Ja, senden</span></button>
         </div>
       </div>
     </div>`;
@@ -2550,15 +2566,17 @@ function bind() {
     state.summaryIsNewCustomer = null;
     render();
   });
-  $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
-  $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = null; render(); });
-  $('[data-action="kunde-entry-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
+  $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : null; render(); });
+  $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = newCustomerContact() ? 'innendienstask' : null; render(); });
+  $('[data-action="kunde-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : null; render(); });
   $('[data-action="kunde-entry-yes"]')?.addEventListener('click', () => {
     state.summarySent = true;
     sendCustomerSummaryEmail();
-    state.summaryStep = null;
+    state.summaryStep = newCustomerContact() ? 'innendienstask' : null;
     render();
   });
+  $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
+  $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = null; render(); });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
   document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
@@ -3077,17 +3095,23 @@ function oneSeed() {
   };
 }
 state.one = oneSeed();
-// Mitarbeiter-Zugänge (Name, Passwort, Team, Funktion, Gebiete) bleiben auf diesem Gerät
-// erhalten, damit ein vom Admin angelegter Kollege sich auch nach einem Neuladen anmelden
-// kann. oneSeed() selbst bleibt unverändert, weil die Testfälle den unberührten Ausgangsstand
-// brauchen. Kontakte/Vorlagen/Protokoll starten dagegen bewusst jedes Mal neu (Simulation).
+// Mitarbeiter-Zugänge (Name, Passwort, Team, Funktion, Gebiete) sowie im Außendienst neu
+// erfasste Kontakte (z. B. aus der Kaltakquise) bleiben auf diesem Gerät erhalten, damit sie
+// einen Neuladen der Seite überstehen. oneSeed() selbst bleibt unverändert, weil die
+// Testfälle den unberührten Ausgangsstand brauchen — Vorlagen/Protokoll starten weiterhin
+// bewusst jedes Mal neu (Simulation).
 (function onePersistedInit(){
   try {
     const saved = JSON.parse(localStorage.getItem('oneUsers') || 'null');
     if (Array.isArray(saved) && saved.length) state.one.users = saved;
   } catch (e) { console.warn('Gespeicherte ONE-Mitarbeiter konnten nicht geladen werden', e); }
+  try {
+    const savedContacts = JSON.parse(localStorage.getItem('oneContacts') || 'null');
+    if (Array.isArray(savedContacts) && savedContacts.length) state.one.contacts = savedContacts;
+  } catch (e) { console.warn('Gespeicherte ONE-Kontakte konnten nicht geladen werden', e); }
 })();
 function onePersistUsers(){ try { localStorage.setItem('oneUsers', JSON.stringify(state.one.users)); } catch (e) {} }
+function onePersistContacts(){ try { localStorage.setItem('oneContacts', JSON.stringify(state.one.contacts)); } catch (e) {} }
 
 // Eine Anmeldung gilt für die ganze App — Produktberater und ONE teilen sich dieselbe Identität,
 // damit niemand beim Wechsel zwischen den beiden Bereichen ein zweites Mal Name/Passwort
