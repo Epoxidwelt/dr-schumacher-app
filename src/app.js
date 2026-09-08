@@ -1374,6 +1374,20 @@ function occasionPromptModal() {
       </div>
     </div>`;
   }
+  if (state.summaryStep === 'crmask') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Letzter Schritt</span>
+        <h2>Benötigen Sie noch einen CRM-Eintrag?</h2>
+        <p>Wir fassen die besprochenen Produkte automatisch zusammen und schicken Ihnen den Eintrag als Gesprächsnotiz per E-Mail zu.</p>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="crm-entry-no">Nein, fertig</button>
+          <button class="primary-button compact" data-action="crm-entry-yes">${icon('talk')}<span>Ja, CRM-Eintrag erstellen</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
   if (state.summaryStep === 'salutation') {
     return `<div class="modal-overlay">
       <div class="modal-card">
@@ -1941,6 +1955,30 @@ function buildCrmSummary(report = state.visitReport) {
   return parts.join('\n');
 }
 
+function currentRepUser(){
+  return state.repName ? state.one.users.find(u => u.name.trim().toLowerCase() === state.repName.trim().toLowerCase()) : null;
+}
+function buildQuickCrmEntry(){
+  const entries = favoriteEntries();
+  const products = entries.map(({product: p, size}) => `${p.name}${size ? ' (' + size + ')' : ''}`).join(', ');
+  return {
+    customer: state.summaryCustomer.trim() || '-',
+    date: oneToday(),
+    contacts: state.summaryCustomer.trim() || '-',
+    type: state.summaryOccasion.trim() || 'Produktvorstellung',
+    products,
+    owner: state.repName || '-'
+  };
+}
+function sendQuickCrmEntry(){
+  const report = buildQuickCrmEntry();
+  const text = buildCrmSummary(report);
+  state.savedReports = [{...report, savedAt: new Date().toISOString()}, ...state.savedReports].slice(0,25);
+  localStorage.setItem('savedVisitReports', JSON.stringify(state.savedReports));
+  const rep = currentRepUser();
+  openMailto(`CRM-Eintrag: ${report.customer}`, text, rep ? rep.email : '');
+}
+
 function saveVisitReportField(field, value) {
   state.visitReport = {...state.visitReport, [field]: value};
   localStorage.setItem('visitReport', JSON.stringify(state.visitReport));
@@ -2302,12 +2340,14 @@ function bind() {
   $('[data-action="occasion-back-salutation"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
   $('[data-action="occasion-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'salutation'; render(); });
   $('[data-action="occasion-send"]')?.addEventListener('click', () => {
-    state.summaryStep = null;
+    state.summaryStep = 'crmask';
     state.summaryIsNewCustomer = null;
     state.summarySent = true;
     sendCustomerSummaryEmail();
     render();
   });
+  $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
+  $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = null; render(); });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
   document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
