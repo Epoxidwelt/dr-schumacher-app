@@ -426,6 +426,7 @@ const state = {
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
   summaryPurpose: null,
+  summaryKaltakquise: false,
   summarySent: false,
   newCustomer: null,
   inviteWelcome: null
@@ -466,7 +467,8 @@ function icon(name) {
     camera:'<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4Z"/><circle cx="12" cy="13.5" r="3.5"/></svg>',
     phone:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/></svg>',
     pin:'<svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>',
-    aroundme:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="8"/></svg>'
+    aroundme:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="8"/></svg>',
+    kaltakquise:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/><path d="M14 3l3 3-3 3M17 6h-6"/></svg>'
   };
   return icons[name] || '';
 }
@@ -623,6 +625,7 @@ function menuScreen() {
     ['instruments','Instrumente','Aufbereitung & Desinfektion'],
     ['application','Applikation','Spendersysteme & Zubehör'],
     ['aroundme','Rund um mich','Kunden in der Nähe finden oder nach Kliniken, Praxen usw. suchen'],
+    ['kaltakquise','Kaltakquise','Neuen Kunden erfassen und in den bestehenden Ablauf übergeben'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
@@ -636,8 +639,8 @@ function menuScreen() {
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary'].includes(card[0]));
-  if (state.activeProfile !== 'sales') cards = cards.filter(card => card[0] !== 'aroundme');
+  if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary','kaltakquise'].includes(card[0]));
+  if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kaltakquise'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
   const today = new Date().toISOString().slice(0,10);
@@ -1273,6 +1276,7 @@ function closeAnyModal(){
   state.summaryPurpose = null;
   state.summaryPendingRecipient = null;
   state.summaryIsNewCustomer = null;
+  state.summaryKaltakquise = false;
   state.newCustomer = null;
   render();
 }
@@ -1281,23 +1285,35 @@ function startSummaryFlow(){
   state.summaryStep = 'purpose';
   state.summaryPurpose = null;
   state.summaryIsNewCustomer = null;
+  state.summaryKaltakquise = false;
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
 }
+function startKaltakquiseFlow(){
+  state.screen = 'summary';
+  state.summaryStep = 'neukunde';
+  state.summaryPurpose = 'crm';
+  state.summaryIsNewCustomer = true;
+  state.summaryKaltakquise = true;
+  state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [] };
+  state.summaryPendingRecipient = null;
+  state.summarySent = false;
+}
 function newCustomerDraftDefault(){
-  return { name:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'' };
+  return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
 }
 function isValidEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||'').trim()); }
-function newCustomerValid(d){ return !!(d.name.trim() && d.plz.trim() && isValidEmail(d.email)); }
+function newCustomerValid(d){ return !!(d.firma.trim() && d.nachname.trim() && d.plz.trim() && isValidEmail(d.email)); }
 function newCustomerSave(){
   const nc = state.newCustomer;
   const d = nc.draft;
   if (!newCustomerValid(d)) return;
   const existing = nc.contactId ? state.one.contacts.find(c => c.id === nc.contactId) : null;
   const fields = {
-    name:d.name.trim(), plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(),
-    hausnummer:d.hausnummer.trim(), email:d.email.trim(), telefon:d.telefon.trim()
+    name:d.firma.trim(), anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
+    plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(),
+    email:d.email.trim(), telefon:d.telefon.trim(), notiz:d.notiz.trim(), produktbereiche:(nc.produktbereiche||[]).slice()
   };
   if (existing){
     Object.assign(existing, fields);
@@ -1307,31 +1323,47 @@ function newCustomerSave(){
   const contact = {
     id, externeNr:'', kundenNr:'', bezirk:'', preisliste:'UVP',
     comm:'bestand', active:true, override:null, abc:null, nextFollowUp:null, kundenstatus:'kontakt',
+    herkunft: state.summaryKaltakquise ? 'kaltakquise' : '',
     ...fields
   };
   state.one.contacts.push(contact);
-  oneAudit('Kontakt angelegt (Kaltakquise)', contact.name + (state.repName ? ' — angelegt von ' + state.repName : ''));
+  oneAudit(state.summaryKaltakquise ? 'Kaltakquise-Kontakt angelegt' : 'Kontakt angelegt (Kaltakquise)', contact.name + (state.repName ? ' — angelegt von ' + state.repName : ''));
   nc.contactId = id;
 }
 function newCustomerContact(){
   const nc = state.newCustomer;
   return nc && nc.contactId ? state.one.contacts.find(c => c.id === nc.contactId) : null;
 }
+function newCustomerAnsprechpartner(d){
+  return [d.anrede, d.vorname, d.nachname].filter(Boolean).join(' ').trim();
+}
 function newCustomerFormFieldsHtml(d){
   const fields = [
-    ['name','Name', true, 'text'], ['strasse','Straße', false, 'text'], ['hausnummer','Hausnummer', false, 'text'],
+    ['firma','Firma / Einrichtung', true, 'text'], ['vorname','Vorname', false, 'text'], ['nachname','Nachname', true, 'text'],
+    ['strasse','Straße', false, 'text'], ['hausnummer','Hausnummer', false, 'text'],
     ['plz','Postleitzahl', true, 'text'], ['ort','Ort', false, 'text'], ['telefon','Telefonnummer', false, 'tel'],
     ['email','E-Mail (Pflichtfeld)', true, 'email']
   ];
   return `<div class="new-customer-form">
-    ${fields.map(([k,label,required,type]) => `<div class="${k==='name'||k==='email'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${required?'required':''} value="${escapeHtml(d[k])}"></div>`).join('')}
+    <div class="wide"><label>Anrede</label><div class="price-toggle-row" style="margin-top:6px">
+      <button type="button" class="filter-chip ${d.anrede==='Herr'?'active':''}" data-nc-anrede="Herr">Herr</button>
+      <button type="button" class="filter-chip ${d.anrede==='Frau'?'active':''}" data-nc-anrede="Frau">Frau</button>
+    </div></div>
+    ${fields.map(([k,label,required,type]) => `<div class="${k==='firma'||k==='email'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${required?'required':''} value="${escapeHtml(d[k])}"></div>`).join('')}
+    <div class="wide"><label for="nc-notiz">Gesprächsnotiz</label><textarea id="nc-notiz" data-nc-field="notiz" rows="3" placeholder="Kundenbedarf, Interesse, Einwände, Rückrufwunsch, nächste Schritte …">${escapeHtml(d.notiz)}</textarea></div>
   </div>`;
 }
+const PRODUKTBEREICHE = [
+  ['surface','Fläche','Desinfektion & Reinigung'],
+  ['hands','Hände & Haut','Händedesinfektion & Pflege'],
+  ['instruments','Instrumente','Aufbereitung & Desinfektion'],
+  ['application','Applikation','Spendersysteme & Zubehör']
+];
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
-  const total = isNew ? 6 : 5;
-  const stepNum = { kundentyp:2, neukunde:3, occasion: isNew?4:3, salutation: isNew?5:4, name: isNew?6:5 };
+  const total = 5;
+  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, occasion: isNew?5:3, salutation:4, name:5 };
 
   if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
@@ -1374,6 +1406,22 @@ function occasionPromptModal() {
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-kundentyp">Zurück</button>
           <button class="primary-button compact" data-action="neukunde-weiter" ${newCustomerValid(d)?'':'disabled'}>Weiter</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'produktbereiche') {
+    const selected = state.newCustomer.produktbereiche || [];
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(560px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Schritt ${stepNum.produktbereiche} von ${total}</span>
+        <h2>Über welche Bereiche wurde gesprochen?</h2>
+        <p>Mehrfachauswahl möglich — dieselben Kacheln wie im Hauptmenü.</p>
+        <div class="category-grid">${PRODUKTBEREICHE.map(([key,title,sub]) => `<button type="button" class="category-card ${key} ${selected.includes(key)?'on':''}" data-produktbereich="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>${selected.includes(key)?'✓':'+'}</b></button>`).join('')}</div>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="occasion-back-neukunde">Zurück</button>
+          <button class="primary-button compact" data-action="produktbereiche-weiter">Weiter</button>
         </div>
       </div>
     </div>`;
@@ -1440,22 +1488,27 @@ function occasionPromptModal() {
       <h2>Telefonat oder Termin vor Ort?</h2>
       <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt.</p>
       <div class="modal-choices">${SUMMARY_OCCASIONS.map(o => `<button class="modal-choice" data-occasion-choice="${escapeHtml(o.value)}">${icon(o.icon)}<span>${escapeHtml(o.short)}</span></button>`).join('')}</div>
-      <div class="modal-actions"><button class="secondary-button compact" data-action="${isNew?'occasion-back-neukunde':'occasion-back-kundentyp'}">Zurück</button></div>
+      <div class="modal-actions"><button class="secondary-button compact" data-action="${isNew?'occasion-back-produktbereiche':'occasion-back-kundentyp'}">Zurück</button></div>
     </div>
   </div>`;
 }
 function buildNewCustomerInnendienstEmail(contact){
+  const ansprechpartner = [contact.anrede, contact.ansprechpartnerVorname, contact.ansprechpartnerNachname].filter(Boolean).join(' ').trim();
   const lines = [
     'Hallo Team,',
     '',
     'bitte nachstehenden Kunden ins System eintragen und mir die Kundennummer zusenden. Bitte hier alle Daten übernehmen von Name, Anschrift, Telefonnummer, E-Mail-Adresse, Handelspartner, Kondition:',
     '',
-    `Name: ${contact.name}`,
+    `Firma: ${contact.name}`,
+    `Ansprechpartner: ${ansprechpartner || '–'}`,
     `Anschrift: ${[contact.strasse, contact.hausnummer].filter(Boolean).join(' ')}${contact.plz || contact.ort ? ', ' + [contact.plz, contact.ort].filter(Boolean).join(' ') : ''}`,
     `Telefonnummer: ${contact.telefon || '–'}`,
     `E-Mail-Adresse: ${contact.email || '–'}`,
     `Handelspartner: –`,
     `Kondition: ${contact.preisliste || 'UVP'}`,
+    `Herkunft: ${contact.herkunft === 'kaltakquise' ? 'Kaltakquise' : '–'}`,
+    `Besprochene Produktbereiche: ${(contact.produktbereiche||[]).map(produktbereichLabel).join(', ') || '–'}`,
+    `Gesprächsnotiz: ${contact.notiz || '–'}`,
     '',
     'Danke und Grüße' + (state.repName ? ', ' + state.repName : '')
   ];
@@ -1642,7 +1695,7 @@ function reportScreen() {
   const summary = buildCrmSummary({...r, date: reportDate, products: productNames});
   return `<main class="page report-page"><div class="section-heading no-print"><div><span class="eyebrow">Kundentermin dokumentieren</span><h1>Besuchsbericht</h1><p>Die Angaben bleiben lokal auf diesem Gerät und können als CRM-Text oder CSV exportiert werden.</p></div></div>
     <section class="report-form no-print">
-      <label>Kunde / Einrichtung<input data-report-field="customer" value="${escapeHtml(r.customer || state.quoteCustomer || '')}" placeholder="z. B. Klinikum Dortmund"></label>
+      <label>Kunde / Einrichtung<input data-report-field="customer" value="${escapeHtml(reportDisplayName(r) || state.quoteCustomer || '')}" placeholder="z. B. Klinikum Dortmund"></label>
       <label>Datum<input data-report-field="date" type="date" value="${escapeHtml(reportDate)}"></label>
       <label>Ansprechpartner<input data-report-field="contacts" value="${escapeHtml(r.contacts || state.quoteContact || '')}" placeholder="Namen und Funktionen"></label>
       <label>Terminart<select data-report-field="type">${['Erstvorstellung','Produktvorstellung','Feedbackgespräch','Testauswertung','Preisgespräch','Follow-up'].map(x=>`<option ${x===(r.type||'Produktvorstellung')?'selected':''}>${x}</option>`).join('')}</select></label>
@@ -1656,8 +1709,8 @@ function reportScreen() {
       <label>Verantwortlich<input data-report-field="owner" value="${escapeHtml(r.owner || '')}" placeholder="Name / Außendienst"></label>
       <div class="report-actions wide"><button class="secondary-button" data-action="copy-report">CRM-Text kopieren</button><button class="secondary-button" data-action="export-report">CSV exportieren</button><button class="secondary-button" data-action="save-report">Bericht lokal speichern</button><button class="primary-button compact" data-action="print-report">Drucken / PDF</button></div>
     </section>
-    <section class="report-sheet"><div class="offer-brand"><img src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher"><div><span>Besuchsbericht</span><strong>${escapeHtml(r.customer || state.quoteCustomer || 'Kundentermin')}</strong><small>${new Date(reportDate+'T12:00:00').toLocaleDateString('de-DE')}</small></div></div><pre class="crm-summary">${escapeHtml(summary)}</pre><div class="offer-disclaimer">Interne Gesprächsdokumentation. Produktbezogene Aussagen vor externer Verwendung anhand der aktuellen offiziellen Unterlagen prüfen.</div></section>
-    ${state.savedReports.length ? `<section class="saved-reports no-print"><h2>Lokal gespeicherte Berichte</h2>${state.savedReports.slice(0,5).map((item,i)=>`<button data-load-report="${i}"><strong>${escapeHtml(item.customer || 'Ohne Kundenname')}</strong><small>${escapeHtml(item.date || '')} · ${escapeHtml(item.result || 'Offen')}</small></button>`).join('')}</section>` : ''}
+    <section class="report-sheet"><div class="offer-brand"><img src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher"><div><span>Besuchsbericht</span><strong>${escapeHtml(reportDisplayName(r) || state.quoteCustomer || 'Kundentermin')}</strong><small>${new Date(reportDate+'T12:00:00').toLocaleDateString('de-DE')}</small></div></div><pre class="crm-summary">${escapeHtml(summary)}</pre><div class="offer-disclaimer">Interne Gesprächsdokumentation. Produktbezogene Aussagen vor externer Verwendung anhand der aktuellen offiziellen Unterlagen prüfen.</div></section>
+    ${state.savedReports.length ? `<section class="saved-reports no-print"><h2>Lokal gespeicherte Berichte</h2>${state.savedReports.slice(0,5).map((item,i)=>`<button data-load-report="${i}"><strong>${escapeHtml(reportDisplayName(item) || 'Ohne Kundenname')}</strong><small>${escapeHtml(item.date || '')} · ${escapeHtml(item.result || 'Offen')}</small></button>`).join('')}</section>` : ''}
   </main>`;
 }
 
@@ -1672,7 +1725,7 @@ function dashboardScreen() {
   const upcoming = reports.filter(r => !isDone(r) && dateValue(r) && dateValue(r) > today).sort((a,b)=>dateValue(a)-dateValue(b));
   const openWithoutDate = reports.filter(r => !isDone(r) && !dateValue(r));
   const completed = reports.filter(isDone);
-  const taskCard = (r, tone='') => `<article class="follow-card ${tone}"><div><span class="follow-date">${r.followUp ? new Date(r.followUp+'T12:00:00').toLocaleDateString('de-DE') : 'Kein Termin'}</span><h3>${escapeHtml(r.customer || 'Ohne Kundenname')}</h3><p>${escapeHtml(r.nextSteps || r.feedback || 'Noch keine nächste Aufgabe dokumentiert.')}</p><small>${escapeHtml(r.owner || 'Nicht zugewiesen')} · ${escapeHtml(r.result || 'Offen')}</small></div><div class="follow-actions"><select data-report-status="${r.index}" aria-label="Status"><option ${r.status==='Offen'?'selected':''}>Offen</option><option ${r.status==='In Bearbeitung'?'selected':''}>In Bearbeitung</option><option ${r.status==='Erledigt'?'selected':''}>Erledigt</option></select><button data-open-dashboard-report="${r.index}">Öffnen</button><button class="danger-link" data-delete-report="${r.index}">Löschen</button></div></article>`;
+  const taskCard = (r, tone='') => `<article class="follow-card ${tone}"><div><span class="follow-date">${r.followUp ? new Date(r.followUp+'T12:00:00').toLocaleDateString('de-DE') : 'Kein Termin'}</span><h3>${escapeHtml(reportDisplayName(r) || 'Ohne Kundenname')}</h3><p>${escapeHtml(r.nextSteps || r.feedback || 'Noch keine nächste Aufgabe dokumentiert.')}</p><small>${escapeHtml(r.owner || 'Nicht zugewiesen')} · ${escapeHtml(r.result || 'Offen')}</small></div><div class="follow-actions"><select data-report-status="${r.index}" aria-label="Status"><option ${r.status==='Offen'?'selected':''}>Offen</option><option ${r.status==='In Bearbeitung'?'selected':''}>In Bearbeitung</option><option ${r.status==='Erledigt'?'selected':''}>Erledigt</option></select><button data-open-dashboard-report="${r.index}">Öffnen</button><button class="danger-link" data-delete-report="${r.index}">Löschen</button></div></article>`;
   const section = (title, items, tone, empty) => `<section class="follow-section"><div class="follow-section-head"><h2>${title}</h2><span>${items.length}</span></div>${items.length ? `<div class="follow-list">${items.map(r=>taskCard(r,tone)).join('')}</div>` : `<p class="follow-empty">${empty}</p>`}</section>`;
   return `<main class="page dashboard-page"><div class="section-heading"><div><span class="eyebrow">Interne Terminsteuerung</span><h1>Follow-up Dashboard</h1><p>Offene Aufgaben aus lokal gespeicherten Besuchsberichten. Alle Daten bleiben auf diesem Gerät.</p></div><button class="primary-button compact dashboard-new" data-action="new-report">Neuer Bericht</button></div>
     <section class="dashboard-stats"><div><span>Überfällig</span><strong>${overdue.length}</strong></div><div><span>Heute</span><strong>${dueToday.length}</strong></div><div><span>Geplant</span><strong>${upcoming.length}</strong></div><div><span>Erledigt</span><strong>${completed.length}</strong></div></section>
@@ -1969,8 +2022,36 @@ function parseBusinessCardFields(raw) {
   return { name, strasse, hausnummer, plz, ort, email, raw };
 }
 
+function produktbereichLabel(key){
+  const found = PRODUKTBEREICHE.find(([k]) => k === key);
+  return found ? found[1] : key;
+}
+function reportDisplayName(r){
+  return (r.firma !== undefined ? r.firma : r.customer) || '';
+}
 function buildCrmSummary(report = state.visitReport) {
   const date = report.date ? new Date(report.date+'T12:00:00').toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE');
+  if (report.firma !== undefined) {
+    // Neukunde/Kaltakquise: Firma und konkreter Ansprechpartner inkl. Anrede stehen im Vordergrund,
+    // statt eines allgemeinen "Kunde/Einrichtung"-Feldes wie beim klassischen Besuchsbericht.
+    const anredeLabel = report.anrede === 'Frau' ? 'Ansprechpartnerin' : 'Ansprechpartner';
+    const ansprechpartner = [report.anrede, report.vorname, report.nachname].filter(Boolean).join(' ').trim();
+    const adresse = [[report.strasse, report.hausnummer].filter(Boolean).join(' '), [report.plz, report.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    const parts = [
+      `${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : 'Neukunde'} vom ${date}`,
+      `Firma: ${report.firma || '-'}`,
+      `${anredeLabel}: ${ansprechpartner || '-'}`,
+      `Adresse: ${adresse || '-'}`,
+      `Telefon: ${report.telefon || '-'}`,
+      `E-Mail: ${report.email || '-'}`,
+      `Besprochene Produktbereiche: ${report.produktbereicheText || '-'}`,
+      `Gesprächsnotiz: ${report.notiz || '-'}`,
+      `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
+      `Nächster Schritt: ${report.nextSteps || report.type || '-'}`,
+      `Zuständiger Mitarbeiter: ${report.owner || '-'}`
+    ];
+    return parts.join('\n');
+  }
   const parts = [
     `Besuchsbericht vom ${date}`,
     `Kunde/Einrichtung: ${report.customer || '-'}`,
@@ -1992,6 +2073,18 @@ function currentRepUser(){
   return state.repName ? state.one.users.find(u => u.name.trim().toLowerCase() === state.repName.trim().toLowerCase()) : null;
 }
 function buildQuickCrmEntry(){
+  const c = newCustomerContact();
+  if (c) {
+    return {
+      firma: c.name, anrede: c.anrede || '', vorname: c.ansprechpartnerVorname || '', nachname: c.ansprechpartnerNachname || '',
+      strasse: c.strasse || '', hausnummer: c.hausnummer || '', plz: c.plz || '', ort: c.ort || '',
+      telefon: c.telefon || '', email: c.email || '',
+      produktbereicheText: (c.produktbereiche||[]).map(produktbereichLabel).join(', '),
+      notiz: c.notiz || '', herkunft: c.herkunft || '',
+      date: oneToday(), type: state.summaryOccasion.trim() || 'Produktvorstellung',
+      nextSteps: '', owner: state.repName || '-'
+    };
+  }
   const entries = favoriteEntries();
   const products = entries.map(({product: p, size}) => `${p.name}${size ? ' (' + size + ')' : ''}`).join(', ');
   return {
@@ -2009,7 +2102,8 @@ function sendQuickCrmEntry(){
   state.savedReports = [{...report, savedAt: new Date().toISOString()}, ...state.savedReports].slice(0,25);
   localStorage.setItem('savedVisitReports', JSON.stringify(state.savedReports));
   const rep = currentRepUser();
-  openMailto(`CRM-Eintrag: ${report.customer}`, text, rep ? rep.email : '');
+  const label = report.firma !== undefined ? report.firma : report.customer;
+  openMailto(`CRM-Eintrag: ${label}`, text, rep ? rep.email : '');
 }
 
 function saveVisitReportField(field, value) {
@@ -2028,10 +2122,10 @@ function saveVisitReport() {
 function exportVisitReportCsv() {
   const r=state.visitReport;
   const headers=['Datum','Kunde','Ansprechpartner','Terminart','Ausgangssituation','Besprochene Produkte','Feedback','Muster/Unterlagen','Ergebnis','Nächste Schritte','Follow-up','Verantwortlich'];
-  const values=[r.date||'',r.customer||'',r.contacts||'',r.type||'',r.current||'',r.products||'',r.feedback||'',r.samples||'',r.result||'',r.nextSteps||'',r.followUp||'',r.owner||''];
+  const values=[r.date||'',reportDisplayName(r),r.contacts||r.notiz||'',r.type||'',r.current||'',r.products||r.produktbereicheText||'',r.feedback||'',r.samples||'',r.result||'',r.nextSteps||'',r.followUp||'',r.owner||''];
   const csv='\ufeff'+[headers,values].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download='besuchsbericht-'+(r.customer||'kunde').replace(/[^a-z0-9äöüß-]+/gi,'-').toLowerCase()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+  a.href=URL.createObjectURL(blob); a.download='besuchsbericht-'+(reportDisplayName(r)||'kunde').replace(/[^a-z0-9äöüß-]+/gi,'-').toLowerCase()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
 }
 
 function saveQuoteItem(key, field, value) {
@@ -2289,7 +2383,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kaltakquise'){startKaltakquiseFlow();render();return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
@@ -2340,7 +2434,7 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null };
+      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [] };
       state.summaryStep = 'neukunde';
     } else {
       state.summaryStep = 'occasion';
@@ -2349,24 +2443,56 @@ function bind() {
   }));
   $('[data-action="occasion-back-kundentyp"]')?.addEventListener('click', () => { state.summaryStep = 'kundentyp'; render(); });
   $('[data-action="occasion-back-neukunde"]')?.addEventListener('click', () => { state.summaryStep = 'neukunde'; render(); });
+  $('[data-action="occasion-back-produktbereiche"]')?.addEventListener('click', () => { state.summaryStep = 'produktbereiche'; render(); });
   document.querySelectorAll('[data-nc-field]').forEach(input => input.addEventListener('input', e => {
     state.newCustomer.draft[e.target.dataset.ncField] = e.target.value;
     const nextBtn = $('[data-action="neukunde-weiter"]');
     if (nextBtn) nextBtn.disabled = !newCustomerValid(state.newCustomer.draft);
   }));
+  document.querySelectorAll('[data-nc-anrede]').forEach(button => button.addEventListener('click', () => {
+    state.newCustomer.draft.anrede = button.dataset.ncAnrede;
+    render();
+  }));
   $('[data-action="neukunde-weiter"]')?.addEventListener('click', () => {
     newCustomerSave();
     const c = newCustomerContact();
+    const d = state.newCustomer.draft;
     if (c) state.summaryPendingRecipient = c.email;
-    state.summaryStep = 'occasion';
+    if (d.anrede) { state.summarySalutation = d.anrede; localStorage.setItem('summarySalutation', d.anrede); }
+    const plainName = [d.vorname, d.nachname].filter(Boolean).join(' ').trim();
+    if (d.nachname) { state.summaryCustomer = plainName || d.nachname; localStorage.setItem('summaryCustomer', state.summaryCustomer); }
+    state.summaryStep = 'produktbereiche';
     render();
   });
+  document.querySelectorAll('[data-produktbereich]').forEach(button => button.addEventListener('click', () => {
+    const key = button.dataset.produktbereich;
+    const list = state.newCustomer.produktbereiche || (state.newCustomer.produktbereiche = []);
+    const idx = list.indexOf(key);
+    if (idx >= 0) list.splice(idx, 1); else list.push(key);
+    const c = newCustomerContact();
+    if (c) c.produktbereiche = list.slice();
+    render();
+  }));
+  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
   $('[data-action="new-customer-send-innendienst"]')?.addEventListener('click', () => sendNewCustomerInnendienstEmail());
   document.querySelectorAll('[data-occasion-choice]').forEach(button => button.addEventListener('click', () => {
     const value = button.dataset.occasionChoice;
     state.summaryOccasion = value;
     localStorage.setItem('summaryOccasion', value);
-    state.summaryStep = 'salutation';
+    if (state.summaryIsNewCustomer) {
+      // Anrede und Ansprechpartner sind bereits aus dem Neukunden-Formular bekannt —
+      // kein erneutes Abfragen nötig, direkt zur passenden Aktion weiterspringen.
+      if (state.summaryPurpose === 'crm') {
+        sendQuickCrmEntry();
+        state.summaryStep = 'kundeask';
+      } else {
+        state.summarySent = true;
+        sendCustomerSummaryEmail();
+        state.summaryStep = 'crmask';
+      }
+    } else {
+      state.summaryStep = 'salutation';
+    }
     render();
   }));
   document.querySelectorAll('[data-salutation-pick]').forEach(button => button.addEventListener('click', () => {
