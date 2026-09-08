@@ -1310,10 +1310,13 @@ function newCustomerSave(){
   const d = nc.draft;
   if (!newCustomerValid(d)) return;
   const existing = nc.contactId ? state.one.contacts.find(c => c.id === nc.contactId) : null;
+  const entries = favoriteEntries();
   const fields = {
     name:d.firma.trim(), anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
     plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(),
-    email:d.email.trim(), telefon:d.telefon.trim(), notiz:d.notiz.trim(), produktbereiche:(nc.produktbereiche||[]).slice()
+    email:d.email.trim(), telefon:d.telefon.trim(), notiz:d.notiz.trim(),
+    produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
+    produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', ')
   };
   if (existing){
     Object.assign(existing, fields);
@@ -1411,17 +1414,20 @@ function occasionPromptModal() {
     </div>`;
   }
   if (state.summaryStep === 'produktbereiche') {
-    const selected = state.newCustomer.produktbereiche || [];
+    const entries = favoriteEntries();
+    const countByCat = {};
+    entries.forEach(({product}) => { countByCat[product.category] = (countByCat[product.category]||0) + 1; });
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(560px,100%)">
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.produktbereiche} von ${total}</span>
-        <h2>Über welche Bereiche wurde gesprochen?</h2>
-        <p>Mehrfachauswahl möglich — dieselben Kacheln wie im Hauptmenü.</p>
-        <div class="category-grid">${PRODUKTBEREICHE.map(([key,title,sub]) => `<button type="button" class="category-card ${key} ${selected.includes(key)?'on':''}" data-produktbereich="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>${selected.includes(key)?'✓':'+'}</b></button>`).join('')}</div>
+        <h2>Welche Produkte wurden besprochen?</h2>
+        <p>Kachel antippen und dort die passenden Produkte markieren — genau wie im Hauptmenü.</p>
+        <div class="category-grid">${PRODUKTBEREICHE.map(([key,title,sub]) => { const count = countByCat[key] || 0; return `<button type="button" class="category-card ${key} ${count?'on':''}" data-produktbereich-open="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${count ? count + ' ausgewählt' : sub}</small></span><b>${count ? '✓' : '›'}</b></button>`; }).join('')}</div>
+        ${entries.length ? `<div class="produkte-picked">${entries.map(({product,size}) => `<span>${escapeHtml(product.name)}${size?` · ${escapeHtml(size)}`:''}</span>`).join('')}</div>` : `<p class="muted-copy">Noch keine Produkte ausgewählt.</p>`}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-neukunde">Zurück</button>
-          <button class="primary-button compact" data-action="produktbereiche-weiter">Weiter</button>
+          <button class="primary-button compact" data-action="produktbereiche-weiter" ${entries.length?'':'disabled'}>Weiter</button>
         </div>
       </div>
     </div>`;
@@ -1508,6 +1514,7 @@ function buildNewCustomerInnendienstEmail(contact){
     `Kondition: ${contact.preisliste || 'UVP'}`,
     `Herkunft: ${contact.herkunft === 'kaltakquise' ? 'Kaltakquise' : '–'}`,
     `Besprochene Produktbereiche: ${(contact.produktbereiche||[]).map(produktbereichLabel).join(', ') || '–'}`,
+    `Besprochene Produkte: ${contact.produkte || '–'}`,
     `Gesprächsnotiz: ${contact.notiz || '–'}`,
     '',
     'Danke und Grüße' + (state.repName ? ', ' + state.repName : '')
@@ -2045,6 +2052,7 @@ function buildCrmSummary(report = state.visitReport) {
       `Telefon: ${report.telefon || '-'}`,
       `E-Mail: ${report.email || '-'}`,
       `Besprochene Produktbereiche: ${report.produktbereicheText || '-'}`,
+      `Besprochene Produkte: ${report.produkteText || '-'}`,
       `Gesprächsnotiz: ${report.notiz || '-'}`,
       `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
       `Nächster Schritt: ${report.nextSteps || report.type || '-'}`,
@@ -2080,6 +2088,7 @@ function buildQuickCrmEntry(){
       strasse: c.strasse || '', hausnummer: c.hausnummer || '', plz: c.plz || '', ort: c.ort || '',
       telefon: c.telefon || '', email: c.email || '',
       produktbereicheText: (c.produktbereiche||[]).map(produktbereichLabel).join(', '),
+      produkteText: c.produkte || '',
       notiz: c.notiz || '', herkunft: c.herkunft || '',
       date: oneToday(), type: state.summaryOccasion.trim() || 'Produktvorstellung',
       nextSteps: '', owner: state.repName || '-'
@@ -2375,10 +2384,12 @@ function bind() {
   $('[data-action="back"]')?.addEventListener('click', () => {
     if (state.screen === 'detail') { state.screen = 'products'; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'messe') { state.previousScreen = null; state.screen = 'messe'; render(); return; }
+    if (state.screen === 'products' && state.previousScreen === 'kaltakquise-produkte' && state.newCustomer) { state.previousScreen = null; newCustomerSave(); state.screen = 'summary'; state.summaryStep = 'produktbereiche'; render(); return; }
+    state.previousScreen = null;
     state.screen = 'menu';
     render();
   });
-  document.querySelectorAll('[data-action="home"]').forEach(el => el.addEventListener('click', () => { state.screen='menu'; render(); }));
+  document.querySelectorAll('[data-action="home"]').forEach(el => el.addEventListener('click', () => { state.previousScreen = null; state.screen='menu'; render(); }));
   $('[data-action="clear-prices"]')?.addEventListener('click', () => { state.priceByArt={}; state.importMeta={}; state.importReport=null; ['priceByArt','priceImportMeta','priceImportReport','prices','sizeArtNr','sizeVE'].forEach(k=>localStorage.removeItem(k)); render(); });
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
@@ -2464,16 +2475,16 @@ function bind() {
     state.summaryStep = 'produktbereiche';
     render();
   });
-  document.querySelectorAll('[data-produktbereich]').forEach(button => button.addEventListener('click', () => {
-    const key = button.dataset.produktbereich;
-    const list = state.newCustomer.produktbereiche || (state.newCustomer.produktbereiche = []);
-    const idx = list.indexOf(key);
-    if (idx >= 0) list.splice(idx, 1); else list.push(key);
-    const c = newCustomerContact();
-    if (c) c.produktbereiche = list.slice();
+  document.querySelectorAll('[data-produktbereich-open]').forEach(button => button.addEventListener('click', () => {
+    state.summaryStep = null;
+    state.previousScreen = 'kaltakquise-produkte';
+    state.category = button.dataset.produktbereichOpen;
+    state.screen = 'products';
+    state.query = '';
+    state.spectrum = 'all';
     render();
   }));
-  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
+  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { newCustomerSave(); state.summaryStep = 'occasion'; render(); });
   $('[data-action="new-customer-send-innendienst"]')?.addEventListener('click', () => sendNewCustomerInnendienstEmail());
   document.querySelectorAll('[data-occasion-choice]').forEach(button => button.addEventListener('click', () => {
     const value = button.dataset.occasionChoice;
