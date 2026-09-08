@@ -1353,7 +1353,6 @@ function newCustomerFormFieldsHtml(d){
       <button type="button" class="filter-chip ${d.anrede==='Frau'?'active':''}" data-nc-anrede="Frau">Frau</button>
     </div></div>
     ${fields.map(([k,label,required,type]) => `<div class="${k==='firma'||k==='email'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${required?'required':''} value="${escapeHtml(d[k])}"></div>`).join('')}
-    <div class="wide"><label for="nc-notiz">Gesprächsnotiz</label><textarea id="nc-notiz" data-nc-field="notiz" rows="3" placeholder="Kundenbedarf, Interesse, Einwände, Rückrufwunsch, nächste Schritte …">${escapeHtml(d.notiz)}</textarea></div>
   </div>`;
 }
 const PRODUKTBEREICHE = [
@@ -1365,8 +1364,8 @@ const PRODUKTBEREICHE = [
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
-  const total = 5;
-  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, occasion: isNew?5:3, salutation:4, name:5 };
+  const total = isNew ? 6 : 5;
+  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, notiz:5, occasion: isNew?6:3, salutation:4, name:5 };
 
   if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
@@ -1428,6 +1427,22 @@ function occasionPromptModal() {
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-neukunde">Zurück</button>
           <button class="primary-button compact" data-action="produktbereiche-weiter" ${entries.length?'':'disabled'}>Weiter</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'notiz') {
+    const d = state.newCustomer.draft;
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(520px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Schritt ${stepNum.notiz} von ${total}</span>
+        <h2>Gesprächsnotiz</h2>
+        <p>Kundenbedarf, Interesse, Einwände, Rückrufwunsch, nächste Schritte …</p>
+        <label class="modal-field"><textarea id="occasionNotiz" rows="4" placeholder="Gesprächsnotiz (optional)">${escapeHtml(d.notiz)}</textarea></label>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="occasion-back-produktbereiche">Zurück</button>
+          <button class="primary-button compact" data-action="notiz-weiter">Weiter</button>
         </div>
       </div>
     </div>`;
@@ -1494,7 +1509,7 @@ function occasionPromptModal() {
       <h2>Telefonat oder Termin vor Ort?</h2>
       <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt.</p>
       <div class="modal-choices">${SUMMARY_OCCASIONS.map(o => `<button class="modal-choice" data-occasion-choice="${escapeHtml(o.value)}">${icon(o.icon)}<span>${escapeHtml(o.short)}</span></button>`).join('')}</div>
-      <div class="modal-actions"><button class="secondary-button compact" data-action="${isNew?'occasion-back-produktbereiche':'occasion-back-kundentyp'}">Zurück</button></div>
+      <div class="modal-actions"><button class="secondary-button compact" data-action="${isNew?'occasion-back-notiz':'occasion-back-kundentyp'}">Zurück</button></div>
     </div>
   </div>`;
 }
@@ -2484,7 +2499,14 @@ function bind() {
     state.spectrum = 'all';
     render();
   }));
-  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { newCustomerSave(); state.summaryStep = 'occasion'; render(); });
+  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { newCustomerSave(); state.summaryStep = 'notiz'; render(); });
+  $('[data-action="occasion-back-notiz"]')?.addEventListener('click', () => { state.summaryStep = 'notiz'; render(); });
+  $('[data-action="notiz-weiter"]')?.addEventListener('click', () => {
+    state.newCustomer.draft.notiz = (($('#occasionNotiz')||{}).value || '').trim();
+    newCustomerSave();
+    state.summaryStep = 'occasion';
+    render();
+  });
   $('[data-action="new-customer-send-innendienst"]')?.addEventListener('click', () => sendNewCustomerInnendienstEmail());
   document.querySelectorAll('[data-occasion-choice]').forEach(button => button.addEventListener('click', () => {
     const value = button.dataset.occasionChoice;
