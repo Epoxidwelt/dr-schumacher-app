@@ -425,6 +425,7 @@ const state = {
   summaryStep: null,
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
+  summarySent: false,
   newCustomer: null,
   inviteWelcome: null
 };
@@ -1279,6 +1280,7 @@ function startSummaryFlow(){
   state.summaryIsNewCustomer = null;
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
+  state.summarySent = false;
 }
 function newCustomerDraftDefault(){
   return { name:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'' };
@@ -1437,10 +1439,12 @@ function summaryScreen(){
     <div><h2>Weitere Produkte markieren</h2><label class="search-box summary-search">${icon('search')}<input id="summarySearch" value="${escapeHtml(state.summaryQuery||'')}" placeholder="Produkt suchen"></label><div class="quick-product-list">${pickable.map(p=>summaryProductCard(p)).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div></div>
   </section>
   ${(state.newCustomer && state.newCustomer.contactId) ? `<section class="new-customer-cta">
-    <div><strong>Kunde neu im System angelegt.</strong><small>Damit der Innendienst ihn auch im ERP-System anlegen und z. B. Sicherheitsdatenblätter, Preise oder Muster zusenden kann, können Sie die Daten direkt weiterleiten.</small></div>
+    <div><strong>Neukunde anlegen?</strong><small>Der Innendienst kann den Neukunden jetzt im CRM-System anlegen – bitte auf „An Innendienst senden" klicken.</small></div>
     <button class="secondary-button compact" data-action="new-customer-send-innendienst">${icon('talk')}<span>An Innendienst senden</span></button>
   </section>` : ''}
-  <div class="offer-actions summary-send"><button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button></div>
+  <div class="offer-actions summary-send">${state.summarySent
+    ? `<button class="primary-button compact" data-action="back-to-menu">${icon('surface')}<span>Zurück zum Menü</span></button>`
+    : `<button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button>`}</div>
   </main>`;
 }
 function summaryProductCard(p){const selected=state.favorites.some(f=>f.id===p.id);return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button data-favorite="${p.id}">${selected?'−':'+'}</button></article>`}
@@ -2254,6 +2258,7 @@ function bind() {
   document.querySelectorAll('[data-favorite-id]').forEach(select => select.onchange = () => changeFavoriteSize(select.dataset.favoriteId, select.dataset.favoriteOldSize, select.value));
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
   $('[data-action="send-summary"]')?.addEventListener('click', () => { startSummaryFlow(); render(); });
+  $('[data-action="back-to-menu"]')?.addEventListener('click', () => { state.screen = 'menu'; render(); });
   document.querySelectorAll('[data-kundentyp-choice]').forEach(button => button.addEventListener('click', () => {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
@@ -2299,6 +2304,7 @@ function bind() {
   $('[data-action="occasion-send"]')?.addEventListener('click', () => {
     state.summaryStep = null;
     state.summaryIsNewCustomer = null;
+    state.summarySent = true;
     sendCustomerSummaryEmail();
     render();
   });
