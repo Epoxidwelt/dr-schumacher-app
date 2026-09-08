@@ -425,6 +425,7 @@ const state = {
   summaryStep: null,
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
+  summaryPurpose: null,
   summarySent: false,
   newCustomer: null,
   inviteWelcome: null
@@ -1269,6 +1270,7 @@ function modalCloseBtn(){
 }
 function closeAnyModal(){
   state.summaryStep = null;
+  state.summaryPurpose = null;
   state.summaryPendingRecipient = null;
   state.summaryIsNewCustomer = null;
   state.newCustomer = null;
@@ -1276,7 +1278,8 @@ function closeAnyModal(){
 }
 function startSummaryFlow(){
   state.screen = 'summary';
-  state.summaryStep = 'kundentyp';
+  state.summaryStep = 'purpose';
+  state.summaryPurpose = null;
   state.summaryIsNewCustomer = null;
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
@@ -1326,20 +1329,36 @@ function newCustomerFormFieldsHtml(d){
 }
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
-  const total = isNew ? 5 : 4;
-  const stepNum = { kundentyp:1, neukunde:2, occasion: isNew?3:2, salutation: isNew?4:3, name: isNew?5:4 };
+  const isCrmFirst = state.summaryPurpose === 'crm';
+  const total = isNew ? 6 : 5;
+  const stepNum = { kundentyp:2, neukunde:3, occasion: isNew?4:3, salutation: isNew?5:4, name: isNew?6:5 };
 
-  if (state.summaryStep === 'kundentyp') {
+  if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
       <div class="modal-card">
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt 1</span>
+        <h2>Was möchten Sie zuerst erledigen?</h2>
+        <p>Das jeweils andere fragen wir am Ende noch mit ja oder nein ab.</p>
+        <div class="modal-choices">
+          <button class="modal-choice" data-purpose-choice="crm">${icon('pm')}<span>CRM-Eintrag erstellen</span></button>
+          <button class="modal-choice" data-purpose-choice="kunde">${icon('talk')}<span>Kundenzusammenfassung an den Kunden senden</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'kundentyp') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Schritt 2</span>
         <h2>Bestandskunde oder Neukunde?</h2>
         <p>Bei einem Neukunden fragen wir im nächsten Schritt kurz die Adresse ab.</p>
         <div class="modal-choices">
           <button class="modal-choice" data-kundentyp-choice="bestand">${icon('pm')}<span>Bestandskunde</span></button>
           <button class="modal-choice" data-kundentyp-choice="neu">${icon('pm')}<span>Neukunde</span></button>
         </div>
+        <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-purpose">Zurück</button></div>
       </div>
     </div>`;
   }
@@ -1365,11 +1384,11 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.name} von ${total}</span>
         <h2>Wie heißt der Ansprechpartner?</h2>
-        <p>Die E-Mail beginnt damit automatisch mit „Hallo ${state.summarySalutation} ${state.summaryCustomer.trim() || 'Name'}".</p>
+        <p>${isCrmFirst ? 'Für den CRM-Eintrag als Ansprechpartner.' : `Die E-Mail beginnt damit automatisch mit „Hallo ${state.summarySalutation} ${state.summaryCustomer.trim() || 'Name'}".`}</p>
         <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller" autofocus></label>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-name">Zurück</button>
-          <button class="primary-button compact" data-action="occasion-send">${icon('talk')}<span>E-Mail senden</span></button>
+          <button class="primary-button compact" data-action="${isCrmFirst?'occasion-send-crm':'occasion-send'}">${icon('talk')}<span>${isCrmFirst?'CRM-Eintrag erstellen':'E-Mail senden'}</span></button>
         </div>
       </div>
     </div>`;
@@ -1384,6 +1403,20 @@ function occasionPromptModal() {
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="crm-entry-no">Nein, fertig</button>
           <button class="primary-button compact" data-action="crm-entry-yes">${icon('talk')}<span>Ja, CRM-Eintrag erstellen</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'kundeask') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Letzter Schritt</span>
+        <h2>Möchten Sie auch eine Kundenzusammenfassung senden?</h2>
+        <p>Die besprochenen Produkte werden dem Kunden dann direkt per E-Mail mit den Vorteilen zusammengefasst.</p>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="kunde-entry-no">Nein, fertig</button>
+          <button class="primary-button compact" data-action="kunde-entry-yes">${icon('talk')}<span>Ja, senden</span></button>
         </div>
       </div>
     </div>`;
@@ -2297,6 +2330,12 @@ function bind() {
   document.querySelectorAll('[data-summary-prices]').forEach(button => button.onclick = () => { state.summaryIncludePrices = button.dataset.summaryPrices === 'true'; localStorage.setItem('summaryIncludePrices', String(state.summaryIncludePrices)); render(); });
   $('[data-action="send-summary"]')?.addEventListener('click', () => { startSummaryFlow(); render(); });
   $('[data-action="back-to-menu"]')?.addEventListener('click', () => { state.screen = 'menu'; render(); });
+  document.querySelectorAll('[data-purpose-choice]').forEach(button => button.addEventListener('click', () => {
+    state.summaryPurpose = button.dataset.purposeChoice;
+    state.summaryStep = 'kundentyp';
+    render();
+  }));
+  $('[data-action="occasion-back-purpose"]')?.addEventListener('click', () => { state.summaryStep = 'purpose'; render(); });
   document.querySelectorAll('[data-kundentyp-choice]').forEach(button => button.addEventListener('click', () => {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
@@ -2346,8 +2385,21 @@ function bind() {
     sendCustomerSummaryEmail();
     render();
   });
+  $('[data-action="occasion-send-crm"]')?.addEventListener('click', () => {
+    sendQuickCrmEntry();
+    state.summaryStep = 'kundeask';
+    state.summaryIsNewCustomer = null;
+    render();
+  });
   $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
   $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = null; render(); });
+  $('[data-action="kunde-entry-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
+  $('[data-action="kunde-entry-yes"]')?.addEventListener('click', () => {
+    state.summarySent = true;
+    sendCustomerSummaryEmail();
+    state.summaryStep = null;
+    render();
+  });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
   document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
