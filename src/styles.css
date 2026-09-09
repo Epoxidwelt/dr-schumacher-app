@@ -157,6 +157,10 @@
 .one-app table{width:100%; border-collapse:collapse; font-size:13.5px}
 .one-tablewrap{overflow-x:auto}
 .one-app th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--one-ink-3); font-weight:600; padding:9px 12px; border-bottom:1px solid var(--one-line); background:var(--one-sunk); white-space:nowrap}
+.one-app th:has(.one-sort-th){padding:0}
+.one-sort-th{display:block; width:100%; border:0; background:none; padding:9px 12px; margin:0; font:inherit; text-align:left; text-transform:inherit; letter-spacing:inherit; color:inherit; cursor:pointer; white-space:nowrap}
+.one-sort-th:hover{color:var(--one-ink-2); background:var(--one-surface-2)}
+.one-sort-th.active{color:var(--one-accent); font-weight:800}
 .one-app td{padding:10px 12px; border-bottom:1px solid var(--one-line); vertical-align:middle}
 .one-app tr:last-child td{border-bottom:0}
 .one-app tbody tr:hover{background:var(--one-surface-2)}

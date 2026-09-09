@@ -3198,7 +3198,7 @@ function oneSeed() {
     audit:[], auditSeq:0,
     loggedInUserId:null, loginName:'', loginPassword:'', loginError:'', forgotMode:false, forgotDone:false,
     view:'dashboard',
-    filters:{ q:'', terr:'', comm:'' },
+    filters:{ q:'', terr:'', comm:'', sortKey:'name', sortDir:'asc' },
     selection:[], mailTemplate:'t1', mailProduct:'DESCOSEPT SPEZIAL', mailIntro:'', mailSent:null,
     probe:{ user:'ma', contact:'k5', result:null },
     tests:null,
@@ -3978,6 +3978,33 @@ function oneViewTasks(){
   <div class="one-panel"><div class="one-panel-body"><div class="one-note">Die drei Buttons verschieben die Wiedervorlage sofort — ohne die Ansicht zu wechseln. „Rhythmus" setzt sie auf den vollen Turnus der Einstufung zurück (A/B/C), gerechnet ab heute.</div></div></div>`;
 }
 
+// Sortierschlüssel für die Tabellen-Spaltenköpfe in "Meine Kontakte" (data-one-sort) —
+// null/leere Werte landen unabhängig von der Richtung immer am Ende, damit z. B. Kontakte
+// ohne Wiedervorlage nicht ständig zwischen oben und unten springen.
+const ONE_SORT_GETTERS = {
+  kundenNr: c => c.kundenNr || '',
+  name: c => c.name || '',
+  ort: c => c.ort || '',
+  preisliste: c => c.preisliste || '',
+  nextFollowUp: c => c.nextFollowUp || ''
+};
+function oneSortContacts(list, sortKey, sortDir){
+  const get = ONE_SORT_GETTERS[sortKey] || ONE_SORT_GETTERS.name;
+  const dir = sortDir === 'desc' ? -1 : 1;
+  return list.slice().sort((a, b) => {
+    const av = get(a), bv = get(b);
+    if (!av && !bv) return 0;
+    if (!av) return 1;
+    if (!bv) return -1;
+    return av.localeCompare(bv, 'de') * dir;
+  });
+}
+function oneSortHeaderHtml(key, label){
+  const O = state.one;
+  const active = O.filters.sortKey === key;
+  const arrow = active ? (O.filters.sortDir === 'desc' ? ' ↓' : ' ↑') : '';
+  return `<th><button type="button" class="one-sort-th ${active?'active':''}" data-one-sort="${key}">${escapeHtml(label)}${arrow}</button></th>`;
+}
 function oneFilteredMine(){
   const u = oneCurrentUser(); const O = state.one;
   let list = oneVisibleContacts(u);
@@ -3988,7 +4015,7 @@ function oneFilteredMine(){
     const q = f.q.trim().toLowerCase();
     list = list.filter(c => (c.name+' '+c.kundenNr+' '+c.plz+' '+c.ort+' '+c.email).toLowerCase().includes(q));
   }
-  return list;
+  return oneSortContacts(list, f.sortKey, f.sortDir);
 }
 
 function oneViewMine(){
@@ -4021,7 +4048,7 @@ function oneViewMine(){
     </div>
     <div class="one-panel-body flush" style="border-top:1px solid var(--one-line)">
       ${list.length ? `<div class="one-tablewrap"><table>
-        <thead><tr><th style="width:38px"></th><th>Kundennr.</th><th>Name</th><th>Ort</th><th>Preisliste</th><th>Einstufung</th><th>Wiedervorlage</th><th>Kommunikation</th><th></th></tr></thead>
+        <thead><tr><th style="width:38px"></th>${oneSortHeaderHtml('kundenNr','Kundennr.')}${oneSortHeaderHtml('name','Name')}${oneSortHeaderHtml('ort','Ort')}${oneSortHeaderHtml('preisliste','Preisliste')}<th>Einstufung</th>${oneSortHeaderHtml('nextFollowUp','Wiedervorlage')}<th>Kommunikation</th><th></th></tr></thead>
         <tbody>${list.map(c=>`<tr>
           <td><input type="checkbox" data-one-pick="${c.id}" ${sel.has(c.id)?'checked':''} style="width:16px;height:16px;accent-color:var(--one-accent)"></td>
           <td class="mono muted">${escapeHtml(c.kundenNr)}</td>
@@ -4369,6 +4396,12 @@ function bindOne(){
 
   const fq = document.getElementById('oneFq');
   if (fq) fq.oninput = (e) => { O.filters.q = e.target.value; render(); };
+  document.querySelectorAll('[data-one-sort]').forEach(btn => btn.onclick = () => {
+    const key = btn.dataset.oneSort;
+    if (O.filters.sortKey === key) O.filters.sortDir = O.filters.sortDir === 'asc' ? 'desc' : 'asc';
+    else { O.filters.sortKey = key; O.filters.sortDir = 'asc'; }
+    render();
+  });
   const prodInp = document.getElementById('oneProdInp');
   if (prodInp) prodInp.oninput = (e) => { O.mailProduct = e.target.value; };
   const introInp = document.getElementById('oneIntroInp');
