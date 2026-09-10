@@ -3170,22 +3170,22 @@ function oneSeed() {
     tenant:{ name:'Dr. Schumacher', short:'DS' },
     territories: JSON.parse(JSON.stringify(ONE_TERRITORIES)),
     contacts:[
-      {id:'k1', externeNr:'EX-10021', kundenNr:'K-4471', name:'Dentalzentrum Hamburg',   plz:'20095', ort:'Hamburg',   strasse:'Mönckebergstraße', hausnummer:'12', bezirk:'Altstadt',  preisliste:'UVP',  email:'anna.petersen@example.com',   telefon:'040 3350210',  comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-3), kundenstatus:'kunde'},
-      {id:'k2', externeNr:'EX-10022', kundenNr:'K-4472', name:'Praxis Nordblick',        plz:'24103', ort:'Kiel',      strasse:'Holstenstraße',    hausnummer:'44', bezirk:'Zentrum',   preisliste:'PL 1', email:'jan.hansen@example.com',      telefon:'0431 6602233', comm:'bestand',     active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,12), kundenstatus:'kunde'},
-      {id:'k3', externeNr:'EX-10023', kundenNr:'K-4473', name:'Dentalzentrum Leipzig',   plz:'04109', ort:'Leipzig',   strasse:'Grimmaische Straße',hausnummer:'7', bezirk:'Mitte',     preisliste:'UVP',  email:'laura.richter@example.com',   telefon:'0341 9807744', comm:'frei',        active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,40), kundenstatus:'kontakt'},
-      {id:'k4', externeNr:'EX-10024', kundenNr:'K-4474', name:'Praxis Dresden',          plz:'01067', ort:'Dresden',   strasse:'Prager Straße',    hausnummer:'3', bezirk:'Altstadt',  preisliste:'PL 2', email:'thomas.berger@example.com',   telefon:'0351 4712260', comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kunde'},
-      {id:'k5', externeNr:'EX-10025', kundenNr:'K-4475', name:'Dentalzentrum Düsseldorf',plz:'40210', ort:'Düsseldorf',strasse:'Königsallee',      hausnummer:'21', bezirk:'Stadtmitte',preisliste:'UVP',  email:'sarah.becker@example.com',    telefon:'0211 8834190', comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-1), kundenstatus:'kunde'},
-      {id:'k6', externeNr:'EX-10026', kundenNr:'K-4476', name:'Praxis Rheinblick',       plz:'41460', ort:'Neuss',     strasse:'Further Straße',   hausnummer:'56', bezirk:'Furth',     preisliste:'PL 1', email:'daniel.weber@example.com',    telefon:'02131 550217', comm:'widerspruch', active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,5), kundenstatus:'kunde'},
-      {id:'k7', externeNr:'EX-10027', kundenNr:'K-4477', name:'Dentalzentrum Stuttgart', plz:'70173', ort:'Stuttgart', strasse:'Königstraße',      hausnummer:'9', bezirk:'Mitte',     preisliste:'UVP',  email:'julia.wagner@example.com',    telefon:'0711 2290187', comm:'frei',        active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kontakt'},
-      {id:'k8', externeNr:'EX-10028', kundenNr:'K-4478', name:'Praxis München',          plz:'80331', ort:'München',   strasse:'Sendlinger Straße',hausnummer:'18', bezirk:'Altstadt',  preisliste:'PL 3', email:'michael.fischer@example.com', telefon:'089 5541023',  comm:'bestand',     active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,80), kundenstatus:'kunde'},
-      {id:'k9', externeNr:'EX-10029', kundenNr:'K-4479', name:'Praxis Grenzfall',        plz:'99999', ort:'',          strasse:'',                 hausnummer:'',   bezirk:'',          preisliste:'UVP',  email:'',                            telefon:'',             comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kunde'}
+      {id:'k1', externeNr:'EX-10021', kundenNr:'K-4471', name:'Dentalzentrum Hamburg',   plz:'20095', ort:'Hamburg',   strasse:'Mönckebergstraße', hausnummer:'12', bezirk:'Altstadt',  preisliste:'UVP',  email:'anna.petersen@example.com',   telefon:'040 3350210',  comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-3), kundenstatus:'kunde', anrede:'Frau', ansprechpartnerVorname:'Anna',    ansprechpartnerNachname:'Petersen'},
+      {id:'k2', externeNr:'EX-10022', kundenNr:'K-4472', name:'Praxis Nordblick',        plz:'24103', ort:'Kiel',      strasse:'Holstenstraße',    hausnummer:'44', bezirk:'Zentrum',   preisliste:'PL 1', email:'jan.hansen@example.com',      telefon:'0431 6602233', comm:'bestand',     active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,12), kundenstatus:'kunde', anrede:'Herr', ansprechpartnerVorname:'Jan',      ansprechpartnerNachname:'Hansen'},
+      {id:'k3', externeNr:'EX-10023', kundenNr:'K-4473', name:'Dentalzentrum Leipzig',   plz:'04109', ort:'Leipzig',   strasse:'Grimmaische Straße',hausnummer:'7', bezirk:'Mitte',     preisliste:'UVP',  email:'laura.richter@example.com',   telefon:'0341 9807744', comm:'frei',        active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,40), kundenstatus:'kontakt', anrede:'Frau', ansprechpartnerVorname:'Laura',    ansprechpartnerNachname:'Richter'},
+      {id:'k4', externeNr:'EX-10024', kundenNr:'K-4474', name:'Praxis Dresden',          plz:'01067', ort:'Dresden',   strasse:'Prager Straße',    hausnummer:'3', bezirk:'Altstadt',  preisliste:'PL 2', email:'thomas.berger@example.com',   telefon:'0351 4712260', comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kunde', anrede:'Herr', ansprechpartnerVorname:'Thomas',   ansprechpartnerNachname:'Berger'},
+      {id:'k5', externeNr:'EX-10025', kundenNr:'K-4475', name:'Dentalzentrum Düsseldorf',plz:'40210', ort:'Düsseldorf',strasse:'Königsallee',      hausnummer:'21', bezirk:'Stadtmitte',preisliste:'UVP',  email:'sarah.becker@example.com',    telefon:'0211 8834190', comm:'frei',        active:true, override:null, abc:'A', nextFollowUp:oneAddDays(today,-1), kundenstatus:'kunde', anrede:'Frau', ansprechpartnerVorname:'Sarah',    ansprechpartnerNachname:'Becker'},
+      {id:'k6', externeNr:'EX-10026', kundenNr:'K-4476', name:'Praxis Rheinblick',       plz:'41460', ort:'Neuss',     strasse:'Further Straße',   hausnummer:'56', bezirk:'Furth',     preisliste:'PL 1', email:'daniel.weber@example.com',    telefon:'02131 550217', comm:'widerspruch', active:true, override:null, abc:'B', nextFollowUp:oneAddDays(today,5), kundenstatus:'kunde', anrede:'Herr', ansprechpartnerVorname:'Daniel',   ansprechpartnerNachname:'Weber'},
+      {id:'k7', externeNr:'EX-10027', kundenNr:'K-4477', name:'Dentalzentrum Stuttgart', plz:'70173', ort:'Stuttgart', strasse:'Königstraße',      hausnummer:'9', bezirk:'Mitte',     preisliste:'UVP',  email:'julia.wagner@example.com',    telefon:'0711 2290187', comm:'frei',        active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kontakt', anrede:'Frau', ansprechpartnerVorname:'Julia',    ansprechpartnerNachname:'Wagner'},
+      {id:'k8', externeNr:'EX-10028', kundenNr:'K-4478', name:'Praxis München',          plz:'80331', ort:'München',   strasse:'Sendlinger Straße',hausnummer:'18', bezirk:'Altstadt',  preisliste:'PL 3', email:'michael.fischer@example.com', telefon:'089 5541023',  comm:'bestand',     active:true, override:null, abc:'C', nextFollowUp:oneAddDays(today,80), kundenstatus:'kunde', anrede:'Herr', ansprechpartnerVorname:'Michael',  ansprechpartnerNachname:'Fischer'},
+      {id:'k9', externeNr:'EX-10029', kundenNr:'K-4479', name:'Praxis Grenzfall',        plz:'99999', ort:'',          strasse:'',                 hausnummer:'',   bezirk:'',          preisliste:'UVP',  email:'',                            telefon:'',             comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kunde', anrede:'', ansprechpartnerVorname:'', ansprechpartnerNachname:''}
     ],
     users:[
-      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlzRanges:[], active:true},
-      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical'],               team:'nord', territories:['nord'], individualPlzRanges:[], active:true},
-      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['nonmedical'],            team:'ost',  territories:['ost'],  individualPlzRanges:[], active:true},
-      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlzRanges:[], active:true},
-      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:['nonmedical'],            team:'sued', territories:['sued'], individualPlzRanges:[], active:true}
+      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlzRanges:[], active:true, telefon:'0221 8890-100'},
+      {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical'],               team:'nord', territories:['nord'], individualPlzRanges:[], active:true, telefon:'0170 1234501'},
+      {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['nonmedical'],            team:'ost',  territories:['ost'],  individualPlzRanges:[], active:true, telefon:'0170 1234502'},
+      {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlzRanges:[], active:true, telefon:'0170 1234503'},
+      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:['nonmedical'],            team:'sued', territories:['sued'], individualPlzRanges:[], active:true, telefon:'0170 1234504'}
     ],
     templates:[
       {id:'t1', name:'Produktneuheit',            promo:true,  subject:'Neu im Sortiment: {{produkt}}',                 body:'wir haben unser Sortiment erweitert. {{produkt}} ist ab sofort lieferbar.\n\nGerne stelle ich Ihnen das Produkt bei Ihrem nächsten Termin persönlich vor.'},
@@ -3206,7 +3206,11 @@ function oneSeed() {
     importStatus:'',   // Textmeldung nach simuliertem Import
     wizard:null,        // {step, data} während "Mitarbeiter anlegen"
     ownPwMessage:null,
-    staffTab:{}       // {[userId]: 'gebiete'|'plz'} - welcher Gebiet-Reiter je Mitarbeiter offen ist
+    staffTab:{},       // {[userId]: 'gebiete'|'plz'} - welcher Gebiet-Reiter je Mitarbeiter offen ist
+    mailings:[],        // Smart-Mailing-Kampagnen (Entwürfe + versendete), pro Mitarbeiter über createdBy erkennbar
+    mailingTab:'home',  // aktiver Reiter innerhalb "Smart Mailing": home|new|drafts|sent|templates|history
+    mailWizard:null,    // {step, data} während "Neues Mailing erstellen"
+    mailingBlocks: oneDefaultMailingBlocks() // zentral vom Admin gepflegte Einstiegs-/Abschluss-Bausteine
   };
 }
 state.one = oneSeed();
@@ -3224,9 +3228,187 @@ state.one = oneSeed();
     const savedContacts = JSON.parse(localStorage.getItem('oneContacts') || 'null');
     if (Array.isArray(savedContacts) && savedContacts.length) state.one.contacts = savedContacts;
   } catch (e) { console.warn('Gespeicherte ONE-Kontakte konnten nicht geladen werden', e); }
+  try {
+    const savedMailings = JSON.parse(localStorage.getItem('oneMailings') || 'null');
+    if (Array.isArray(savedMailings)) state.one.mailings = savedMailings;
+  } catch (e) { console.warn('Gespeicherte Smart-Mailings konnten nicht geladen werden', e); }
+  try {
+    const savedBlocks = JSON.parse(localStorage.getItem('oneMailingBlocks') || 'null');
+    if (savedBlocks && Array.isArray(savedBlocks.einstieg) && Array.isArray(savedBlocks.abschluss)) state.one.mailingBlocks = savedBlocks;
+  } catch (e) { console.warn('Gespeicherte Mailing-Bausteine konnten nicht geladen werden', e); }
 })();
 function onePersistUsers(){ try { localStorage.setItem('oneUsers', JSON.stringify(state.one.users)); } catch (e) {} }
 function onePersistContacts(){ try { localStorage.setItem('oneContacts', JSON.stringify(state.one.contacts)); } catch (e) {} }
+function onePersistMailings(){ try { localStorage.setItem('oneMailings', JSON.stringify(state.one.mailings)); } catch (e) {} }
+function onePersistMailingBlocks(){ try { localStorage.setItem('oneMailingBlocks', JSON.stringify(state.one.mailingBlocks)); } catch (e) {} }
+
+// ===================== ONE Smart Mailing =====================
+// "1 Aktion des Mitarbeiters = viele individuelle Einzel-E-Mails": der Mitarbeiter beantwortet
+// wenige Fragen, ONE baut daraus je Empfänger eine eigene, persönlich adressierte Nachricht aus
+// zentral vom Admin freigegebenen Bausteinen. Es gibt keine Sammel-Adresszeile und keinen
+// sichtbaren Verteiler — genau wie schon bei der bestehenden "E-Mail erstellen"-Funktion, die
+// dieses Modul erweitert, ohne sie zu ersetzen.
+const ONE_MAIL_ANLASS = [
+  ['neu','Neu verfügbar / Produktneuheit'],
+  ['wieder','Wieder verfügbar'],
+  ['neue_groesse','Neue Verpackungsgröße'],
+  ['neue_eigenschaft','Neue Eigenschaft'],
+  ['neuer_einsatz','Neues Anwendungsgebiet'],
+  ['zielgruppe','Besonders interessant für diese Kundengruppe'],
+  ['sortiment','Neuheit im Sortiment'],
+  ['aktion','Preis-/Aktionsinformation'],
+  ['veranstaltung','Veranstaltung / Webinar'],
+  ['individuell','Individueller Anlass']
+];
+const ONE_MAIL_TONE = [
+  ['kurz','Kurz & direkt'], ['persoenlich','Persönlich'], ['beratend','Beratend'],
+  ['sachlich','Sachlich'], ['locker','Freundlich & locker'], ['kompakt','Sehr kompakt']
+];
+const ONE_MAIL_CTA = [
+  ['info','Nur zur Information'],
+  ['melden','Gerne bei mir melden'],
+  ['rueckruf','Rückruf anbieten'],
+  ['termin','Termin vereinbaren'],
+  ['vorstellen','Produkt vorstellen'],
+  ['muster','Muster anfragen'],
+  ['weitere_info','Weitere Informationen anfordern'],
+  ['naechster_besuch','Beim nächsten Besuch besprechen']
+];
+const ONE_MAILWIZARD_STEPS = ['audience','product','anlass','vorteile','tonalitaet','cta','note','subject','preview','check','confirm'];
+function oneMailAnlassLabel(key){ return (ONE_MAIL_ANLASS.find(a=>a[0]===key)||[])[1] || key; }
+function oneMailToneLabel(key){ return (ONE_MAIL_TONE.find(a=>a[0]===key)||[])[1] || key; }
+function oneMailCtaLabel(key){ return (ONE_MAIL_CTA.find(a=>a[0]===key)||[])[1] || key; }
+// Startbausteine passend zu den Beispielen aus der Anforderung — vom Admin unter "Smart Mailing
+// Bausteine" erweiterbar. Einstiegsbausteine sind nach Tonalität getaggt, Abschlussbausteine nach
+// Call-to-Action; ONE wählt daraus automatisch, der Mitarbeiter trifft nur die Auswahlentscheidung
+// (Ziel, Produkt, Anlass, Vorteile, Tonalität, CTA) — keinen Bausteintext direkt.
+function oneDefaultMailingBlocks(){
+  return {
+    einstieg: [
+      {id:'e1', label:'Persönlich', tones:['persoenlich','beratend'], text:'ich möchte Sie heute persönlich über eine interessante Neuheit informieren.'},
+      {id:'e2', label:'Themenbezug', tones:['sachlich','locker'], text:'da dieses Thema für Ihre Einrichtung interessant sein könnte, möchte ich Ihnen eine kurze Information zukommen lassen.'},
+      {id:'e3', label:'Kompakt', tones:['kurz','kompakt'], text:'ich möchte Sie kurz auf eine aktuelle Produktentwicklung aufmerksam machen.'}
+    ],
+    abschluss: [
+      {id:'a1', ctaKey:'info', label:'Nur zur Information', text:'Diese Information soll Sie zunächst nur auf dem Laufenden halten.'},
+      {id:'a2', ctaKey:'melden', label:'Gerne melden', text:'Bei Fragen können Sie mich jederzeit gerne kontaktieren.'},
+      {id:'a3', ctaKey:'rueckruf', label:'Rückruf', text:'Gerne rufe ich Sie kurz an, um das Thema zu besprechen — sagen Sie mir einfach, wann es passt.'},
+      {id:'a4', ctaKey:'termin', label:'Termin', text:'Gerne vereinbare ich mit Ihnen einen kurzen Termin, um das im Detail zu besprechen.'},
+      {id:'a5', ctaKey:'vorstellen', label:'Vorstellen', text:'Gerne erläutere ich Ihnen das bei unserem nächsten Termin.'},
+      {id:'a6', ctaKey:'muster', label:'Muster', text:'Auf Wunsch stelle ich Ihnen gerne ein Muster zur Verfügung — sagen Sie mir einfach Bescheid.'},
+      {id:'a7', ctaKey:'weitere_info', label:'Weitere Infos', text:'Wenn Sie weitere Informationen wünschen, melde ich mich gerne mit den passenden Unterlagen.'},
+      {id:'a8', ctaKey:'naechster_besuch', label:'Nächster Besuch', text:'Wenn das Thema für Sie interessant ist, spreche ich es gerne bei meinem nächsten Besuch mit Ihnen an.'}
+    ]
+  };
+}
+function oneFormatDateTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE') + ', ' + d.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) + ' Uhr';
+}
+// Persönliche Anrede aus Anrede/Vor-/Nachname des Ansprechpartners — mit Rückfallebene für
+// Kontakte ohne hinterlegten Ansprechpartner (z. B. reine Firmenkontakte ohne Personendaten).
+function oneContactSalutation(c){
+  const nachname = (c.ansprechpartnerNachname || '').trim();
+  if (!nachname) return { formal:'Sehr geehrte Damen und Herren', casual:'Hallo', missing:true };
+  const anredeWort = c.anrede === 'Frau' ? 'Frau' : c.anrede === 'Herr' ? 'Herr' : '';
+  if (!anredeWort) return { formal:'Sehr geehrte Damen und Herren', casual:'Hallo ' + nachname, missing:true };
+  return {
+    formal: `Sehr geehrte${anredeWort==='Frau'?'':'r'} ${anredeWort} ${nachname}`,
+    casual: `Hallo ${anredeWort} ${nachname}`,
+    missing:false
+  };
+}
+const ONE_MAIL_AUDIENCE = [
+  ['all','Alle meine Kunden'], ['abc_a','A-Kunden'], ['abc_b','B-Kunden'], ['abc_c','C-Kunden'],
+  ['gebiet','Bestimmtes Gebiet'], ['plz','Bestimmte PLZ enthält'], ['manuell','Einzelne Kontakte manuell auswählen']
+];
+// Die Zielgruppe entsteht IMMER aus oneVisibleContacts(u) — derselben Berechtigungsprüfung, die
+// auch "Meine Kontakte" trägt. Ein Mitarbeiter kann über Smart Mailing also nie Kontakte
+// außerhalb seiner zugewiesenen Gebiete erreichen, unabhängig von der gewählten Zielgruppen-Option.
+function oneMailAudienceContacts(u, mode, value){
+  let list = oneVisibleContacts(u);
+  if (mode === 'abc_a') list = list.filter(c => c.abc === 'A');
+  else if (mode === 'abc_b') list = list.filter(c => c.abc === 'B');
+  else if (mode === 'abc_c') list = list.filter(c => c.abc === 'C');
+  else if (mode === 'gebiet' && value) list = list.filter(c => { const t = oneTerritoryOfContact(c); return t && t.id === value; });
+  else if (mode === 'plz' && value) list = list.filter(c => (c.plz||'').includes(value.trim()));
+  return list;
+}
+function oneMailSubjectSuggestions(productName, anlassKey){
+  const short = productName || 'unser Produkt';
+  return [
+    `Neu für Sie: ${short}`,
+    `Kurze Information zu ${short}`,
+    `Eine interessante Neuheit für Ihre Praxis`,
+    `${short} – kurze Information`
+  ];
+}
+// Baut den vollständigen, personalisierten Text für genau einen Empfänger. Die Produktfakten
+// selbst (aus productFacts()) verändern sich durch die Tonalität nicht — nur Einstieg und
+// Abschluss werden passend zur gewählten Tonalität/CTA ausgewählt (Anforderung: "Die inhaltlichen
+// Produktinformationen dürfen sich dadurch nicht verändern").
+function buildSmartMailingBody(mailing, contact){
+  const O = state.one;
+  const product = PRODUCTS.find(p => p.id === mailing.productId);
+  const sal = oneContactSalutation(contact);
+  const greeting = (mailing.casual ? sal.casual : sal.formal) + ',';
+  const toneMatches = O.mailingBlocks.einstieg.filter(b => (b.tones||[]).includes(mailing.tonalitaet));
+  const einstieg = (toneMatches[0] || O.mailingBlocks.einstieg[0] || {text:''}).text;
+  const abschlussBlock = O.mailingBlocks.abschluss.find(b => b.ctaKey === mailing.cta);
+  const abschluss = abschlussBlock ? abschlussBlock.text : '';
+  const vorteile = mailing.vorteile || [];
+  const vorteileText = vorteile.length === 0 ? ''
+    : vorteile.length === 1 ? vorteile[0]
+    : vorteile.slice(0,-1).join(', ') + ' sowie ' + vorteile[vorteile.length-1];
+  const summaryLower = product && product.summary ? product.summary.charAt(0).toLowerCase() + product.summary.slice(1) : 'eine passende Lösung';
+  const produktSatz = product
+    ? `Mit ${product.name} steht Ihnen ${summaryLower} zur Verfügung${vorteileText ? ', die sich besonders durch ' + vorteileText + ' auszeichnet' : ''}.`
+    : '';
+  const u = state.one.users.find(x => x.id === mailing.createdBy) || oneCurrentUser();
+  const lines = [greeting, '', einstieg];
+  if ((mailing.personalNote||'').trim()) lines.push('', mailing.personalNote.trim());
+  if (produktSatz) lines.push('', produktSatz);
+  if (abschluss) lines.push('', abschluss);
+  lines.push('', 'Beste Grüße', '');
+  if (u){
+    lines.push(u.name);
+    const posLine = oneFunktionLabel(u.funktion) + (u.territories && u.territories.length ? ' – Gebiet ' + u.territories.map(t=>oneTerrById(t).name).join(', ') : '');
+    lines.push(posLine);
+    if (u.telefon) lines.push(u.telefon);
+    lines.push(u.email);
+  }
+  lines.push('Dr. Schumacher');
+  return lines.join('\n');
+}
+// Prüft einen einzelnen Empfänger vor dem Versand (Anforderung Abschnitt 16/17/24). Ein Kontakt
+// gilt nur dann als versandbereit, wenn E-Mail, Ansprechpartner und Anrede vorhanden sind, keine
+// Kommunikationssperre vorliegt und dasselbe Mailing (Produkt + Anlass) ihm nicht bereits per
+// erfolgreichem Versand zugestellt wurde.
+function oneMailEligibility(mailing, c){
+  const reasons = [];
+  if (!c.active) reasons.push('Kontakt gesperrt/inaktiv');
+  if (!c.email || !c.email.trim()) reasons.push('keine E-Mail-Adresse');
+  if (!(c.ansprechpartnerNachname||'').trim()) reasons.push('kein Ansprechpartner hinterlegt');
+  if (!c.anrede) reasons.push('keine Anrede hinterlegt');
+  if (c.comm === 'widerspruch') reasons.push('Kommunikationssperre (Widerspruch)');
+  const dup = state.one.mailings.find(m => m.id !== mailing.id && m.status === 'sent' && m.productId === mailing.productId && m.anlass === mailing.anlass && (m.results||[]).some(r => r.contactId === c.id && r.status === 'sent'));
+  return { ok: reasons.length === 0, reasons, duplicate: dup || null };
+}
+function oneMailWizardDefault(u){
+  return {
+    step:'audience',
+    data:{
+      id:'sm' + Date.now().toString(36),
+      createdBy: u ? u.id : null,
+      audienceMode:'all', audienceValue:'', recipientIds:[],
+      productId:'', productQuery:'',
+      anlass:'', vorteile:[], tonalitaet:'', casual:false, cta:'', personalNote:'',
+      subject:'', subjectCustom:false,
+      previewIndex:0,
+      overrideDuplicates:{}
+    }
+  };
+}
 
 // Eine Anmeldung gilt für die ganze App — Produktberater und ONE teilen sich dieselbe Identität,
 // damit niemand beim Wechsel zwischen den beiden Bereichen ein zweites Mal Name/Passwort
@@ -3405,9 +3587,9 @@ function oneKundenstatusChip(c){ return c.kundenstatus === 'kontakt' ? '<span cl
 
 const ONE_ADMIN_NAV = [
   ['dashboard','Dashboard'], ['staff','Mitarbeiter'], ['terr','Gebiete'],
-  ['contacts','Kontakte'], ['templates','E-Mail-Vorlagen'], ['security','Sicherheit'], ['tests','Testfälle'], ['settings','Einstellungen']
+  ['contacts','Kontakte'], ['templates','E-Mail-Vorlagen'], ['mailingBlocks','Smart Mailing Bausteine'], ['security','Sicherheit'], ['tests','Testfälle'], ['settings','Einstellungen']
 ];
-const ONE_EMP_NAV = [ ['home','Startseite'], ['mine','Meine Kontakte'], ['tasks','Aufgaben'], ['mail','E-Mail erstellen'], ['tpl','Vorlagen'], ['settings','Einstellungen'] ];
+const ONE_EMP_NAV = [ ['home','Startseite'], ['mine','Meine Kontakte'], ['mailing','Smart Mailing'], ['tasks','Aufgaben'], ['mail','E-Mail erstellen'], ['tpl','Vorlagen'], ['settings','Einstellungen'] ];
 function oneNavFor(u){ return (u && u.role === 'admin') ? ONE_ADMIN_NAV : ONE_EMP_NAV; }
 
 function oneDueContacts(u){
@@ -3825,6 +4007,36 @@ function oneViewTemplates(){
   </div></div>`;
 }
 
+function oneViewMailingBlocks(){
+  const O = state.one;
+  return `
+  <div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>Smart Mailing Bausteine</h1>
+    <p>Diese Formulierungen stehen dem Außendienst im Smart-Mailing-Assistenten zur Verfügung. Mitarbeiter wählen nur aus — der Text selbst lässt sich dort nicht verändern.</p>
+  </div></div>
+  <div class="one-panel"><div class="one-panel-head"><h2>Einstiegsbausteine</h2><p>Wird passend zur vom Mitarbeiter gewählten Tonalität automatisch eingesetzt.</p></div>
+    <div class="one-panel-body flush">${O.mailingBlocks.einstieg.map(b => `<div class="one-recipient">
+      <span style="flex:1"><input type="text" data-mb-field="einstieg:${b.id}:label" value="${escapeHtml(b.label)}" style="font-weight:800; border:0; background:none; width:100%; margin-bottom:4px">
+        <textarea data-mb-field="einstieg:${b.id}:text" rows="2" style="width:100%; border:1px solid var(--one-line); border-radius:8px; padding:6px 8px; font:inherit">${escapeHtml(b.text)}</textarea>
+        <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:10px">${ONE_MAIL_TONE.map(([k,l]) => `<label style="display:flex; align-items:center; gap:5px; font-size:12px; cursor:pointer"><input type="checkbox" data-mb-tone-toggle="${b.id}:${k}" ${(b.tones||[]).includes(k)?'checked':''}> ${l}</label>`).join('')}</div></span>
+      <button class="one-btn sm danger" data-one-act="mailblock-delete" data-one-value="einstieg:${b.id}">Entfernen</button>
+    </div>`).join('')}</div>
+    <div class="one-panel-body" style="border-top:1px solid var(--one-line)"><button class="one-btn" data-one-act="mailblock-add-einstieg">+ Einstiegsbaustein hinzufügen</button></div>
+  </div>
+  <div class="one-panel"><div class="one-panel-head"><h2>Abschlussbausteine</h2><p>Je einer pro Handlungsaufforderung (Call-to-Action) — wird automatisch anhand der Mitarbeiter-Auswahl eingesetzt.</p></div>
+    <div class="one-panel-body flush">${O.mailingBlocks.abschluss.map(b => `<div class="one-recipient">
+      <span style="flex:1">
+        <select data-mb-field="abschluss:${b.id}:ctaKey" style="font-weight:800; border:0; background:none; margin-bottom:4px">${ONE_MAIL_CTA.map(([k,l])=>`<option value="${k}" ${b.ctaKey===k?'selected':''}>${l}</option>`).join('')}</select>
+        <textarea data-mb-field="abschluss:${b.id}:text" rows="2" style="width:100%; border:1px solid var(--one-line); border-radius:8px; padding:6px 8px; font:inherit">${escapeHtml(b.text)}</textarea>
+      </span>
+      <button class="one-btn sm danger" data-one-act="mailblock-delete" data-one-value="abschluss:${b.id}">Entfernen</button>
+    </div>`).join('')}</div>
+    <div class="one-panel-body" style="border-top:1px solid var(--one-line)"><button class="one-btn" data-one-act="mailblock-add-abschluss">+ Abschlussbaustein hinzufügen</button></div>
+  </div>
+  <div class="one-panel"><div class="one-panel-body"><div class="one-note">Produktvorteile werden nicht hier gepflegt — sie stammen automatisch aus den Produktfakten der ONE-Produktdatenbank (dieselben, die auch im Produktberater erscheinen). Damit gibt es nur eine Quelle für freigegebene Produktaussagen.</div></div></div>`;
+}
+
 function oneViewSecurity(){
   const O = state.one;
   const probeUser = O.users.find(u=>u.id===O.probe.user);
@@ -4224,6 +4436,257 @@ function oneViewTpl(){
   <div class="one-panel"><div class="one-panel-body"><div class="one-note">Werbliche Vorlagen erreichen nur Kontakte mit Einwilligung oder Bestandskundenstatus. Wer widersprochen hat, wird vom System ausgeschlossen — unabhängig davon, wer den Versand auslöst.</div></div></div>`;
 }
 
+// ===================== Smart Mailing — Mitarbeiteransicht =====================
+function oneViewSmartMailing(){
+  const O = state.one;
+  if (O.mailWizard) return oneViewMailWizard();
+  const u = oneCurrentUser();
+  const mine = O.mailings.filter(m => m.createdBy === u.id);
+  const tab = O.mailingTab || 'home';
+  const head = `<div class="one-page-head"><div>
+    <span class="one-eyebrow">Mein Bereich</span>
+    <h1>Smart Mailing</h1>
+    <p>Kunden auswählen, ein paar Fragen beantworten — ONE baut daraus für jeden Empfänger eine eigene, persönliche E-Mail. Kein Sammel-Verteiler.</p>
+  </div></div>`;
+  const tabs = `<div class="one-choices" style="flex-direction:row; flex-wrap:wrap; gap:10px; margin-bottom:18px">
+    ${[['home','Übersicht'],['drafts','Entwürfe'],['sent','Versendete Mailings'],['templates','Vorlagen / Bausteine'],['history','Versandhistorie']]
+      .map(([k,label]) => `<button class="one-choice ${tab===k?'on':''}" style="flex:none" data-one-act="mailing-tab" data-one-value="${k}">${label}${k==='drafts'&&mine.filter(m=>m.status==='draft').length?' ('+mine.filter(m=>m.status==='draft').length+')':''}${k==='sent'&&mine.filter(m=>m.status==='sent').length?' ('+mine.filter(m=>m.status==='sent').length+')':''}</button>`).join('')}
+  </div>`;
+  let body = '';
+  if (tab === 'drafts') body = oneMailingListHtml(mine.filter(m=>m.status==='draft'), 'Noch keine Entwürfe.');
+  else if (tab === 'sent') body = oneMailingListHtml(mine.filter(m=>m.status==='sent'), 'Noch keine versendeten Mailings.', true);
+  else if (tab === 'templates') body = oneViewMailingBlocksReadonly();
+  else if (tab === 'history') body = oneMailingHistoryHtml(mine);
+  else body = `
+    <div class="one-panel"><div class="one-panel-body" style="text-align:center; padding:36px 20px">
+      <button class="one-btn primary" data-one-act="mailing-new" style="font-size:16px; padding:16px 28px">+ Neues Mailing erstellen</button>
+      <p class="muted" style="margin-top:14px">Empfänger wählen → Produkt wählen → wenige Fragen beantworten → Vorschau → Versandcheck → einmal bestätigen.</p>
+    </div></div>
+    <div class="one-panel"><div class="one-panel-body" style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px">
+      <div><div class="strong" style="font-size:22px">${mine.filter(m=>m.status==='draft').length}</div><div class="muted">Entwürfe</div></div>
+      <div><div class="strong" style="font-size:22px">${mine.filter(m=>m.status==='sent').length}</div><div class="muted">Versendete Mailings</div></div>
+      <div><div class="strong" style="font-size:22px">${mine.reduce((a,m)=>a+(m.results||[]).filter(r=>r.status==='sent').length,0)}</div><div class="muted">Einzel-E-Mails gesamt</div></div>
+    </div></div>`;
+  return head + tabs + body;
+}
+function oneMailingListHtml(list, emptyText, showResults){
+  if (!list.length) return `<div class="one-panel"><div class="one-empty"><strong>${escapeHtml(emptyText)}</strong></div></div>`;
+  return list.slice().sort((a,b)=> (b.sentAt||b.id).localeCompare(a.sentAt||a.id)).map(m => {
+    const product = PRODUCTS.find(p=>p.id===m.productId);
+    const sentCount = (m.results||[]).filter(r=>r.status==='sent').length;
+    return `<div class="one-panel"><div class="one-panel-body">
+      <div style="display:flex; justify-content:space-between; align-items:start; gap:12px; flex-wrap:wrap">
+        <div>
+          <div class="strong" style="font-size:17px">${escapeHtml(product ? product.name : 'Unbekanntes Produkt')}</div>
+          <div class="muted" style="font-size:13px">${escapeHtml(oneMailAnlassLabel(m.anlass))} · ${escapeHtml(m.subject||'')}</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center">
+          ${m.status==='sent' ? `<span class="one-chip ok">${sentCount} versendet</span>` : `<span class="one-chip quiet">Entwurf</span>`}
+          ${m.status==='draft' ? `<button class="one-btn sm primary" data-one-act="mailing-resume" data-one-id="${m.id}">Fortsetzen</button><button class="one-btn sm" data-one-act="mailing-delete-draft" data-one-id="${m.id}">Verwerfen</button>` : ''}
+        </div>
+      </div>
+      ${showResults ? `<div class="one-tablewrap" style="margin-top:12px"><table><thead><tr><th>Kontakt</th><th>Status</th><th>Zeitpunkt</th><th></th></tr></thead><tbody>
+        ${(m.results||[]).map(r => {
+          const c = state.one.contacts.find(x=>x.id===r.contactId);
+          return `<tr><td>${escapeHtml(c?c.name:r.contactId)}</td><td>${r.status==='sent'?'<span class="one-chip ok">versendet</span>':`<span class="one-chip stop">${escapeHtml(r.reason||'übersprungen')}</span>`}</td><td class="muted">${m.sentAt?oneFormatDateTime(m.sentAt):'—'}</td><td>${(r.status==='sent'&&c&&c.email)?`<button class="one-btn sm" data-one-act="mailing-open-mailto" data-one-id="${m.id}" data-one-value="${r.contactId}">E-Mail öffnen</button>`:''}</td></tr>`;
+        }).join('')}
+      </tbody></table></div>` : ''}
+    </div></div>`;
+  }).join('');
+}
+function oneMailingHistoryHtml(mine){
+  const rows = [];
+  mine.filter(m=>m.status==='sent').forEach(m => {
+    const product = PRODUCTS.find(p=>p.id===m.productId);
+    (m.results||[]).filter(r=>r.status==='sent').forEach(r => {
+      const c = state.one.contacts.find(x=>x.id===r.contactId);
+      rows.push({ time:m.sentAt, contact:c?c.name:r.contactId, product:product?product.name:'—', anlass:oneMailAnlassLabel(m.anlass), subject:m.subject });
+    });
+  });
+  rows.sort((a,b)=> (b.time||'').localeCompare(a.time||''));
+  if (!rows.length) return `<div class="one-panel"><div class="one-empty"><strong>Noch keine Versandhistorie</strong>Sobald ein Mailing versendet wurde, erscheint hier jede einzelne E-Mail als Eintrag.</div></div>`;
+  return `<div class="one-panel"><div class="one-panel-body flush"><div class="one-tablewrap"><table>
+    <thead><tr><th>Zeitpunkt</th><th>Kontakt</th><th>Produkt</th><th>Anlass</th><th>Betreff</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td class="muted">${r.time?oneFormatDateTime(r.time):'—'}</td><td class="strong">${escapeHtml(r.contact)}</td><td>${escapeHtml(r.product)}</td><td>${escapeHtml(r.anlass)}</td><td class="muted">${escapeHtml(r.subject)}</td></tr>`).join('')}</tbody>
+  </table></div></div></div>`;
+}
+function oneViewMailingBlocksReadonly(){
+  const O = state.one;
+  return `<div class="one-panel"><div class="one-panel-head"><h2>Einstiegsbausteine</h2><p>ONE wählt daraus passend zur gewählten Tonalität automatisch einen aus — keine eigene Auswahl nötig.</p></div>
+    <div class="one-panel-body flush">${O.mailingBlocks.einstieg.map(b=>`<div class="one-recipient"><span class="strong">${escapeHtml(b.label)}</span><span class="muted" style="max-width:60%">${escapeHtml(b.text)}</span></div>`).join('')}</div></div>
+  <div class="one-panel"><div class="one-panel-head"><h2>Abschlussbausteine</h2><p>Wird passend zur gewählten Handlungsaufforderung automatisch eingesetzt.</p></div>
+    <div class="one-panel-body flush">${O.mailingBlocks.abschluss.map(b=>`<div class="one-recipient"><span class="strong">${escapeHtml(b.label)}</span><span class="muted" style="max-width:60%">${escapeHtml(b.text)}</span></div>`).join('')}</div></div>
+  <div class="one-panel"><div class="one-panel-body"><div class="one-note">Produktvorteile stammen direkt aus der ONE-Produktdatenbank (dieselben freigegebenen Fakten, die auch im Produktberater angezeigt werden) — dafür ist keine separate Pflege nötig. Bausteine werden zentral vom Admin unter „Smart Mailing Bausteine" verwaltet.</div></div></div>`;
+}
+function oneMailWizardTitle(step){
+  return ({
+    audience:'Wen möchtest du informieren?', product:'Um welches Produkt geht es?',
+    anlass:'Was ist der wichtigste Anlass?', vorteile:'Welche Vorteile möchtest du hervorheben?',
+    tonalitaet:'Wie soll die Nachricht klingen?', cta:'Was soll der Kunde anschließend tun?',
+    note:'Möchtest du noch etwas Persönliches ergänzen?', subject:'Betreff wählen',
+    preview:'Vorschau', check:'Versandcheck', confirm:'Versandfreigabe'
+  })[step] || step;
+}
+function oneViewMailWizard(){
+  const O = state.one;
+  const w = O.mailWizard; const step = w.step; const d = w.data;
+  const u = oneCurrentUser();
+  const product = PRODUCTS.find(p => p.id === d.productId);
+  if (step === 'done'){
+    const summary = w.sentSummary || {count:(d.results||[]).filter(r=>r.status==='sent').length, total:(d.results||[]).length};
+    return `<div class="one-page-head"><div><span class="one-eyebrow">Smart Mailing</span><h1>Mailing versendet</h1></div></div>
+    <div class="one-panel"><div class="one-panel-body">
+      <div class="one-note" style="border-left-color:var(--one-ok); background:var(--one-ok-soft)">
+        <strong>${summary.count} von ${summary.total} personalisierte${summary.count===1?'':'n'} E-Mail${summary.count===1?'':'s'} erzeugt${summary.count<summary.total?' — die übrigen wurden wegen der Prüfung im Versandcheck übersprungen':''}.</strong>
+        Produkt: ${escapeHtml(product?product.name:'—')} · Anlass: ${escapeHtml(oneMailAnlassLabel(d.anlass))}. Jeder Kontakt hat automatisch einen CRM-Eintrag erhalten.
+      </div>
+      <div class="one-wizard-actions" style="margin-top:16px"><button class="one-btn primary" data-one-act="mailwizard-done">Zu den versendeten Mailings</button></div>
+    </div></div>`;
+  }
+  const stepIndex = ONE_MAILWIZARD_STEPS.indexOf(step);
+  let body = '';
+
+  if (step === 'audience'){
+    const list = oneMailAudienceContacts(u, d.audienceMode, d.audienceValue);
+    if (!d._audienceInit || d._lastMode !== d.audienceMode || d._lastValue !== d.audienceValue){
+      d.recipientIds = list.map(c=>c.id);
+      d._audienceInit = true; d._lastMode = d.audienceMode; d._lastValue = d.audienceValue;
+    }
+    body = `<h2>1. ${oneMailWizardTitle('audience')}</h2>
+      <p>Nur Kontakte aus Ihren zugewiesenen Gebieten stehen zur Auswahl — geprüft über dieselbe Berechtigung wie „Meine Kontakte".</p>
+      <div class="one-choices" style="flex-direction:row; flex-wrap:wrap; gap:10px">
+        ${ONE_MAIL_AUDIENCE.map(([k,label]) => `<button class="one-choice" style="flex:none" data-one-act="mailwizard-audience-mode" data-one-value="${k}">${d.audienceMode===k?'✓ ':''}${label}</button>`).join('')}
+      </div>
+      ${d.audienceMode==='gebiet' ? `<div class="one-choices" style="flex-direction:row; flex-wrap:wrap; gap:8px; margin-top:10px">
+        ${u.territories.map(t=>`<button class="one-choice ${d.audienceValue===t?'on':''}" style="flex:none" data-one-act="mailwizard-audience-value" data-one-value="${t}">${escapeHtml(oneTerrById(t).name)}</button>`).join('')}
+      </div>` : ''}
+      ${d.audienceMode==='plz' ? `<div class="one-field" style="margin-top:10px; max-width:220px"><label for="mwPlz">PLZ enthält</label><input type="text" id="mwPlz" value="${escapeHtml(d.audienceValue)}" placeholder="z. B. 402"></div>` : ''}
+      <div class="one-note" style="margin-top:16px"><strong>${d.recipientIds.length} Kontakt${d.recipientIds.length===1?'':'e'} ausgewählt.</strong> Vor dem nächsten Schritt können Sie die Liste prüfen und einzelne Kontakte abwählen.</div>
+      <div class="one-tablewrap" style="margin-top:10px; max-height:320px; overflow-y:auto"><table><thead><tr><th style="width:34px"></th><th>Name</th><th>Ort</th><th>Einstufung</th></tr></thead><tbody>
+        ${list.map(c=>`<tr><td><input type="checkbox" data-mw-recipient="${c.id}" ${d.recipientIds.includes(c.id)?'checked':''} style="width:16px;height:16px;accent-color:var(--one-accent)"></td><td class="strong">${escapeHtml(c.name)}</td><td class="muted">${escapeHtml(c.plz)} ${escapeHtml(c.ort)}</td><td>${oneAbcChip(c)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Keine Kontakte für diese Auswahl.</td></tr>'}
+      </tbody></table></div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-cancel">Abbrechen</button><button class="one-btn primary" data-one-act="mailwizard-next" ${d.recipientIds.length?'':'disabled'}>Weiter</button></div>`;
+  }
+
+  else if (step === 'product'){
+    const q = (d.productQuery||'').trim().toLowerCase();
+    const matches = (q ? PRODUCTS.filter(p => p.name.toLowerCase().includes(q)) : PRODUCTS).slice(0,12);
+    body = `<h2>2. ${oneMailWizardTitle('product')}</h2>
+      <p>Direkt aus der bestehenden ONE-Produktdatenbank — Beschreibung, Vorteile und Fakten werden automatisch übernommen.</p>
+      <div class="one-field"><label for="mwProdQ">Produkt suchen</label><input type="text" id="mwProdQ" value="${escapeHtml(d.productQuery)}" placeholder="z. B. Ultrasol OXY"></div>
+      <div class="one-choices" style="margin-top:10px">
+        ${matches.map(p => `<button class="one-choice ${d.productId===p.id?'on':''}" data-one-act="mailwizard-product" data-one-value="${p.id}"><span>${escapeHtml(p.name)}</span><small class="muted" style="display:block; font-weight:400">${escapeHtml(p.kind)}</small></button>`).join('') || '<div class="muted">Kein Produkt gefunden.</div>'}
+      </div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next" ${d.productId?'':'disabled'}>Weiter</button></div>`;
+  }
+
+  else if (step === 'anlass'){
+    body = `<h2>3. ${oneMailWizardTitle('anlass')}</h2>
+      <p>Produkt: <strong>${escapeHtml(product?product.name:'—')}</strong></p>
+      <div class="one-choices">${ONE_MAIL_ANLASS.map(([k,label]) => `<button class="one-choice ${d.anlass===k?'on':''}" data-one-act="mailwizard-anlass" data-one-value="${k}">${label}</button>`).join('')}</div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next" ${d.anlass?'':'disabled'}>Weiter</button></div>`;
+  }
+
+  else if (step === 'vorteile'){
+    const facts = product ? productFacts(product) : [];
+    body = `<h2>4. ${oneMailWizardTitle('vorteile')}</h2>
+      <p>Maximal 4 Vorteile auswählen — nur freigegebene Aussagen aus der Produktdatenbank stehen zur Wahl.</p>
+      <div class="one-choices">${facts.map(f => `<button class="one-choice ${d.vorteile.includes(f)?'on':''}" data-one-act="mailwizard-vorteil" data-one-value="${escapeHtml(f)}">${f}</button>`).join('') || '<div class="muted">Für dieses Produkt sind keine Fakten hinterlegt.</div>'}</div>
+      ${d.vorteile.length>=4 ? '<div class="one-note warn" style="margin-top:12px">Maximal 4 Vorteile — für weitere bitte zuerst eine Auswahl abwählen.</div>' : ''}
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next" ${d.vorteile.length?'':'disabled'}>Weiter</button></div>`;
+  }
+
+  else if (step === 'tonalitaet'){
+    body = `<h2>5. ${oneMailWizardTitle('tonalitaet')}</h2>
+      <div class="one-choices">${ONE_MAIL_TONE.map(([k,label]) => `<button class="one-choice ${d.tonalitaet===k?'on':''}" data-one-act="mailwizard-tone" data-one-value="${k}">${label}</button>`).join('')}</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:14px; cursor:pointer"><input type="checkbox" id="mwCasual" ${d.casual?'checked':''} style="width:16px;height:16px"> <span>Lockere Anrede „Hallo" statt „Sehr geehrte/r" verwenden</span></label>
+      <div class="one-note" style="margin-top:12px">Die Tonalität verändert nur Einstieg und Anrede — die Produktinformationen selbst bleiben unverändert.</div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next" ${d.tonalitaet?'':'disabled'}>Weiter</button></div>`;
+  }
+
+  else if (step === 'cta'){
+    body = `<h2>6. ${oneMailWizardTitle('cta')}</h2>
+      <div class="one-choices">${ONE_MAIL_CTA.map(([k,label]) => `<button class="one-choice ${d.cta===k?'on':''}" data-one-act="mailwizard-cta" data-one-value="${k}">${label}</button>`).join('')}</div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next" ${d.cta?'':'disabled'}>Weiter</button></div>`;
+  }
+
+  else if (step === 'note'){
+    body = `<h2>7. ${oneMailWizardTitle('note')}</h2>
+      <p class="muted">Optional — ein Satz Bezug zu einem konkreten Gespräch. Wird direkt nach dem Einstieg eingefügt.</p>
+      <textarea id="mwNote" rows="3" placeholder="z. B. Da wir beim letzten Termin über dieses Thema gesprochen haben, wollte ich Sie direkt informieren.">${escapeHtml(d.personalNote)}</textarea>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next">Weiter</button></div>`;
+  }
+
+  else if (step === 'subject'){
+    const suggestions = oneMailSubjectSuggestions(product?product.name:'', d.anlass);
+    if (!d.subject) d.subject = suggestions[0];
+    body = `<h2>8. ${oneMailWizardTitle('subject')}</h2>
+      <div class="one-choices">${suggestions.map(s => `<button class="one-choice ${(!d.subjectCustom && d.subject===s)?'on':''}" data-one-act="mailwizard-subject" data-one-value="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}</div>
+      <div class="one-field" style="margin-top:12px"><label for="mwSubjectCustom">oder eigener Betreff</label><input type="text" id="mwSubjectCustom" value="${d.subjectCustom?escapeHtml(d.subject):''}" placeholder="Eigenen Betreff eingeben"></div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next" ${d.subject.trim()?'':'disabled'}>Weiter zur Vorschau</button></div>`;
+  }
+
+  else if (step === 'preview'){
+    const contacts = d.recipientIds.map(id => state.one.contacts.find(c=>c.id===id)).filter(Boolean);
+    const idx = Math.min(d.previewIndex||0, Math.max(contacts.length-1,0));
+    const c = contacts[idx];
+    const previewBody = c ? buildSmartMailingBody(d, c) : '';
+    body = `<h2>9. ${oneMailWizardTitle('preview')}</h2>
+      <p class="muted">Mail ${contacts.length?idx+1:0} von ${contacts.length} — so sieht sie beim jeweiligen Empfänger aus.</p>
+      ${c ? `<div class="one-mailprev"><span class="mono muted">An: ${escapeHtml(c.email||'(keine E-Mail hinterlegt)')}
+Betreff: ${escapeHtml(d.subject)}</span>
+
+${escapeHtml(previewBody)}</div>
+      <div style="display:flex; gap:8px; margin-top:12px">
+        <button class="one-btn sm" data-one-act="mailwizard-preview-prev" ${idx<=0?'disabled':''}>‹ Vorherige</button>
+        <button class="one-btn sm" data-one-act="mailwizard-preview-next" ${idx>=contacts.length-1?'disabled':''}>Nächste ›</button>
+      </div>` : '<div class="one-note stop">Keine Empfänger vorhanden.</div>'}
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next">Weiter zum Versandcheck</button></div>`;
+  }
+
+  else if (step === 'check'){
+    const contacts = d.recipientIds.map(id => state.one.contacts.find(c=>c.id===id)).filter(Boolean);
+    const checked = contacts.map(c => ({ c, elig: oneMailEligibility(d, c) }));
+    const ready = checked.filter(x => x.elig.ok || (x.elig.duplicate && !x.elig.reasons.length && d.overrideDuplicates[x.c.id]));
+    const problems = checked.filter(x => !ready.includes(x));
+    body = `<h2>10. ${oneMailWizardTitle('check')}</h2>
+      <div class="one-note ${problems.length?'warn':''}"><strong>${ready.length} von ${contacts.length} Empfänger${contacts.length===1?'':'n'} bereit zum Versand.</strong>${problems.length ? ' ' + problems.length + ' mit Hinweis — siehe unten.' : ''}</div>
+      <div class="one-tablewrap" style="margin-top:12px"><table><thead><tr><th>Kontakt</th><th>Status</th><th></th></tr></thead><tbody>
+        ${checked.map(({c,elig}) => {
+          const isDupOnly = elig.duplicate && elig.reasons.length===0;
+          const overridden = isDupOnly && d.overrideDuplicates[c.id];
+          const okNow = elig.ok && !elig.duplicate || overridden;
+          return `<tr>
+            <td class="strong">${escapeHtml(c.name)}</td>
+            <td>${okNow ? '<span class="one-chip ok">bereit</span>' : elig.duplicate ? `<span class="one-chip warn">bereits am ${oneFormatDateTime(elig.duplicate.sentAt).split(',')[0]} erhalten</span>` : `<span class="one-chip stop">${escapeHtml(elig.reasons.join(', '))}</span>`}</td>
+            <td>${isDupOnly ? `<label style="display:flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer"><input type="checkbox" data-mw-override="${c.id}" ${overridden?'checked':''}> trotzdem senden</label>` : ''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody></table></div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-next" ${ready.length?'':'disabled'}>Nur gültige Empfänger übernehmen (${ready.length})</button></div>`;
+  }
+
+  else if (step === 'confirm'){
+    const contacts = d.recipientIds.map(id => state.one.contacts.find(c=>c.id===id)).filter(Boolean);
+    const checked = contacts.map(c => ({ c, elig: oneMailEligibility(d, c) }));
+    const ready = checked.filter(x => x.elig.ok || (x.elig.duplicate && x.elig.reasons.length===0 && d.overrideDuplicates[x.c.id]));
+    body = `<h2>11. ${oneMailWizardTitle('confirm')}</h2>
+      <p>Du bist dabei, <strong>${ready.length} personalisierte Einzel-E-Mail${ready.length===1?'':'s'}</strong> zu versenden — jede mit genau einem Empfänger im An-Feld.</p>
+      <div class="one-chain" style="margin:14px 0">
+        <div class="one-chain-step"><span class="k">Empfänger</span><span class="v">${ready.length}</span></div>
+        <div class="one-chain-step"><span class="k">Produkt</span><span class="v">${escapeHtml(product?product.name:'—')}</span></div>
+        <div class="one-chain-step"><span class="k">Anlass</span><span class="v">${escapeHtml(oneMailAnlassLabel(d.anlass))}</span></div>
+        <div class="one-chain-step"><span class="k">Betreff</span><span class="v">${escapeHtml(d.subject)}</span></div>
+        <div class="one-chain-step is-accent"><span class="k">Absender</span><span class="v">${escapeHtml(u.name)}</span></div>
+      </div>
+      <div class="one-note warn"><strong>Kein Sammelversand.</strong> Jede Nachricht wird als eigene E-Mail mit einem einzelnen Empfänger erzeugt. Im Prototyp wird nichts tatsächlich über Microsoft Graph verschickt — jede erzeugte Nachricht bleibt zusätzlich einzeln über „E-Mail öffnen" abrufbar.</div>
+      <div class="one-wizard-actions"><button class="one-btn" data-one-act="mailwizard-back">Zurück</button><button class="one-btn primary" data-one-act="mailwizard-send" ${ready.length?'':'disabled'}>${ready.length} E-Mail${ready.length===1?'':'s'} versenden</button></div>`;
+  }
+
+  return `<div class="one-page-head"><div><span class="one-eyebrow">Smart Mailing · Neues Mailing</span><h1>Schritt ${stepIndex+1} von ${ONE_MAILWIZARD_STEPS.length}</h1></div><div class="one-spacer"></div><button class="one-btn" data-one-act="mailwizard-cancel">Abbrechen</button></div>
+  <div class="one-panel"><div class="one-panel-body">${body}</div></div>`;
+}
+
 function oneViewSettings(){
   const u = oneCurrentUser(); const O = state.one;
   return `
@@ -4262,8 +4725,8 @@ function oneViewSettings(){
 
 const ONE_VIEWS = {
   dashboard:oneViewDashboard, staff:oneViewStaff, terr:oneViewTerr, contacts:oneViewContacts,
-  templates:oneViewTemplates, security:oneViewSecurity, tests:oneViewTests,
-  home:oneViewHome, mine:oneViewMine, tasks:oneViewTasks, mail:oneViewMail, tpl:oneViewTpl, settings:oneViewSettings
+  templates:oneViewTemplates, security:oneViewSecurity, tests:oneViewTests, mailingBlocks:oneViewMailingBlocks,
+  home:oneViewHome, mine:oneViewMine, mailing:oneViewSmartMailing, tasks:oneViewTasks, mail:oneViewMail, tpl:oneViewTpl, settings:oneViewSettings
 };
 
 function oneViewLogin(){
@@ -4729,6 +5192,174 @@ function bindOne(){
       oneAudit('E-Mail-Versand', eligible.length + '× „' + tpl.name + '" als Einzelnachricht');
       render(); return;
     }
+
+    // ===================== Smart Mailing =====================
+    if (a === 'mailing-tab'){ O.mailingTab = el.dataset.oneValue; render(); return; }
+    if (a === 'mailing-new'){ O.mailWizard = oneMailWizardDefault(oneCurrentUser()); render(); return; }
+    if (a === 'mailing-resume'){
+      const m = O.mailings.find(x => x.id === el.dataset.oneId);
+      if (!m) return;
+      O.mailWizard = { step: m.step || 'audience', data: JSON.parse(JSON.stringify(m)) };
+      render(); return;
+    }
+    if (a === 'mailing-delete-draft'){
+      O.mailings = O.mailings.filter(x => x.id !== el.dataset.oneId);
+      onePersistMailings();
+      render(); return;
+    }
+    if (a === 'mailing-open-mailto'){
+      const m = O.mailings.find(x => x.id === el.dataset.oneId);
+      const c = O.contacts.find(x => x.id === el.dataset.oneValue);
+      if (!m || !c) return;
+      openMailto(m.subject, buildSmartMailingBody(m, c), c.email);
+      return;
+    }
+    if (a === 'mailwizard-cancel'){
+      const d = O.mailWizard && O.mailWizard.data;
+      if (d && d.productId && d.recipientIds && d.recipientIds.length){
+        const existing = O.mailings.find(x => x.id === d.id);
+        const record = { ...d, step: O.mailWizard.step, status:'draft' };
+        if (existing) Object.assign(existing, record); else O.mailings.push(record);
+        onePersistMailings();
+      }
+      O.mailWizard = null; O.mailingTab = 'home'; render(); return;
+    }
+    if (a === 'mailwizard-back'){
+      const i = ONE_MAILWIZARD_STEPS.indexOf(O.mailWizard.step);
+      O.mailWizard.step = ONE_MAILWIZARD_STEPS[Math.max(i-1,0)];
+      render(); return;
+    }
+    if (a === 'mailwizard-next'){
+      const d = O.mailWizard.data;
+      const i = ONE_MAILWIZARD_STEPS.indexOf(O.mailWizard.step);
+      if (O.mailWizard.step === 'check'){
+        const contacts = d.recipientIds.map(id => O.contacts.find(c=>c.id===id)).filter(Boolean);
+        const ready = contacts.filter(c => { const e = oneMailEligibility(d, c); return e.ok || (e.duplicate && e.reasons.length===0 && d.overrideDuplicates[c.id]); });
+        d.recipientIds = ready.map(c=>c.id);
+      }
+      O.mailWizard.step = ONE_MAILWIZARD_STEPS[Math.min(i+1, ONE_MAILWIZARD_STEPS.length-1)];
+      render(); return;
+    }
+    if (a === 'mailwizard-audience-mode'){
+      const d = O.mailWizard.data;
+      d.audienceMode = el.dataset.oneValue; d.audienceValue=''; d._audienceInit=false;
+      render(); return;
+    }
+    if (a === 'mailwizard-audience-value'){
+      const d = O.mailWizard.data;
+      d.audienceValue = el.dataset.oneValue; d._audienceInit=false;
+      render(); return;
+    }
+    if (a === 'mailwizard-product'){
+      const d = O.mailWizard.data;
+      d.productId = el.dataset.oneValue; d.vorteile = [];
+      render(); return;
+    }
+    if (a === 'mailwizard-anlass'){ O.mailWizard.data.anlass = el.dataset.oneValue; render(); return; }
+    if (a === 'mailwizard-vorteil'){
+      const d = O.mailWizard.data; const v = el.dataset.oneValue;
+      const idx = d.vorteile.indexOf(v);
+      if (idx >= 0) d.vorteile.splice(idx,1);
+      else if (d.vorteile.length < 4) d.vorteile.push(v);
+      render(); return;
+    }
+    if (a === 'mailwizard-tone'){ O.mailWizard.data.tonalitaet = el.dataset.oneValue; render(); return; }
+    if (a === 'mailwizard-cta'){ O.mailWizard.data.cta = el.dataset.oneValue; render(); return; }
+    if (a === 'mailwizard-subject'){ O.mailWizard.data.subject = el.dataset.oneValue; O.mailWizard.data.subjectCustom = false; render(); return; }
+    if (a === 'mailwizard-preview-prev'){ O.mailWizard.data.previewIndex = Math.max((O.mailWizard.data.previewIndex||0)-1, 0); render(); return; }
+    if (a === 'mailwizard-preview-next'){ O.mailWizard.data.previewIndex = (O.mailWizard.data.previewIndex||0)+1; render(); return; }
+    if (a === 'mailwizard-send'){
+      const d = O.mailWizard.data; const u = oneCurrentUser();
+      const contacts = d.recipientIds.map(id => O.contacts.find(c=>c.id===id)).filter(Boolean);
+      const results = [];
+      contacts.forEach(c => {
+        const elig = oneMailEligibility(d, c);
+        const overridden = elig.duplicate && elig.reasons.length===0 && d.overrideDuplicates[c.id];
+        if (elig.ok || overridden){
+          results.push({ contactId:c.id, status:'sent' });
+        } else {
+          results.push({ contactId:c.id, status:'skipped', reason: elig.reasons.join(', ') || 'bereits angeschrieben' });
+        }
+      });
+      const sentAt = new Date().toISOString();
+      const record = { ...d, status:'sent', sentAt, results };
+      delete record.step;
+      const existing = O.mailings.find(x => x.id === d.id);
+      if (existing) Object.assign(existing, record); else O.mailings.push(record);
+      onePersistMailings();
+      const product = PRODUCTS.find(p => p.id === d.productId);
+      const sentCount = results.filter(r=>r.status==='sent').length;
+      results.filter(r=>r.status==='sent').forEach(r => {
+        oneAudit('Smart Mailing versendet', (O.contacts.find(c=>c.id===r.contactId)||{}).name + ' — ' + (product?product.name:'') + ' (' + oneMailAnlassLabel(d.anlass) + ')');
+      });
+      onePersistContacts();
+      O.mailWizard = { step:'done', data: record, sentSummary:{count:sentCount, total:contacts.length} };
+      render(); return;
+    }
+    if (a === 'mailwizard-done'){ O.mailWizard = null; O.mailingTab = 'sent'; render(); return; }
+
+    // ===================== Smart Mailing Bausteine (Admin) =====================
+    if (a === 'mailblock-add-einstieg'){
+      O.mailingBlocks.einstieg.push({ id:'e'+Date.now().toString(36), label:'Neuer Baustein', tones:[], text:'' });
+      onePersistMailingBlocks(); render(); return;
+    }
+    if (a === 'mailblock-add-abschluss'){
+      O.mailingBlocks.abschluss.push({ id:'a'+Date.now().toString(36), ctaKey:'info', label:'Neuer Baustein', text:'' });
+      onePersistMailingBlocks(); render(); return;
+    }
+    if (a === 'mailblock-delete'){
+      const [type, id] = el.dataset.oneValue.split(':');
+      O.mailingBlocks[type] = O.mailingBlocks[type].filter(b => b.id !== id);
+      onePersistMailingBlocks(); render(); return;
+    }
+  });
+
+  // ===================== Smart Mailing — Einzelfelder =====================
+  if (O.mailWizard){
+    const d = O.mailWizard.data;
+    document.querySelectorAll('[data-mw-recipient]').forEach(cb => cb.onchange = () => {
+      const id = cb.dataset.mwRecipient;
+      if (cb.checked) { if (!d.recipientIds.includes(id)) d.recipientIds.push(id); }
+      else d.recipientIds = d.recipientIds.filter(x => x !== id);
+      render();
+    });
+    document.querySelectorAll('[data-mw-override]').forEach(cb => cb.onchange = () => {
+      d.overrideDuplicates[cb.dataset.mwOverride] = cb.checked;
+      render();
+    });
+    const plzInp = document.getElementById('mwPlz');
+    if (plzInp) plzInp.oninput = (e) => { d.audienceValue = e.target.value; d._audienceInit = false; render(); };
+    const prodQ = document.getElementById('mwProdQ');
+    if (prodQ) prodQ.oninput = (e) => { d.productQuery = e.target.value; render(); };
+    const casualBox = document.getElementById('mwCasual');
+    if (casualBox) casualBox.onchange = (e) => { d.casual = e.target.checked; };
+    const noteInp = document.getElementById('mwNote');
+    if (noteInp) noteInp.oninput = (e) => { d.personalNote = e.target.value; };
+    const subjCustom = document.getElementById('mwSubjectCustom');
+    if (subjCustom) subjCustom.oninput = (e) => {
+      d.subject = e.target.value; d.subjectCustom = true;
+      const btn = document.querySelector('[data-one-act="mailwizard-next"]');
+      if (btn) btn.disabled = !d.subject.trim();
+    };
+  }
+  // ===================== Smart Mailing Bausteine — Admin-Felder =====================
+  document.querySelectorAll('[data-mb-field]').forEach(el => {
+    const [type, id, field] = el.dataset.mbField.split(':');
+    const handler = () => {
+      const block = O.mailingBlocks[type].find(b => b.id === id);
+      if (block) block[field] = el.value;
+      onePersistMailingBlocks();
+    };
+    el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', handler);
+  });
+  document.querySelectorAll('[data-mb-tone-toggle]').forEach(cb => cb.onchange = () => {
+    const [id, tone] = cb.dataset.mbToneToggle.split(':');
+    const block = O.mailingBlocks.einstieg.find(b => b.id === id);
+    if (!block) return;
+    block.tones = block.tones || [];
+    if (cb.checked) { if (!block.tones.includes(tone)) block.tones.push(tone); }
+    else block.tones = block.tones.filter(t => t !== tone);
+    onePersistMailingBlocks();
   });
 }
 
