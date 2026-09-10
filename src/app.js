@@ -427,6 +427,7 @@ const state = {
   summaryIsNewCustomer: null,
   summaryPurpose: null,
   summaryKaltakquise: false,
+  summaryKundenbesuch: false,
   summarySent: false,
   newCustomer: null,
   inviteWelcome: null
@@ -468,7 +469,7 @@ function icon(name) {
     phone:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/></svg>',
     pin:'<svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>',
     aroundme:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="8"/></svg>',
-    kaltakquise:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/><path d="M14 3l3 3-3 3M17 6h-6"/></svg>',
+    kundenbesuch:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/><path d="M14 3l3 3-3 3M17 6h-6"/></svg>',
     meinekontakte:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4M14 13h4"/></svg>',
     smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>'
   };
@@ -553,7 +554,6 @@ function render() {
   bind();
   if (state.screen === 'messe') initSignaturePad();
   if (state.screen === 'aroundme') initAroundMeMap();
-  if (state.summaryStep === 'karte') initKaltakquiseMap();
   if (focusState) {
     const el = document.getElementById(focusState.id);
     if (el) {
@@ -628,7 +628,7 @@ function menuScreen() {
     ['instruments','Instrumente','Aufbereitung & Desinfektion'],
     ['application','Applikation','Spendersysteme & Zubehör'],
     ['aroundme','Rund um mich','Kunden in der Nähe finden oder nach Kliniken, Praxen usw. suchen'],
-    ['kaltakquise','Kaltakquise','Neuen Kunden erfassen und in den bestehenden Ablauf übergeben'],
+    ['kundenbesuch','Kundenbesuch','Bestandskunde oder Kaltakquise erfassen und in den bestehenden Ablauf übergeben'],
     ['meinekontakte','Meine Kontakte','Ihre freigegebenen Kunden und zuletzt angelegten Kontakte'],
     ['smartmailing','Smart Mailing','Viele Kunden gezielt und persönlich per E-Mail informieren'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
@@ -644,8 +644,8 @@ function menuScreen() {
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary','kaltakquise','meinekontakte','smartmailing'].includes(card[0]));
-  if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kaltakquise','meinekontakte','smartmailing'].includes(card[0]));
+  if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
+  if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
   const today = new Date().toISOString().slice(0,10);
@@ -850,27 +850,6 @@ function initAroundMeMap(){
   });
   if (bounds.length > 1) map.fitBounds(bounds, { padding:[32,32] });
   aroundMeMapInstance = map;
-}
-let kaltakquiseMapInstance = null;
-function initKaltakquiseMap(){
-  if (kaltakquiseMapInstance){ kaltakquiseMapInstance.remove(); kaltakquiseMapInstance = null; }
-  const el = document.getElementById('kaltakquiseMap');
-  if (!el || typeof L === 'undefined') return;
-  const nc = state.newCustomer;
-  const hasPoint = nc.pickedLat != null;
-  const center = hasPoint ? [nc.pickedLat, nc.pickedLng] : (nc.myPos ? [nc.myPos.lat, nc.myPos.lng] : [51.1657, 10.4515]);
-  const map = L.map(el, { scrollWheelZoom:true }).setView(center, hasPoint || nc.myPos ? 15 : 6);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende',
-    maxZoom: 19
-  }).addTo(map);
-  if (hasPoint) L.marker([nc.pickedLat, nc.pickedLng], { icon: aroundMeDivIcon('kontakt') }).addTo(map);
-  map.on('click', e => {
-    nc.pickedLat = e.latlng.lat;
-    nc.pickedLng = e.latlng.lng;
-    render();
-  });
-  kaltakquiseMapInstance = map;
 }
 function aroundMeScreen(){
   const am = state.aroundMe;
@@ -1321,6 +1300,7 @@ function closeAnyModal(){
   state.summaryPendingRecipient = null;
   state.summaryIsNewCustomer = null;
   state.summaryKaltakquise = false;
+  state.summaryKundenbesuch = false;
   state.newCustomer = null;
   render();
 }
@@ -1330,17 +1310,23 @@ function startSummaryFlow(){
   state.summaryPurpose = null;
   state.summaryIsNewCustomer = null;
   state.summaryKaltakquise = false;
+  state.summaryKundenbesuch = false;
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
 }
-function startKaltakquiseFlow(){
+// Einstieg über die Kachel "Kundenbesuch": fragt zuerst, ob es sich um einen Bestandskunden
+// oder eine Kaltakquise handelt (state.summaryKundenbesuch markiert diesen Einstiegsweg für den
+// [data-kundentyp-choice]-Handler), statt wie früher direkt in die Kaltakquise-Adresserfassung
+// zu springen.
+function startKundenbesuchFlow(){
   state.screen = 'summary';
-  state.summaryStep = 'neukunde';
+  state.summaryStep = 'kundentyp';
   state.summaryPurpose = 'crm';
-  state.summaryIsNewCustomer = true;
-  state.summaryKaltakquise = true;
-  state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, pickedLat:null, pickedLng:null, locating:false, locateError:'' };
+  state.summaryIsNewCustomer = null;
+  state.summaryKaltakquise = false;
+  state.summaryKundenbesuch = true;
+  state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
 }
@@ -1348,12 +1334,12 @@ function newCustomerDraftDefault(){
   return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
 }
 function isValidEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||'').trim()); }
-// Bei der Kaltakquise ist die E-Mail-Adresse bewusst kein Pflichtfeld — vor Ort hat der Kunde
-// sie oft noch nicht genannt, und der Kontakt soll trotzdem gespeichert werden können. Ist ein
-// Wert eingetragen, muss er aber ein gültiges Format haben.
+// Bei der Kaltakquise gibt es bewusst kein Pflichtfeld — vor Ort sind oft noch nicht alle
+// Angaben bekannt, und der Kontakt soll trotzdem gespeichert werden können. Ist ein Wert
+// eingetragen (z. B. eine E-Mail-Adresse), muss er aber ein gültiges Format haben.
 function newCustomerValid(d){
-  const emailOk = state.summaryKaltakquise ? (!d.email.trim() || isValidEmail(d.email)) : isValidEmail(d.email);
-  return !!(d.firma.trim() && d.nachname.trim() && d.plz.trim() && emailOk);
+  if (state.summaryKaltakquise) return !d.email.trim() || isValidEmail(d.email);
+  return !!(d.firma.trim() && d.nachname.trim() && d.plz.trim() && isValidEmail(d.email));
 }
 function newCustomerSave(){
   const nc = state.newCustomer;
@@ -1393,24 +1379,30 @@ function newCustomerAnsprechpartner(d){
   return [d.anrede, d.vorname, d.nachname].filter(Boolean).join(' ').trim();
 }
 function newCustomerFormFieldsHtml(d){
-  const emailRequired = !state.summaryKaltakquise;
+  // Bei der Kaltakquise gibt es bewusst kein Pflichtfeld — der Kontakt muss auch mit nur
+  // wenigen (oder gar keinen) Angaben gespeichert werden können. Bei der klassischen
+  // Neukunde-Erfassung über die Kundenzusammenfassung bleiben Firma/Nachname/PLZ/E-Mail
+  // dagegen Pflicht, weil daraus direkt eine Kunden-E-Mail verschickt wird.
+  const required = !state.summaryKaltakquise;
   const fields = [
-    ['firma','Firma / Einrichtung', true, 'text'], ['vorname','Vorname', false, 'text'], ['nachname','Nachname', true, 'text'],
-    ['strasse','Straße', false, 'text'], ['hausnummer','Hausnummer', false, 'text'],
-    ['plz','Postleitzahl', true, 'text'], ['ort','Ort', false, 'text'], ['telefon','Telefonnummer', false, 'tel'],
-    ['email', emailRequired ? 'E-Mail (Pflichtfeld)' : 'E-Mail (optional)', emailRequired, 'email']
+    ['firma','Firma / Einrichtung', required, 'text'], ['vorname','Vorname', false, 'text'], ['nachname','Nachname', required, 'text'],
+    ['strasse','Straße', false, 'text'], ['hausnummer','Hausnummer', false, 'tel'],
+    ['plz','Postleitzahl', required, 'tel'], ['ort','Ort', false, 'text'], ['telefon','Telefonnummer', false, 'tel'],
+    ['email', required ? 'E-Mail (Pflichtfeld)' : 'E-Mail (optional)', required, 'email']
   ];
   const nc = state.newCustomer;
   return `<div class="new-customer-form">
     ${state.summaryKaltakquise ? `<div class="wide location-actions">
       <button type="button" class="secondary-button compact" data-action="neukunde-locate" ${nc.locating?'disabled':''}>${icon('pin')}<span>${nc.locating?'Standort wird ermittelt…':'Aktuellen Standort übernehmen'}</span></button>
-      <button type="button" class="secondary-button compact" data-action="neukunde-karte">${icon('aroundme')}<span>Auf Karte auswählen</span></button>
     </div>${nc.locateError ? `<div class="wide"><p class="region-login-error">${escapeHtml(nc.locateError)}</p></div>` : ''}` : ''}
     <div class="wide"><label>Anrede</label><div class="price-toggle-row" style="margin-top:6px">
       <button type="button" class="filter-chip ${d.anrede==='Herr'?'active':''}" data-nc-anrede="Herr">Herr</button>
       <button type="button" class="filter-chip ${d.anrede==='Frau'?'active':''}" data-nc-anrede="Frau">Frau</button>
     </div></div>
-    ${fields.map(([k,label,required,type]) => `<div class="${k==='firma'||k==='email'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${required?'required':''} value="${escapeHtml(d[k])}"></div>`).join('')}
+    ${fields.map(([k,label,fieldRequired,type]) => {
+      const numeric = k==='plz' || k==='hausnummer';
+      return `<div class="${k==='firma'||k==='email'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${numeric?'inputmode="numeric" pattern="[0-9]*"':''} ${k==='plz'?'maxlength="5"':''} ${fieldRequired?'required':''} value="${escapeHtml(d[k])}"></div>`;
+    }).join('')}
   </div>`;
 }
 const PRODUKTBEREICHE = [
@@ -1440,15 +1432,16 @@ function occasionPromptModal() {
     </div>`;
   }
   if (state.summaryStep === 'kundentyp') {
+    const neuLabel = state.summaryKundenbesuch ? 'Kaltakquise' : 'Neukunde';
     return `<div class="modal-overlay">
       <div class="modal-card">
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt 2</span>
-        <h2>Bestandskunde oder Neukunde?</h2>
-        <p>Bei einem Neukunden fragen wir im nächsten Schritt kurz die Adresse ab.</p>
+        <h2>Bestandskunde oder ${neuLabel}?</h2>
+        <p>${state.summaryKundenbesuch ? 'Bei einer Kaltakquise fragen wir im nächsten Schritt kurz die Adresse ab.' : 'Bei einem Neukunden fragen wir im nächsten Schritt kurz die Adresse ab.'}</p>
         <div class="modal-choices">
           <button class="modal-choice" data-kundentyp-choice="bestand">${icon('pm')}<span>Bestandskunde</span></button>
-          <button class="modal-choice" data-kundentyp-choice="neu">${icon('pm')}<span>Neukunde</span></button>
+          <button class="modal-choice" data-kundentyp-choice="neu">${icon('pm')}<span>${neuLabel}</span></button>
         </div>
         <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-purpose">Zurück</button></div>
       </div>
@@ -1461,28 +1454,11 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.neukunde} von ${total}</span>
         <h2>Adresse des Neukunden</h2>
-        <p>${state.summaryKaltakquise ? 'So einfach wie möglich – nur Name und PLZ sind Pflicht. Die E-Mail-Adresse kann später nachgetragen werden.' : 'So einfach wie möglich – nur Name, PLZ und E-Mail sind Pflicht.'}</p>
+        <p>${state.summaryKaltakquise ? 'So einfach wie möglich – kein Feld ist Pflicht. Alle Angaben können später ergänzt werden.' : 'So einfach wie möglich – nur Name, PLZ und E-Mail sind Pflicht.'}</p>
         ${newCustomerFormFieldsHtml(d)}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-kundentyp">Zurück</button>
           <button class="primary-button compact" data-action="neukunde-weiter" ${newCustomerValid(d)?'':'disabled'}>Weiter</button>
-        </div>
-      </div>
-    </div>`;
-  }
-  if (state.summaryStep === 'karte') {
-    const nc = state.newCustomer;
-    return `<div class="modal-overlay">
-      <div class="modal-card" style="width:min(560px,100%)">
-        ${modalCloseBtn()}
-        <span class="eyebrow">Standort wählen</span>
-        <h2>Standort auf der Karte auswählen</h2>
-        <p>Tippen Sie auf die Karte, um den Standort des Kunden zu markieren. Die Adresse wird daraus automatisch ermittelt.</p>
-        <div id="kaltakquiseMap" class="aroundme-map"></div>
-        ${nc.locateError ? `<p class="region-login-error">${escapeHtml(nc.locateError)}</p>` : ''}
-        <div class="modal-actions">
-          <button class="secondary-button compact" data-action="karte-zurueck">Zurück</button>
-          <button class="primary-button compact" data-action="karte-uebernehmen" ${(nc.pickedLat!=null && !nc.locating)?'':'disabled'}>${nc.locating?'Adresse wird ermittelt…':'Adresse übernehmen'}</button>
         </div>
       </div>
     </div>`;
@@ -2508,7 +2484,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kaltakquise'){startKaltakquiseFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
@@ -2559,8 +2535,11 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, pickedLat:null, pickedLng:null, locating:false, locateError:'' };
+      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
       state.summaryStep = 'neukunde';
+      // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
+      // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
+      if (state.summaryKundenbesuch) state.summaryKaltakquise = true;
     } else {
       state.summaryStep = 'occasion';
     }
@@ -2570,7 +2549,14 @@ function bind() {
   $('[data-action="occasion-back-neukunde"]')?.addEventListener('click', () => { state.summaryStep = 'neukunde'; render(); });
   $('[data-action="occasion-back-produktbereiche"]')?.addEventListener('click', () => { state.summaryStep = 'produktbereiche'; render(); });
   document.querySelectorAll('[data-nc-field]').forEach(input => input.addEventListener('input', e => {
-    state.newCustomer.draft[e.target.dataset.ncField] = e.target.value;
+    const field = e.target.dataset.ncField;
+    let val = e.target.value;
+    // PLZ und Hausnummer: nur Ziffern, keine von Spracheingabe eingefügten Kommas/Punkte —
+    // beim Diktieren einer Zahl wie "41466" sollen die Ziffern einfach von links nach rechts
+    // aneinandergereiht werden, PLZ zusätzlich auf 5 Stellen begrenzt.
+    if (field === 'plz') { val = val.replace(/\D+/g, '').slice(0, 5); e.target.value = val; }
+    else if (field === 'hausnummer') { val = val.replace(/\D+/g, ''); e.target.value = val; }
+    state.newCustomer.draft[field] = val;
     const nextBtn = $('[data-action="neukunde-weiter"]');
     if (nextBtn) nextBtn.disabled = !newCustomerValid(state.newCustomer.draft);
   }));
@@ -2589,27 +2575,6 @@ function bind() {
       nc.locateError = e.message || 'Standort konnte nicht ermittelt werden.';
     }
     nc.locating = false;
-    render();
-  });
-  $('[data-action="neukunde-karte"]')?.addEventListener('click', () => {
-    state.newCustomer.locateError = '';
-    state.summaryStep = 'karte';
-    render();
-  });
-  $('[data-action="karte-zurueck"]')?.addEventListener('click', () => { state.summaryStep = 'neukunde'; render(); });
-  $('[data-action="karte-uebernehmen"]')?.addEventListener('click', async () => {
-    const nc = state.newCustomer;
-    if (nc.pickedLat == null) return;
-    nc.locating = true; nc.locateError = ''; render();
-    try {
-      const addr = await reverseGeocode(nc.pickedLat, nc.pickedLng);
-      Object.assign(nc.draft, addr);
-      nc.locating = false;
-      state.summaryStep = 'neukunde';
-    } catch (e) {
-      nc.locating = false;
-      nc.locateError = e.message || 'Adresse konnte nicht ermittelt werden. Bitte Felder manuell ausfüllen.';
-    }
     render();
   });
   $('[data-action="neukunde-weiter"]')?.addEventListener('click', () => {
