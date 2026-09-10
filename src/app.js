@@ -1411,6 +1411,33 @@ const PRODUKTBEREICHE = [
   ['instruments','Instrumente','Aufbereitung & Desinfektion'],
   ['application','Applikation','Spendersysteme & Zubehör']
 ];
+const NOTIZ_BAUSTEINE = {
+  surface: [
+    'Setzt aktuell ein anderes Flächendesinfektionsmittel ein, ist aber offen für einen Vergleich.',
+    'Wünscht kürzere Einwirkzeit bei der Flächendesinfektion.',
+    'Muster zur Flächendesinfektion gewünscht, Rückmeldung folgt.'
+  ],
+  hands: [
+    'Bemängelt Hautverträglichkeit der aktuellen Händedesinfektion.',
+    'Interesse an neuem Spendersystem für die Händedesinfektion.',
+    'Schulung zur korrekten Händedesinfektion gewünscht.'
+  ],
+  instruments: [
+    'Aufbereitung der Instrumente erfolgt bisher manuell, Interesse an effizienterer Lösung.',
+    'Fragt nach Materialverträglichkeit des Desinfektionsmittels.',
+    'Möchte Instrumentendesinfektion um ein sporizides Mittel ergänzen.'
+  ],
+  application: [
+    'Bestehende Spendersysteme sind veraltet oder defekt, Austausch gewünscht.',
+    'Fragt nach Zubehör und Ersatzteilen für vorhandene Spender.',
+    'Wandspender für mehrere Räume angefragt.'
+  ],
+  general: [
+    'Rückruf gewünscht, Termin folgt.',
+    'Aktuell kein Bedarf, in einigen Monaten erneut ansprechen.',
+    'Preisliste per E-Mail nachgereicht.'
+  ]
+};
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
@@ -1484,12 +1511,25 @@ function occasionPromptModal() {
   }
   if (state.summaryStep === 'notiz') {
     const d = state.newCustomer.draft;
+    const selectedCats = Array.from(new Set(favoriteEntries().map(({product}) => product.category)));
+    const bausteinGroups = selectedCats
+      .map(key => [key, (PRODUKTBEREICHE.find(p => p[0] === key) || [])[1] || key])
+      .concat([['general', 'Allgemein']])
+      .filter(([key]) => (NOTIZ_BAUSTEINE[key] || []).length);
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(520px,100%)">
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.notiz} von ${total}</span>
         <h2>Gesprächsnotiz</h2>
         <p>Kundenbedarf, Interesse, Einwände, Rückrufwunsch, nächste Schritte …</p>
+        <div class="notiz-bausteine">
+          ${bausteinGroups.map(([key,title]) => `<div class="notiz-baustein-group">
+            <span class="notiz-baustein-label">${escapeHtml(title)}</span>
+            <div class="notiz-baustein-chips">
+              ${NOTIZ_BAUSTEINE[key].map((text,i) => `<button type="button" class="notiz-chip" data-notiz-cat="${key}" data-notiz-idx="${i}">${escapeHtml(text)}</button>`).join('')}
+            </div>
+          </div>`).join('')}
+        </div>
         <label class="modal-field"><textarea id="occasionNotiz" rows="4" placeholder="Gesprächsnotiz (optional)">${escapeHtml(d.notiz)}</textarea></label>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-produktbereiche">Zurück</button>
@@ -2599,6 +2639,13 @@ function bind() {
   }));
   $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { newCustomerSave(); state.summaryStep = 'notiz'; render(); });
   $('[data-action="occasion-back-notiz"]')?.addEventListener('click', () => { state.summaryStep = 'notiz'; render(); });
+  document.querySelectorAll('[data-notiz-cat]').forEach(btn => btn.addEventListener('click', () => {
+    const text = (NOTIZ_BAUSTEINE[btn.dataset.notizCat] || [])[+btn.dataset.notizIdx];
+    const ta = $('#occasionNotiz');
+    if (!text || !ta) return;
+    ta.value = ta.value.trim() ? ta.value.trim() + ' ' + text : text;
+    state.newCustomer.draft.notiz = ta.value;
+  }));
   $('[data-action="notiz-weiter"]')?.addEventListener('click', () => {
     state.newCustomer.draft.notiz = (($('#occasionNotiz')||{}).value || '').trim();
     newCustomerSave();
