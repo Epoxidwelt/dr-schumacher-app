@@ -3374,6 +3374,18 @@ function oneQuickActionsHtml(contactId, opts){
     ${(o.del !== false && u && u.role === 'admin') ? `<button class="one-btn sm danger" data-one-act="delete-contact" data-one-id="${contactId}">Löschen</button>` : ''}
   </div>`;
 }
+// Eigenständige Aktionsleiste für "Meine Kontakte" (Mitarbeiter) — bewusst getrennt von
+// oneQuickActionsHtml (Admin/"Kontakte"): hier existiert der Löschen-Button als Markup gar
+// nicht erst, statt nur per Rollenprüfung ausgeblendet zu sein. Mitarbeiter können Kontakte
+// also strukturell nicht löschen, unabhängig von einer Berechtigungsprüfung an dieser Stelle.
+function oneMineActionsHtml(contactId){
+  return `<div class="one-quick-actions">
+    <button class="one-btn sm" data-one-followup="${contactId}:day">+1 Tag</button>
+    <button class="one-btn sm" data-one-followup="${contactId}:month">+1 Monat</button>
+    <button class="one-btn sm" data-one-followup="${contactId}:rhythm">Rhythmus</button>
+    <button class="one-btn sm" data-one-act="edit-mine-contact" data-one-id="${contactId}">Bearbeiten</button>
+  </div>`;
+}
 function oneAdjustFollowUp(contactId, mode){
   const c = state.one.contacts.find(x=>x.id===contactId);
   if (!c) return;
@@ -3691,6 +3703,37 @@ function oneContactFormHtml(){
       <div class="one-wizard-actions" style="margin-top:14px">
         <button class="one-btn" data-one-act="cancel-new-contact">Abbrechen</button>
         <button class="one-btn primary" data-one-act="save-new-contact" ${d.name.trim() && d.plz.trim() ? '' : 'disabled'}>${d._editId ? 'Änderungen speichern' : 'Kontakt speichern'}</button>
+      </div>
+    </div></div>`;
+}
+// Eigenständiges Formular für "Meine Kontakte" (Mitarbeiter) — bewusst getrennt von
+// oneContactFormHtml (Admin/"Kontakte"): enthält nur die Felder, die ein Mitarbeiter im
+// Feld selbst erfassen soll. Externe Nummer, Kundennummer und Bezirk sind ERP-/Admin-Zuordnungen
+// (der Innendienst vergibt die echte Kundennummer nach Prüfung) und tauchen hier deshalb gar
+// nicht als Eingabefeld auf — ihre Werte bleiben beim Speichern unverändert erhalten, weil der
+// Entwurf sie beim Öffnen aus dem bestehenden Kontakt übernimmt (oneEditContactDraft) und nur
+// die hier sichtbaren Felder überschrieben werden.
+function oneMineContactFormHtml(){
+  const d = state.one.newContact;
+  const fields = [
+    ['name','Firma / Name'], ['strasse','Straße'], ['hausnummer','Hausnummer'],
+    ['plz','PLZ'], ['ort','Ort'], ['telefon','Telefonnummer'], ['email','E-Mail']
+  ];
+  return `<div class="one-panel"><div class="one-panel-head"><h2>${d._editId ? 'Kontakt bearbeiten' : 'Kontakt hinzufügen'}</h2><p>Gebiet wird automatisch aus der PLZ abgeleitet.</p></div>
+    <div class="one-panel-body">
+      <div class="one-scan-row">
+        <button class="one-btn" data-one-act="scan-contact-card">${icon('camera')}<span>Visitenkarte fotografieren</span></button>
+        <input id="oneScanInput" type="file" accept="image/*" capture="environment" style="display:none">
+        <small class="muted">${state.messeScanStatus ? escapeHtml(state.messeScanStatus) : 'Füllt Name, Adresse und E-Mail automatisch aus – danach bitte prüfen.'}</small>
+      </div>
+      <div class="one-filters">
+        ${fields.map(([k,label]) => `<div class="one-field"><label for="oneNC-${k}">${label}</label><input type="text" id="oneNC-${k}" data-one-nc="${k}" value="${escapeHtml(d[k])}"></div>`).join('')}
+        <div class="one-field"><label for="oneNC-preisliste">Preisliste</label><select class="f" id="oneNC-preisliste" data-one-nc="preisliste">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(p=>`<option ${d.preisliste===p?'selected':''}>${p}</option>`).join('')}</select></div>
+        <div class="one-field"><label for="oneNC-kundenstatus">Status</label><select class="f" id="oneNC-kundenstatus" data-one-nc="kundenstatus"><option value="kunde" ${d.kundenstatus==='kunde'?'selected':''}>Kaufender Kunde</option><option value="kontakt" ${d.kundenstatus==='kontakt'?'selected':''}>Nur Kontakt im System (noch kein Kauf)</option></select></div>
+      </div>
+      <div class="one-wizard-actions" style="margin-top:14px">
+        <button class="one-btn" data-one-act="cancel-mine-contact">Abbrechen</button>
+        <button class="one-btn primary" data-one-act="save-mine-contact" ${d.name.trim() && d.plz.trim() ? '' : 'disabled'}>${d._editId ? 'Änderungen speichern' : 'Kontakt speichern'}</button>
       </div>
     </div></div>`;
 }
@@ -4030,8 +4073,8 @@ function oneViewMine(){
     <h1>Meine Kontakte</h1>
     <p>Gebiete: ${u.territories.map(t=>escapeHtml(oneTerrById(t).name)).join(' · ') || 'keine'} — ${allVis.length} Kontakte freigegeben.</p>
   </div><div class="one-spacer"></div>
-  <button class="one-btn" data-one-act="new-contact">+ Kontakt hinzufügen</button></div>
-  ${O.newContact ? oneContactFormHtml() : ''}
+  <button class="one-btn" data-one-act="new-mine-contact">+ Kontakt hinzufügen</button></div>
+  ${O.newContact ? oneMineContactFormHtml() : ''}
   <div class="one-panel">
     <div class="one-panel-body">
       <div class="one-filters">
@@ -4058,7 +4101,7 @@ function oneViewMine(){
           <td><div class="one-abc-picker">${['A','B','C'].map(t=>`<button class="one-abc-opt ${c.abc===t?'on '+t:''}" data-one-abc="${c.id}:${t}">${t}</button>`).join('')}</div></td>
           <td>${oneDueBadge(c) || '<span class="muted">—</span>'}</td>
           <td>${oneCommChip(c)}</td>
-          <td>${oneQuickActionsHtml(c.id)}</td>
+          <td>${oneMineActionsHtml(c.id)}</td>
         </tr>`).join('')}</tbody></table></div>`
       : `<div class="one-empty"><strong>Keine Kontakte</strong>${allVis.length ? 'Kein Treffer für diesen Filter.' : 'Für Ihre Gebiete ist derzeit kein Kontakt freigegeben.'}</div>`}
     </div>
@@ -4409,7 +4452,7 @@ function bindOne(){
   document.querySelectorAll('[data-one-nc]').forEach(el => {
     const handler = () => {
       O.newContact[el.dataset.oneNc] = el.value;
-      const saveBtn = document.querySelector('[data-one-act="save-new-contact"]');
+      const saveBtn = document.querySelector('[data-one-act="save-new-contact"], [data-one-act="save-mine-contact"]');
       if (saveBtn) saveBtn.disabled = !(O.newContact.name.trim() && O.newContact.plz.trim());
     };
     el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', handler);
@@ -4589,6 +4632,34 @@ function bindOne(){
     if (a === 'scan-contact-card'){ document.getElementById('oneScanInput')?.click(); return; }
     if (a === 'cancel-new-contact'){ O.newContact = null; render(); return; }
     if (a === 'save-new-contact'){
+      const d = O.newContact;
+      if (d._editId){
+        const c = O.contacts.find(x => x.id === d._editId);
+        if (c){
+          Object.assign(c, { externeNr:d.externeNr.trim(), kundenNr:d.kundenNr.trim(), name:d.name.trim(), plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(), bezirk:d.bezirk.trim(), preisliste:d.preisliste, email:d.email.trim(), telefon:d.telefon.trim(), kundenstatus:d.kundenstatus || 'kunde' });
+          oneAudit('Kontakt bearbeitet', c.name + ' (' + (oneCurrentUser()||{}).name + ')');
+        }
+      } else {
+        const id = 'k' + Date.now().toString(36);
+        O.contacts.push({ id, externeNr:d.externeNr.trim(), kundenNr:d.kundenNr.trim(), name:d.name.trim(), plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(), bezirk:d.bezirk.trim(), preisliste:d.preisliste, email:d.email.trim(), telefon:d.telefon.trim(), comm:'bestand', active:true, override:null, abc:null, nextFollowUp:null, kundenstatus:d.kundenstatus || 'kunde' });
+        oneAudit('Kontakt angelegt', d.name + ' (' + (oneCurrentUser()||{}).name + ')');
+      }
+      onePersistContacts();
+      O.newContact = null;
+      render(); return;
+    }
+    // Eigener Aktionspfad für "Meine Kontakte" (Mitarbeiter) — komplett getrennt vom
+    // Admin-Pfad (new-contact/edit-contact/save-new-contact) und ohne jede Lösch-Aktion.
+    if (a === 'new-mine-contact'){ O.newContact = oneNewContactDraft(); state.messeScanStatus = ''; render(); return; }
+    if (a === 'edit-mine-contact'){
+      const c = O.contacts.find(x => x.id === el.dataset.oneId);
+      if (!c) return;
+      O.newContact = oneEditContactDraft(c);
+      state.messeScanStatus = '';
+      render(); return;
+    }
+    if (a === 'cancel-mine-contact'){ O.newContact = null; render(); return; }
+    if (a === 'save-mine-contact'){
       const d = O.newContact;
       if (d._editId){
         const c = O.contacts.find(x => x.id === d._editId);
