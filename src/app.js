@@ -469,7 +469,8 @@ function icon(name) {
     pin:'<svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>',
     aroundme:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="8"/></svg>',
     kaltakquise:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/><path d="M14 3l3 3-3 3M17 6h-6"/></svg>',
-    meinekontakte:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4M14 13h4"/></svg>'
+    meinekontakte:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4M14 13h4"/></svg>',
+    smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>'
   };
   return icons[name] || '';
 }
@@ -629,6 +630,7 @@ function menuScreen() {
     ['aroundme','Rund um mich','Kunden in der Nähe finden oder nach Kliniken, Praxen usw. suchen'],
     ['kaltakquise','Kaltakquise','Neuen Kunden erfassen und in den bestehenden Ablauf übergeben'],
     ['meinekontakte','Meine Kontakte','Ihre freigegebenen Kunden und zuletzt angelegten Kontakte'],
+    ['smartmailing','Smart Mailing','Viele Kunden gezielt und persönlich per E-Mail informieren'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
@@ -642,8 +644,8 @@ function menuScreen() {
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary','kaltakquise','meinekontakte'].includes(card[0]));
-  if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kaltakquise','meinekontakte'].includes(card[0]));
+  if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary','kaltakquise','meinekontakte','smartmailing'].includes(card[0]));
+  if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kaltakquise','meinekontakte','smartmailing'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
   const today = new Date().toISOString().slice(0,10);
@@ -2506,7 +2508,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kaltakquise'){startKaltakquiseFlow();render();return;} if(key==='meinekontakte'){state.one.view='mine';const oneUser=oneCurrentUser();if(!oneUser||oneUser.role!=='employee'){state.previousScreen='one';state.screen='region';render();return;}state.screen='one';render();return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kaltakquise'){startKaltakquiseFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
@@ -3525,6 +3527,23 @@ function oneCanAccessContact(user, contactId, o){
   return oneVisibleContacts(user, o).some(c => c.id === contactId);
 }
 function oneCurrentUser(){ return state.one.users.find(u => u.id === state.one.loggedInUserId) || null; }
+// Direkteinstieg von einer Produktberater-Kachel (z. B. "Meine Kontakte", "Smart Mailing") in
+// eine bestimmte ONE-Ansicht. Prüft dabei die tatsächlich angemeldete Identität — nicht nur die
+// Geräte-Rollenwahl — und verlangt bei fehlender/nicht passender Mitarbeiter-Anmeldung eine
+// erneute Anmeldung, statt eine veraltete Sitzung (z. B. eine ältere Admin-Anmeldung) zu
+// übernehmen. Siehe die gleichlautende Absicherung im Profil-Auswahl-Handler.
+function oneDeepLink(view){
+  state.one.view = view;
+  const oneUser = oneCurrentUser();
+  if (!oneUser || oneUser.role !== 'employee'){
+    state.previousScreen = 'one';
+    state.screen = 'region';
+    render();
+    return;
+  }
+  state.screen = 'one';
+  render();
+}
 function oneTerrById(id){ return state.one.territories.find(t => t.id === id); }
 function oneTeamLabel(id){ const t = ONE_TEAMS.find(x=>x.id===id); return t ? t.label : '—'; }
 function oneFunktionLabel(f){ return f === 'innendienst' ? 'Innendienst' : f === 'aussendienst' ? 'Außendienst' : '—'; }
