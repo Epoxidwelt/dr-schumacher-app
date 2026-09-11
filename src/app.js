@@ -429,6 +429,7 @@ const state = {
   summaryKaltakquise: false,
   summaryKundenbesuch: false,
   summarySent: false,
+  angebotOptionen: {pif:false, sdb:false, ba:false},
   newCustomer: null,
   inviteWelcome: null
 };
@@ -1302,6 +1303,7 @@ function closeAnyModal(){
   state.summaryKaltakquise = false;
   state.summaryKundenbesuch = false;
   state.newCustomer = null;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false};
   render();
 }
 function startSummaryFlow(){
@@ -1314,6 +1316,7 @@ function startSummaryFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false};
 }
 // Einstieg über die Kachel "Kundenbesuch": fragt zuerst, ob es sich um einen Bestandskunden
 // oder eine Kaltakquise handelt (state.summaryKundenbesuch markiert diesen Einstiegsweg für den
@@ -1329,6 +1332,7 @@ function startKundenbesuchFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false};
 }
 function newCustomerDraftDefault(){
   return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
@@ -1724,12 +1728,47 @@ function occasionPromptModal() {
     return `<div class="modal-overlay">
       <div class="modal-card">
         ${modalCloseBtn()}
-        <span class="eyebrow">Letzter Schritt</span>
+        <span class="eyebrow">Vorletzter Schritt</span>
         <h2>Kontaktdaten an Innendienst senden?</h2>
         <p>Der Innendienst kann den Neukunden dann mit allen erfassten Daten direkt im CRM-System anlegen.</p>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="innendienst-ask-no">Nein, fertig</button>
           <button class="primary-button compact" data-action="innendienst-ask-yes">${icon('talk')}<span>Ja, senden</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'angebotask') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Letzter Schritt</span>
+        <h2>Soll ein Angebot an den Kunden gesendet werden?</h2>
+        <p>Das Angebot wird über den Innendienst erstellt und versendet — egal ob Bestandskunde oder Kaltakquise.</p>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="angebot-ask-no">Nein, fertig</button>
+          <button class="primary-button compact" data-action="angebot-ask-yes">${icon('talk')}<span>Ja, Angebot anfragen</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'angebotOptionen') {
+    const opts = state.angebotOptionen;
+    const entries = favoriteEntries();
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(480px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Letzter Schritt</span>
+        <h2>Was soll der Innendienst mitsenden?</h2>
+        <p>Wird zusammen mit dem Angebot direkt an den Kunden verschickt.</p>
+        <div class="notiz-baustein-chips">
+          <button type="button" class="notiz-chip ${opts.pif?'active':''}" data-angebot-toggle="pif">Produktinformation</button>
+          <button type="button" class="notiz-chip ${opts.sdb?'active':''}" data-angebot-toggle="sdb">Sicherheitsdatenblatt</button>
+          <button type="button" class="notiz-chip ${opts.ba?'active':''}" data-angebot-toggle="ba">Betriebsanweisung</button>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="occasion-back-angebotask">Zurück</button>
+          <button class="primary-button compact" data-action="angebot-senden" ${entries.length?'':'disabled'}>${icon('talk')}<span>An Innendienst senden</span></button>
         </div>
       </div>
     </div>`;
@@ -1781,6 +1820,35 @@ function sendNewCustomerInnendienstEmail(){
   const contact = newCustomerContact();
   if (!contact) return;
   const {subject, body} = buildNewCustomerInnendienstEmail(contact);
+  openMailto(subject, body, innendienstEmail());
+}
+// Angebote laufen immer über den Innendienst — egal ob Bestandskunde oder Kaltakquise/Neukunde.
+// Die E-Mail listet die im Gespräch markierten Produkte mit Artikelnummer auf, damit der
+// Innendienst direkt das passende Angebot erstellen kann.
+function buildAngebotInnendienstEmail(){
+  const entries = favoriteEntries();
+  const contact = newCustomerContact();
+  const customerName = contact ? contact.name : state.summaryCustomer.trim();
+  const opts = state.angebotOptionen;
+  const lines = [
+    'Hallo Team,',
+    '',
+    `bitte für ${customerName || 'den Kunden'} ein Angebot erstellen und versenden für folgende Produkte:`,
+    ''
+  ];
+  entries.forEach(({product, size}) => {
+    lines.push(`PRODUKT: ${product.name}`, `Artikelnummer: ${resolveArtNr(product, size)}`, `Gebinde: ${size}`, '');
+  });
+  const extras = [];
+  if (opts.pif) extras.push('Produktinformation');
+  if (opts.sdb) extras.push('Sicherheitsdatenblatt');
+  if (opts.ba) extras.push('Betriebsanweisung');
+  if (extras.length) lines.push(`Bitte zusätzlich mit dem Angebot mitsenden: ${extras.join(', ')}`, '');
+  lines.push('Danke und Grüße' + (state.repName ? ', ' + state.repName : ''));
+  return { subject: `Angebotsanfrage${customerName ? ' für ' + customerName : ''} – Dr. Schumacher`, body: lines.join('\n') };
+}
+function sendAngebotInnendienstEmail(){
+  const {subject, body} = buildAngebotInnendienstEmail();
   openMailto(subject, body, innendienstEmail());
 }
 
@@ -2984,17 +3052,26 @@ function bind() {
     state.summaryIsNewCustomer = null;
     render();
   });
-  $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : null; render(); });
-  $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = newCustomerContact() ? 'innendienstask' : null; render(); });
-  $('[data-action="kunde-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : null; render(); });
+  $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
+  $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
+  $('[data-action="kunde-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
   $('[data-action="kunde-entry-yes"]')?.addEventListener('click', () => {
     state.summarySent = true;
     sendCustomerSummaryEmail();
-    state.summaryStep = newCustomerContact() ? 'innendienstask' : null;
+    state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask';
     render();
   });
-  $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
-  $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = null; render(); });
+  $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
+  $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = 'angebotask'; render(); });
+  $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
+  $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => { state.summaryStep = 'angebotOptionen'; render(); });
+  $('[data-action="occasion-back-angebotask"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
+  document.querySelectorAll('[data-angebot-toggle]').forEach(button => button.addEventListener('click', () => {
+    const key = button.dataset.angebotToggle;
+    state.angebotOptionen[key] = !state.angebotOptionen[key];
+    render();
+  }));
+  $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; render(); });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
   document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
