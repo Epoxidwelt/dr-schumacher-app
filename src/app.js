@@ -473,6 +473,7 @@ function icon(name) {
     competition:'<svg viewBox="0 0 24 24"><path d="M4 7h16M7 4v16M17 4v16M4 17h16"/></svg>',
     talk:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8M8 12h6"/></svg>',
     offer:'<svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4M9 11h6M9 15h6"/></svg>',
+    angebot:'<svg viewBox="0 0 24 24"><path d="M5 3h9l4 4v10H5z"/><path d="M14 3v4h4M9 11h5M9 15h3"/><path d="M14.5 14.5 20 20m0 0v-4.2m0 4.2h-4.2"/></svg>',
     summary:'<svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="m8.5 9 2 2 4-4M8 15h8"/></svg>',
     report:'<svg viewBox="0 0 24 24"><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="m15 16 2 2 3-4"/></svg>',
     dashboard:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 18h7M17.5 14.5V21"/></svg>',
@@ -651,7 +652,7 @@ function coreCategoryGrid() {
 // "Anordnen"-Modus selbst zurechtlegen (lokal auf dem eigenen Gerät gespeichert). Diese Liste
 // ist nur der Ausgangszustand; neu hinzukommende Kacheln werden an bestehende Reihenfolgen
 // automatisch hinten angehängt.
-const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','compare','competition','offer','summary','report','dashboard','messe','pm','downloads','all'];
+const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','downloads','all'];
 function orderedToolCards(toolCards) {
   const order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder : DASHBOARD_TOOL_KEYS_DEFAULT;
   const byKey = new Map(toolCards.map(c => [c[0], c]));
@@ -748,6 +749,7 @@ function menuScreen() {
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
     ['offer','Kundenübersicht','Markierte Produkte als Angebot oder PDF'],
+    ['angebot','Angebot anfragen','Mit ★ markierte Produkte als Angebotsanfrage an den Innendienst senden'],
     ['summary','Kundenzusammenfassung','Mit ★ markierte Produkte per E-Mail an den Kunden'],
     ['report','Besuchsbericht','CRM-Zusammenfassung und Follow-up'],
     ['dashboard','Follow-up Dashboard','Offene Termine und Aufgaben im Blick'],
@@ -757,7 +759,7 @@ function menuScreen() {
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
+  if (!can('sales')) cards = cards.filter(card => !['compare','offer','angebot','summary','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
   if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = orderedToolCards(cards.filter(c => !coreKeys.includes(c[0])));
@@ -1450,6 +1452,22 @@ function startKundenbesuchFlow(){
   state.summarySent = false;
   state.angebotOptionen = {pif:false, sdb:false, ba:false};
 }
+// Einstieg über die Kachel "Angebot anfragen": nutzt die im Gespräch bereits mit ★ markierten
+// Produkte und führt direkt in die Angebotsanfrage an den Innendienst — ohne die übrigen
+// Wizard-Schritte (Kundentyp, Produktbereiche, Muster, Notiz, Ergebnis), da hier bewusst kein
+// CRM-Eintrag oder keine Kundenmail entstehen soll, nur die fertige E-Mail an den Innendienst.
+function startAngebotFlow(){
+  state.screen = 'summary';
+  state.summaryStep = 'angebotKunde';
+  state.summaryPurpose = 'angebot';
+  state.summaryIsNewCustomer = null;
+  state.summaryKaltakquise = false;
+  state.summaryKundenbesuch = false;
+  state.newCustomer = null;
+  state.summaryPendingRecipient = null;
+  state.summarySent = false;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false};
+}
 function newCustomerDraftDefault(){
   return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
 }
@@ -1862,6 +1880,24 @@ function occasionPromptModal() {
       </div>
     </div>`;
   }
+  if (state.summaryStep === 'angebotKunde') {
+    const entries = favoriteEntries();
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(480px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Angebot anfragen</span>
+        <h2>Für wen ist das Angebot?</h2>
+        <p>Die mit ★ markierten Produkte werden automatisch in die Anfrage an den Innendienst übernommen.</p>
+        ${entries.length ? `<div class="produkte-picked">${entries.map(({product,size}) => `<span>${escapeHtml(product.name)}${size?` · ${escapeHtml(size)}`:''}</span>`).join('')}</div>` : `<p class="muted-copy">Noch keine Produkte markiert — bitte zuerst im Gespräch mit ★ markieren.</p>`}
+        <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="Kunde / Einrichtung (optional)"></label>
+        <label class="modal-field"><input id="occasionKundenNr" type="text" value="${escapeHtml(state.summaryKundenNr)}" placeholder="KD-Nr. (optional)"></label>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="modal-close">Abbrechen</button>
+          <button class="primary-button compact" data-action="angebotkunde-weiter" ${entries.length?'':'disabled'}>Weiter</button>
+        </div>
+      </div>
+    </div>`;
+  }
   if (state.summaryStep === 'angebotOptionen') {
     const opts = state.angebotOptionen;
     const entries = favoriteEntries();
@@ -1877,7 +1913,7 @@ function occasionPromptModal() {
           <button type="button" class="notiz-chip ${opts.ba?'active':''}" data-angebot-toggle="ba">Betriebsanweisung</button>
         </div>
         <div class="modal-actions">
-          <button class="secondary-button compact" data-action="occasion-back-angebotask">Zurück</button>
+          <button class="secondary-button compact" data-action="${state.summaryPurpose === 'angebot' ? 'occasion-back-angebotkunde' : 'occasion-back-angebotask'}">Zurück</button>
           <button class="primary-button compact" data-action="angebot-senden" ${entries.length?'':'disabled'}>${icon('talk')}<span>An Innendienst senden</span></button>
         </div>
       </div>
@@ -2892,7 +2928,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
@@ -3189,6 +3225,8 @@ function bind() {
   $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
   $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => { state.summaryStep = 'angebotOptionen'; render(); });
   $('[data-action="occasion-back-angebotask"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
+  $('[data-action="occasion-back-angebotkunde"]')?.addEventListener('click', () => { state.summaryStep = 'angebotKunde'; render(); });
+  $('[data-action="angebotkunde-weiter"]')?.addEventListener('click', () => { state.summaryStep = 'angebotOptionen'; render(); });
   document.querySelectorAll('[data-angebot-toggle]').forEach(button => button.addEventListener('click', () => {
     const key = button.dataset.angebotToggle;
     state.angebotOptionen[key] = !state.angebotOptionen[key];
