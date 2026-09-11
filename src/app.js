@@ -1454,11 +1454,13 @@ function startKundenbesuchFlow(){
 }
 // Einstieg über die Kachel "Angebot anfragen": nutzt die im Gespräch bereits mit ★ markierten
 // Produkte und führt direkt in die Angebotsanfrage an den Innendienst — ohne die übrigen
-// Wizard-Schritte (Kundentyp, Produktbereiche, Muster, Notiz, Ergebnis), da hier bewusst kein
-// CRM-Eintrag oder keine Kundenmail entstehen soll, nur die fertige E-Mail an den Innendienst.
+// Wizard-Schritte für Produktbereiche/Muster/Notiz/Ergebnis, da hier bewusst kein vollständiger
+// CRM-Eintrag entstehen soll. Kundentyp (Bestandskunde/Neukunde) wird trotzdem gefragt, weil
+// Neukunde eine Adresse braucht und der Innendienst dafür zusätzlich informiert werden muss,
+// dass der Kontakt neu angelegt werden soll.
 function startAngebotFlow(){
   state.screen = 'summary';
-  state.summaryStep = 'angebotKunde';
+  state.summaryStep = 'kundentyp';
   state.summaryPurpose = 'angebot';
   state.summaryIsNewCustomer = null;
   state.summaryKaltakquise = false;
@@ -1609,10 +1611,20 @@ function occasionPromptModal() {
   // zwar unabhängig davon, ob zuerst ein CRM-Eintrag oder die Kundenzusammenfassung gewählt
   // wurde. Nur der Identitäts-Schritt unterscheidet sich: Neukunde bekommt das kombinierte
   // Adressformular, Bestandskunde Anrede+Name(+KD-Nr.), weil die Adresse schon vorliegt.
-  const stepNum = isNew
-    ? { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, ergebnis:7, occasion:8 }
-    : { kundentyp:2, salutation:3, name:4, produktbereiche:5, musterfrage:6, notiz:7, ergebnis:8, occasion:9 };
-  const total = isNew ? 8 : 9;
+  //
+  // Die eigenständige Kachel "Angebot anfragen" durchläuft denselben Kundentyp-Entscheid und
+  // (bei Neukunde) dasselbe Adressformular wie oben, aber ohne Produktbereiche/Muster/Notiz/
+  // Ergebnis — sie soll nur den Innendienst-Funnel abkürzen, keinen vollständigen CRM-Eintrag
+  // erzeugen. Bestandskunde landet direkt bei Name+KD-Nr. (angebotKunde), Neukunde bei der
+  // Adresse und optional der "Kontaktdaten an Innendienst senden?"-Frage (innendienstask),
+  // bevor es zu den Angebot-Optionen geht.
+  const isAngebot = state.summaryPurpose === 'angebot';
+  const stepNum = isAngebot
+    ? { kundentyp:1, neukunde:2, angebotKunde:2 }
+    : isNew
+      ? { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, ergebnis:7, occasion:8 }
+      : { kundentyp:2, salutation:3, name:4, produktbereiche:5, musterfrage:6, notiz:7, ergebnis:8, occasion:9 };
+  const total = isAngebot ? 2 : (isNew ? 8 : 9);
 
   if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
@@ -1633,14 +1645,14 @@ function occasionPromptModal() {
     return `<div class="modal-overlay">
       <div class="modal-card">
         ${modalCloseBtn()}
-        <span class="eyebrow">Schritt 2</span>
+        <span class="eyebrow">Schritt ${stepNum.kundentyp}${isAngebot ? ' von ' + total : ''}</span>
         <h2>Bestandskunde oder ${neuLabel}?</h2>
         <p>${state.summaryKundenbesuch ? 'Bei einer Kaltakquise fragen wir im nächsten Schritt kurz die Adresse ab.' : 'Bei einem Neukunden fragen wir im nächsten Schritt kurz die Adresse ab.'}</p>
         <div class="modal-choices">
           <button class="modal-choice" data-kundentyp-choice="bestand">${icon('pm')}<span>Bestandskunde</span></button>
           <button class="modal-choice" data-kundentyp-choice="neu">${icon('pm')}<span>${neuLabel}</span></button>
         </div>
-        <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-purpose">Zurück</button></div>
+        ${isAngebot ? '' : `<div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-purpose">Zurück</button></div>`}
       </div>
     </div>`;
   }
@@ -1885,14 +1897,14 @@ function occasionPromptModal() {
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(480px,100%)">
         ${modalCloseBtn()}
-        <span class="eyebrow">Angebot anfragen</span>
+        <span class="eyebrow">Schritt ${stepNum.angebotKunde} von ${total}</span>
         <h2>Für wen ist das Angebot?</h2>
         <p>Die mit ★ markierten Produkte werden automatisch in die Anfrage an den Innendienst übernommen.</p>
         ${entries.length ? `<div class="produkte-picked">${entries.map(({product,size}) => `<span>${escapeHtml(product.name)}${size?` · ${escapeHtml(size)}`:''}</span>`).join('')}</div>` : `<p class="muted-copy">Noch keine Produkte markiert — bitte zuerst im Gespräch mit ★ markieren.</p>`}
         <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="Kunde / Einrichtung (optional)"></label>
         <label class="modal-field"><input id="occasionKundenNr" type="text" value="${escapeHtml(state.summaryKundenNr)}" placeholder="KD-Nr. (optional)"></label>
         <div class="modal-actions">
-          <button class="secondary-button compact" data-action="modal-close">Abbrechen</button>
+          <button class="secondary-button compact" data-action="occasion-back-kundentyp">Zurück</button>
           <button class="primary-button compact" data-action="angebotkunde-weiter" ${entries.length?'':'disabled'}>Weiter</button>
         </div>
       </div>
@@ -1901,6 +1913,9 @@ function occasionPromptModal() {
   if (state.summaryStep === 'angebotOptionen') {
     const opts = state.angebotOptionen;
     const entries = favoriteEntries();
+    const angebotBackAction = state.summaryPurpose === 'angebot'
+      ? (state.newCustomer ? 'occasion-back-innendienstask' : 'occasion-back-angebotkunde')
+      : 'occasion-back-angebotask';
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(480px,100%)">
         ${modalCloseBtn()}
@@ -1913,7 +1928,7 @@ function occasionPromptModal() {
           <button type="button" class="notiz-chip ${opts.ba?'active':''}" data-angebot-toggle="ba">Betriebsanweisung</button>
         </div>
         <div class="modal-actions">
-          <button class="secondary-button compact" data-action="${state.summaryPurpose === 'angebot' ? 'occasion-back-angebotkunde' : 'occasion-back-angebotask'}">Zurück</button>
+          <button class="secondary-button compact" data-action="${angebotBackAction}">Zurück</button>
           <button class="primary-button compact" data-action="angebot-senden" ${entries.length?'':'disabled'}>${icon('talk')}<span>An Innendienst senden</span></button>
         </div>
       </div>
@@ -2986,6 +3001,10 @@ function bind() {
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
       if (state.summaryKundenbesuch) state.summaryKaltakquise = true;
+    } else if (state.summaryPurpose === 'angebot') {
+      // Angebotsanfrage-Kachel, Bestandskunde: KD-Nr. ist schon bekannt, kein voller
+      // CRM-Ablauf nötig — direkt zu Name+KD-Nr. und dann zu den Angebot-Optionen.
+      state.summaryStep = 'angebotKunde';
     } else {
       // Bestandskunde durchläuft jetzt denselben Ablauf wie Neukunde: erst Ansprechpartner
       // (hier per Anrede+Name statt Adressformular, da schon bekannt), dann Produktbereiche,
@@ -3034,7 +3053,9 @@ function bind() {
     if (d.anrede) { state.summarySalutation = d.anrede; localStorage.setItem('summarySalutation', d.anrede); }
     const plainName = [d.vorname, d.nachname].filter(Boolean).join(' ').trim();
     if (d.nachname) { state.summaryCustomer = plainName || d.nachname; localStorage.setItem('summaryCustomer', state.summaryCustomer); }
-    state.summaryStep = 'produktbereiche';
+    // Angebotsanfrage-Kachel, Neukunde: kein voller CRM-Ablauf — stattdessen direkt fragen,
+    // ob der neue Kontakt an den Innendienst gemeldet werden soll, dann zu den Angebot-Optionen.
+    state.summaryStep = state.summaryPurpose === 'angebot' ? 'innendienstask' : 'produktbereiche';
     render();
   });
   document.querySelectorAll('[data-produktbereich-open]').forEach(button => button.addEventListener('click', () => {
@@ -3220,8 +3241,9 @@ function bind() {
     state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask';
     render();
   });
-  $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
-  $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = 'angebotask'; render(); });
+  $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : 'angebotask'; render(); });
+  $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : 'angebotask'; render(); });
+  $('[data-action="occasion-back-innendienstask"]')?.addEventListener('click', () => { state.summaryStep = 'innendienstask'; render(); });
   $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
   $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => { state.summaryStep = 'angebotOptionen'; render(); });
   $('[data-action="occasion-back-angebotask"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
