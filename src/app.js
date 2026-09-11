@@ -429,7 +429,9 @@ const state = {
   summaryKaltakquise: false,
   summaryKundenbesuch: false,
   summarySent: false,
-  angebotOptionen: {pif:false, sdb:false, ba:false},
+  angebotOptionen: {pif:false, sdb:false, ba:false, muster:false},
+  angebotMusterMengen: {},
+  angebotMusterCycleIndex: 0,
   newCustomer: null,
   inviteWelcome: null
 };
@@ -1303,7 +1305,9 @@ function closeAnyModal(){
   state.summaryKaltakquise = false;
   state.summaryKundenbesuch = false;
   state.newCustomer = null;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false};
+  state.angebotOptionen = {pif:false, sdb:false, ba:false, muster:false};
+  state.angebotMusterMengen = {};
+  state.angebotMusterCycleIndex = 0;
   render();
 }
 function startSummaryFlow(){
@@ -1316,7 +1320,9 @@ function startSummaryFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false};
+  state.angebotOptionen = {pif:false, sdb:false, ba:false, muster:false};
+  state.angebotMusterMengen = {};
+  state.angebotMusterCycleIndex = 0;
 }
 // Einstieg über die Kachel "Kundenbesuch": fragt zuerst, ob es sich um einen Bestandskunden
 // oder eine Kaltakquise handelt (state.summaryKundenbesuch markiert diesen Einstiegsweg für den
@@ -1332,7 +1338,9 @@ function startKundenbesuchFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false};
+  state.angebotOptionen = {pif:false, sdb:false, ba:false, muster:false};
+  state.angebotMusterMengen = {};
+  state.angebotMusterCycleIndex = 0;
 }
 function newCustomerDraftDefault(){
   return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
@@ -1765,10 +1773,49 @@ function occasionPromptModal() {
           <button type="button" class="notiz-chip ${opts.pif?'active':''}" data-angebot-toggle="pif">Produktinformation</button>
           <button type="button" class="notiz-chip ${opts.sdb?'active':''}" data-angebot-toggle="sdb">Sicherheitsdatenblatt</button>
           <button type="button" class="notiz-chip ${opts.ba?'active':''}" data-angebot-toggle="ba">Betriebsanweisung</button>
+          <button type="button" class="notiz-chip ${opts.muster?'active':''}" data-angebot-toggle="muster">Muster</button>
         </div>
+        ${opts.muster ? `<div class="ergebnis-block">
+          <span class="notiz-baustein-label">Muster-Menge je Produkt</span>
+          ${entries.map(({product,size}) => {
+            const m = state.angebotMusterMengen[musterEntryKey(product, size)];
+            const desc = (!m || !m.mode) ? 'Menge noch nicht festgelegt' : (m.mode==='skip' ? 'kein Muster' : m.mode==='ve' ? `${m.ve} VE (${m.gesamt} Stück)` : `${m.gesamt} Stück`);
+            return `<div class="muster-summary-row"><span>${escapeHtml(product.name)}${size?' · '+escapeHtml(size):''}</span><small>${escapeHtml(desc)}</small></div>`;
+          }).join('')}
+          <button type="button" class="secondary-button compact" data-action="angebot-muster-mengen">Menge festlegen</button>
+        </div>` : ''}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-angebotask">Zurück</button>
           <button class="primary-button compact" data-action="angebot-senden" ${entries.length?'':'disabled'}>${icon('talk')}<span>An Innendienst senden</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'angebotMusterZyklus') {
+    const entries = favoriteEntries();
+    const idx = Math.min(state.angebotMusterCycleIndex || 0, entries.length - 1);
+    const entry = entries[idx];
+    const key = musterEntryKey(entry.product, entry.size);
+    const veCount = veStueckCount(entry.product, entry.size);
+    const m = state.angebotMusterMengen[key];
+    const stueckMode = !!(m && m.mode === 'stueck');
+    const canContinue = !!(m && m.mode && (m.mode !== 'stueck' || m.stueck > 0));
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(480px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Muster zum Angebot · Produkt ${idx+1} von ${entries.length}</span>
+        <h2>${escapeHtml(entry.product.name)}${entry.size ? ` · ${escapeHtml(entry.size)}` : ''}</h2>
+        ${veCount ? `<p class="muster-ve-info">1 VE = <strong>${veCount} Stück</strong></p>` : `<p class="muster-ve-info muted">VE-Größe nicht hinterlegt — bitte Stückzahl angeben.</p>`}
+        <div class="muster-tiles">
+          ${veCount ? `<button type="button" class="muster-tile ${m && m.mode==='ve' && m.ve===1 ? 'active':''}" data-angebot-muster-tile="ve1"><strong>1 VE</strong><small>${veCount} Stück</small></button>
+          <button type="button" class="muster-tile ${m && m.mode==='ve' && m.ve===2 ? 'active':''}" data-angebot-muster-tile="ve2"><strong>2 VE</strong><small>${veCount*2} Stück</small></button>` : ''}
+          <button type="button" class="muster-tile muster-tile-wide ${stueckMode ? 'active':''}" data-angebot-muster-tile="stueck"><strong>Stück</strong><small>individuelle Menge eingeben</small></button>
+        </div>
+        ${stueckMode ? `<label class="modal-field"><input id="angebotMusterStueckInput" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="z. B. 3" value="${m.stueck || ''}" autofocus></label>` : ''}
+        <button type="button" class="muster-skip-link ${m && m.mode==='skip' ? 'active':''}" data-angebot-muster-tile="skip">Kein Muster für dieses Produkt</button>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="angebot-muster-zyklus-zurueck">Zurück</button>
+          <button class="primary-button compact" data-action="angebot-muster-zyklus-weiter" ${canContinue?'':'disabled'}>Weiter</button>
         </div>
       </div>
     </div>`;
@@ -1844,6 +1891,14 @@ function buildAngebotInnendienstEmail(){
   if (opts.sdb) extras.push('Sicherheitsdatenblatt');
   if (opts.ba) extras.push('Betriebsanweisung');
   if (extras.length) lines.push(`Bitte zusätzlich mit dem Angebot mitsenden: ${extras.join(', ')}`, '');
+  if (opts.muster) {
+    const musterItems = entries.map(({product, size}) => {
+      const m = state.angebotMusterMengen[musterEntryKey(product, size)];
+      return (m && m.mode && m.mode !== 'skip') ? { name: product.name, size, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt } : null;
+    }).filter(Boolean);
+    lines.push('Bitte zusätzlich folgende Muster mit dem Angebot mitsenden:');
+    lines.push(...(musterItems.length ? musterItems.map(musterLineText) : ['– keine Menge ausgewählt –']), '');
+  }
   lines.push('Danke und Grüße' + (state.repName ? ', ' + state.repName : ''));
   return { subject: `Angebotsanfrage${customerName ? ' für ' + customerName : ''} – Dr. Schumacher`, body: lines.join('\n') };
 }
@@ -3064,13 +3119,71 @@ function bind() {
   $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
   $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = 'angebotask'; render(); });
   $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
-  $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => { state.summaryStep = 'angebotOptionen'; render(); });
+  $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => {
+    // Wurden im Gespräch bereits Muster mit "noch zusenden" markiert (Kaltakquise/Neukunde),
+    // fließt das direkt in die Angebotsanfrage ein — die Menge muss nicht erneut abgefragt werden.
+    const nc = state.newCustomer;
+    if (nc && nc.musterWanted) {
+      const zusenden = Object.entries(nc.musterMengen || {}).filter(([,m]) => m.status === 'zusenden');
+      if (zusenden.length) {
+        state.angebotOptionen.muster = true;
+        zusenden.forEach(([key, m]) => { state.angebotMusterMengen[key] = {...m}; });
+      }
+    }
+    state.summaryStep = 'angebotOptionen';
+    render();
+  });
   $('[data-action="occasion-back-angebotask"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
   document.querySelectorAll('[data-angebot-toggle]').forEach(button => button.addEventListener('click', () => {
     const key = button.dataset.angebotToggle;
     state.angebotOptionen[key] = !state.angebotOptionen[key];
     render();
   }));
+  $('[data-action="angebot-muster-mengen"]')?.addEventListener('click', () => { state.angebotMusterCycleIndex = 0; state.summaryStep = 'angebotMusterZyklus'; render(); });
+  document.querySelectorAll('[data-angebot-muster-tile]').forEach(button => button.addEventListener('click', () => {
+    const entries = favoriteEntries();
+    const idx = Math.min(state.angebotMusterCycleIndex || 0, entries.length - 1);
+    const entry = entries[idx];
+    if (!entry) return;
+    const key = musterEntryKey(entry.product, entry.size);
+    const veCount = veStueckCount(entry.product, entry.size);
+    const mode = button.dataset.angebotMusterTile;
+    if (mode === 've1' && veCount) state.angebotMusterMengen[key] = { mode:'ve', ve:1, stueck:0, gesamt:veCount };
+    else if (mode === 've2' && veCount) state.angebotMusterMengen[key] = { mode:'ve', ve:2, stueck:0, gesamt:veCount*2 };
+    else if (mode === 'skip') state.angebotMusterMengen[key] = { mode:'skip', ve:0, stueck:0, gesamt:0 };
+    else if (mode === 'stueck') {
+      const prev = state.angebotMusterMengen[key];
+      const stueck = (prev && prev.mode === 'stueck') ? prev.stueck : 0;
+      state.angebotMusterMengen[key] = { mode:'stueck', ve:0, stueck, gesamt:stueck };
+    }
+    render();
+  }));
+  $('#angebotMusterStueckInput')?.addEventListener('input', e => {
+    const entries = favoriteEntries();
+    const idx = Math.min(state.angebotMusterCycleIndex || 0, entries.length - 1);
+    const entry = entries[idx];
+    if (!entry) return;
+    const key = musterEntryKey(entry.product, entry.size);
+    const digits = e.target.value.replace(/\D+/g, '');
+    e.target.value = digits;
+    const n = digits ? parseInt(digits, 10) : 0;
+    state.angebotMusterMengen[key] = { mode:'stueck', ve:0, stueck:n, gesamt:n };
+    const weiterBtn = $('[data-action="angebot-muster-zyklus-weiter"]');
+    if (weiterBtn) weiterBtn.disabled = !(n > 0);
+  });
+  $('[data-action="angebot-muster-zyklus-zurueck"]')?.addEventListener('click', () => {
+    const idx = state.angebotMusterCycleIndex || 0;
+    if (idx > 0) state.angebotMusterCycleIndex = idx - 1;
+    else state.summaryStep = 'angebotOptionen';
+    render();
+  });
+  $('[data-action="angebot-muster-zyklus-weiter"]')?.addEventListener('click', () => {
+    const entries = favoriteEntries();
+    const idx = state.angebotMusterCycleIndex || 0;
+    if (idx < entries.length - 1) state.angebotMusterCycleIndex = idx + 1;
+    else state.summaryStep = 'angebotOptionen';
+    render();
+  });
   $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; render(); });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
