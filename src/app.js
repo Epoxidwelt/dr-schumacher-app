@@ -1361,6 +1361,7 @@ function newCustomerSave(){
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
     produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', '),
     musterWanted: !!nc.musterWanted, musterListe,
+    wettbewerber: (nc.crmWettbewerber || '').trim(),
     feedback: (nc.crmFeedback || '').trim(), samples: nc.crmSamples || 'Keine', result: nc.crmResult || 'Offen',
     nextFollowUp: (nc.crmFollowUpWanted && nc.crmFollowUpDate) ? nc.crmFollowUpDate : null
   };
@@ -1457,6 +1458,7 @@ const ERGEBNIS_FEEDBACK_BAUSTEINE = [
 const ERGEBNIS_SAMPLES_OPTIONS = ['Keine','Unterlagen gesendet','Muster übergeben','Test vereinbart','Angebot angefordert'];
 const ERGEBNIS_RESULT_OPTIONS = ['Offen','Interesse vorhanden','Testphase','Angebot erforderlich','Kein aktueller Bedarf','Abschluss vorbereitet'];
 const ERGEBNIS_FOLLOWUP_QUICK = [['Morgen',1],['In 1 Woche',7],['In 2 Wochen',14],['In 1 Monat',30]];
+const ERGEBNIS_WETTBEWERBER_OPTIONS = ['Schülke','Bode','Ecolab','B. Braun'];
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
@@ -1618,6 +1620,14 @@ function occasionPromptModal() {
         <h2>Rückmeldung &amp; Ergebnis</h2>
         <p>Schnell erfassen — für den CRM-Eintrag und das Follow-up Dashboard.</p>
         <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Aktueller Wettbewerber (optional)</span>
+          <div class="notiz-baustein-chips">
+            ${ERGEBNIS_WETTBEWERBER_OPTIONS.map(o => `<button type="button" class="notiz-chip ${!nc.crmWettbewerberCustom && nc.crmWettbewerber===o?'active':''}" data-wettbewerber-choice="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
+            <button type="button" class="notiz-chip ${nc.crmWettbewerberCustom?'active':''}" data-wettbewerber-choice="__custom__">Sonstiger</button>
+          </div>
+          ${nc.crmWettbewerberCustom ? `<label class="modal-field"><input id="ergebnisWettbewerberCustom" type="text" placeholder="Hersteller / Produktname" value="${escapeHtml(nc.crmWettbewerber)}"></label>` : ''}
+        </div>
+        <div class="ergebnis-block">
           <span class="notiz-baustein-label">Feedback / Bedarf</span>
           <div class="notiz-baustein-chips">${ERGEBNIS_FEEDBACK_BAUSTEINE.map((text,i) => `<button type="button" class="notiz-chip" data-feedback-idx="${i}">${escapeHtml(text)}</button>`).join('')}</div>
           <label class="modal-field"><textarea id="ergebnisFeedback" rows="2" placeholder="Eigener Text (optional)">${escapeHtml(nc.crmFeedback || '')}</textarea></label>
@@ -1743,13 +1753,6 @@ function buildNewCustomerInnendienstEmail(contact){
     `Handelspartner: –`,
     `Kondition: ${contact.preisliste || 'UVP'}`,
     `Herkunft: ${contact.herkunft === 'kaltakquise' ? 'Kaltakquise' : '–'}`,
-    `Besprochene Produktbereiche: ${(contact.produktbereiche||[]).map(produktbereichLabel).join(', ') || '–'}`,
-    `Besprochene Produkte: ${contact.produkte || '–'}`,
-    `Gesprächsnotiz: ${contact.notiz || '–'}`,
-    ...(contact.musterWanted ? [
-      `Musteranfrage: Muster gewünscht — wird vom Außendienst selbst über den Onlineshop bestellt.`,
-      ...((contact.musterListe && contact.musterListe.length) ? contact.musterListe.map(musterLineText) : ['– keine Menge ausgewählt –'])
-    ] : []),
     '',
     'Danke und Grüße' + (state.repName ? ', ' + state.repName : '')
   ];
@@ -2288,6 +2291,7 @@ function buildCrmSummary(report = state.visitReport) {
       `Besprochene Produktbereiche: ${report.produktbereicheText || '-'}`,
       `Besprochene Produkte: ${report.produkteText || '-'}`,
       `Gesprächsnotiz: ${report.notiz || '-'}`,
+      `Aktueller Wettbewerber: ${report.wettbewerber || '-'}`,
       `Feedback / Bedarf: ${report.feedback || '-'}`,
       `Muster / Unterlagen: ${report.samples || 'Keine'}`,
       `Ergebnis: ${report.result || 'Offen'}`,
@@ -2333,6 +2337,7 @@ function buildQuickCrmEntry(){
       produkteText: c.produkte || '',
       notiz: c.notiz || '', herkunft: c.herkunft || '',
       musterWanted: !!c.musterWanted, musterListe: c.musterListe || [],
+      wettbewerber: c.wettbewerber || '',
       feedback: c.feedback || '', samples: c.samples || 'Keine', result: c.result || 'Offen', followUp: c.nextFollowUp || '',
       date: oneToday(), type: state.summaryOccasion.trim() || 'Produktvorstellung',
       nextSteps: '', owner: state.repName || '-'
@@ -2710,7 +2715,7 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {}, crmFeedback: '', crmSamples: 'Keine', crmResult: 'Offen', crmFollowUpWanted: null, crmFollowUpDate: '' };
+      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {}, crmWettbewerber: '', crmWettbewerberCustom: false, crmFeedback: '', crmSamples: 'Keine', crmResult: 'Offen', crmFollowUpWanted: null, crmFollowUpDate: '' };
       state.summaryStep = 'neukunde';
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
@@ -2839,6 +2844,13 @@ function bind() {
     state.summaryStep = (state.summaryPurpose === 'crm') ? 'ergebnis' : 'occasion';
     render();
   });
+  document.querySelectorAll('[data-wettbewerber-choice]').forEach(btn => btn.addEventListener('click', () => {
+    const val = btn.dataset.wettbewerberChoice;
+    if (val === '__custom__') { state.newCustomer.crmWettbewerberCustom = true; state.newCustomer.crmWettbewerber = ''; }
+    else { state.newCustomer.crmWettbewerberCustom = false; state.newCustomer.crmWettbewerber = val; }
+    render();
+  }));
+  $('#ergebnisWettbewerberCustom')?.addEventListener('input', e => { state.newCustomer.crmWettbewerber = e.target.value; });
   document.querySelectorAll('[data-feedback-idx]').forEach(btn => btn.addEventListener('click', () => {
     const text = ERGEBNIS_FEEDBACK_BAUSTEINE[+btn.dataset.feedbackIdx];
     const ta = $('#ergebnisFeedback');
