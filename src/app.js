@@ -1352,7 +1352,7 @@ function newCustomerSave(){
   // genaue VE-/Stückzahl je Produkt; beim Bestandskunden übernimmt das der Innendienst.
   const musterListe = nc.musterWanted ? entries.map(({product, size}) => {
     const m = nc.musterMengen[musterEntryKey(product, size)];
-    return (m && m.mode !== 'skip') ? { name: product.name, size, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt } : null;
+    return (m && m.status && m.status !== 'skip') ? { name: product.name, size, status: m.status, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt } : null;
   }).filter(Boolean) : [];
   const fields = {
     name:d.firma.trim(), anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
@@ -1569,20 +1569,28 @@ function occasionPromptModal() {
     const veCount = veStueckCount(entry.product, entry.size);
     const m = state.newCustomer.musterMengen[key];
     const stueckMode = !!(m && m.mode === 'stueck');
-    const canContinue = !!m && (m.mode !== 'stueck' || m.stueck > 0);
+    const showQty = !!(m && (m.status === 'dagelassen' || m.status === 'zusenden'));
+    // "Bereits dagelassen" dokumentiert nur, was beim Termin schon übergeben wurde — keine
+    // Bestellung nötig. "Noch zusenden" ist die Menge, die der Außendienst anschließend über
+    // den Onlineshop bestellt. Beides läuft über dieselbe Mengen-Eingabe, nur mit anderem Status.
+    const canContinue = !!m && (m.status === 'skip' || (showQty && (m.mode === 've' || (m.mode === 'stueck' && m.stueck > 0))));
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(480px,100%)">
         ${modalCloseBtn()}
         <span class="eyebrow">Muster · Produkt ${idx+1} von ${entries.length}</span>
         <h2>${escapeHtml(entry.product.name)}${entry.size ? ` · ${escapeHtml(entry.size)}` : ''}</h2>
-        ${veCount ? `<p class="muster-ve-info">1 VE = <strong>${veCount} Stück</strong></p>` : `<p class="muster-ve-info muted">VE-Größe nicht hinterlegt — bitte Stückzahl angeben.</p>`}
         <div class="muster-tiles">
-          ${veCount ? `<button type="button" class="muster-tile ${m && m.mode==='ve' && m.ve===1 ? 'active':''}" data-muster-tile="ve1"><strong>1 VE</strong><small>${veCount} Stück</small></button>
-          <button type="button" class="muster-tile ${m && m.mode==='ve' && m.ve===2 ? 'active':''}" data-muster-tile="ve2"><strong>2 VE</strong><small>${veCount*2} Stück</small></button>` : ''}
+          <button type="button" class="muster-tile muster-tile-wide ${m && m.status==='dagelassen' ? 'active':''}" data-muster-status="dagelassen"><strong>Bereits dagelassen</strong><small>heute beim Termin übergeben</small></button>
+          <button type="button" class="muster-tile muster-tile-wide ${m && m.status==='zusenden' ? 'active':''}" data-muster-status="zusenden"><strong>Noch zusenden</strong><small>wird über den Onlineshop bestellt</small></button>
+        </div>
+        ${showQty ? `${veCount ? `<p class="muster-ve-info">1 VE = <strong>${veCount} Stück</strong></p>` : `<p class="muster-ve-info muted">VE-Größe nicht hinterlegt — bitte Stückzahl angeben.</p>`}
+        <div class="muster-tiles">
+          ${veCount ? `<button type="button" class="muster-tile ${m.mode==='ve' && m.ve===1 ? 'active':''}" data-muster-tile="ve1"><strong>1 VE</strong><small>${veCount} Stück</small></button>
+          <button type="button" class="muster-tile ${m.mode==='ve' && m.ve===2 ? 'active':''}" data-muster-tile="ve2"><strong>2 VE</strong><small>${veCount*2} Stück</small></button>` : ''}
           <button type="button" class="muster-tile muster-tile-wide ${stueckMode ? 'active':''}" data-muster-tile="stueck"><strong>Stück</strong><small>individuelle Menge eingeben</small></button>
         </div>
-        ${stueckMode ? `<label class="modal-field"><input id="musterStueckInput" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="z. B. 3" value="${m.stueck || ''}" autofocus></label>` : ''}
-        <button type="button" class="muster-skip-link ${m && m.mode==='skip' ? 'active':''}" data-muster-tile="skip">Kein Muster für dieses Produkt</button>
+        ${stueckMode ? `<label class="modal-field"><input id="musterStueckInput" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="z. B. 3" value="${m.stueck || ''}" autofocus></label>` : ''}` : ''}
+        <button type="button" class="muster-skip-link ${m && m.status==='skip' ? 'active':''}" data-muster-status="skip">Kein Muster für dieses Produkt</button>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="muster-zyklus-zurueck">Zurück</button>
           <button class="primary-button compact" data-action="muster-zyklus-weiter" ${canContinue?'':'disabled'}>Weiter</button>
@@ -2307,10 +2315,7 @@ function buildCrmSummary(report = state.visitReport) {
       `Muster / Unterlagen: ${report.samples || 'Keine'}`,
       `Ergebnis: ${report.result || 'Offen'}`,
       `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
-      ...(report.musterWanted ? [
-        `Musteranfrage (Bestellung über Onlineshop durch Außendienst):`,
-        ...((report.musterListe && report.musterListe.length) ? report.musterListe.map(musterLineText) : ['– keine Menge ausgewählt –'])
-      ] : []),
+      ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
       `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
       `Nächster Schritt: ${report.nextSteps || report.type || '-'}`,
       `Zuständiger Mitarbeiter: ${report.owner || '-'}`
@@ -2561,6 +2566,19 @@ function musterLineText(item) {
   const label = item.name + (item.size ? ' · ' + item.size : '');
   return item.mode === 've' ? `${label} — ${item.ve} VE (${item.gesamt} Stück gesamt)` : `${label} — ${item.gesamt} Stück`;
 }
+// Getrennt nach "bereits dagelassen" (reine Dokumentation, keine Bestellung nötig) und "noch
+// zusenden" (muss der Außendienst über den Onlineshop bestellen) — sonst liest sich die
+// Zusammenfassung so, als müsste alles noch bestellt werden.
+function musterSummaryLines(musterListe) {
+  const list = musterListe || [];
+  const dagelassen = list.filter(i => i.status === 'dagelassen');
+  const zusenden = list.filter(i => i.status === 'zusenden');
+  const lines = [];
+  if (dagelassen.length) lines.push('Muster bereits dagelassen:', ...dagelassen.map(musterLineText));
+  if (zusenden.length) lines.push('Muster noch zusenden (Bestellung über Onlineshop durch Außendienst):', ...zusenden.map(musterLineText));
+  if (!lines.length) lines.push('Muster gewünscht — keine Angabe ausgewählt.');
+  return lines;
+}
 function unitsInSize(size) {
   const m = /^(\d+)\s*Tücher/i.exec(size || '');
   return m ? Number(m[1]) : null;
@@ -2797,6 +2815,20 @@ function bind() {
     else state.summaryStep = 'notiz';
     render();
   }));
+  document.querySelectorAll('[data-muster-status]').forEach(button => button.addEventListener('click', () => {
+    const entries = favoriteEntries();
+    const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
+    const entry = entries[idx];
+    if (!entry) return;
+    const key = musterEntryKey(entry.product, entry.size);
+    const status = button.dataset.musterStatus;
+    if (status === 'skip') { state.newCustomer.musterMengen[key] = { status:'skip', mode:null, ve:0, stueck:0, gesamt:0 }; }
+    else {
+      const prev = state.newCustomer.musterMengen[key];
+      state.newCustomer.musterMengen[key] = { status, mode:(prev&&prev.mode)||null, ve:(prev&&prev.ve)||0, stueck:(prev&&prev.stueck)||0, gesamt:(prev&&prev.gesamt)||0 };
+    }
+    render();
+  }));
   document.querySelectorAll('[data-muster-tile]').forEach(button => button.addEventListener('click', () => {
     const entries = favoriteEntries();
     const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
@@ -2804,14 +2836,14 @@ function bind() {
     if (!entry) return;
     const key = musterEntryKey(entry.product, entry.size);
     const veCount = veStueckCount(entry.product, entry.size);
+    const status = state.newCustomer.musterMengen[key]?.status;
     const mode = button.dataset.musterTile;
-    if (mode === 've1' && veCount) state.newCustomer.musterMengen[key] = { mode:'ve', ve:1, stueck:0, gesamt:veCount };
-    else if (mode === 've2' && veCount) state.newCustomer.musterMengen[key] = { mode:'ve', ve:2, stueck:0, gesamt:veCount*2 };
-    else if (mode === 'skip') state.newCustomer.musterMengen[key] = { mode:'skip', ve:0, stueck:0, gesamt:0 };
+    if (mode === 've1' && veCount) state.newCustomer.musterMengen[key] = { status, mode:'ve', ve:1, stueck:0, gesamt:veCount };
+    else if (mode === 've2' && veCount) state.newCustomer.musterMengen[key] = { status, mode:'ve', ve:2, stueck:0, gesamt:veCount*2 };
     else if (mode === 'stueck') {
       const prev = state.newCustomer.musterMengen[key];
       const stueck = (prev && prev.mode === 'stueck') ? prev.stueck : 0;
-      state.newCustomer.musterMengen[key] = { mode:'stueck', ve:0, stueck, gesamt:stueck };
+      state.newCustomer.musterMengen[key] = { status, mode:'stueck', ve:0, stueck, gesamt:stueck };
     }
     render();
   }));
@@ -2821,10 +2853,11 @@ function bind() {
     const entry = entries[idx];
     if (!entry) return;
     const key = musterEntryKey(entry.product, entry.size);
+    const status = state.newCustomer.musterMengen[key]?.status;
     const digits = e.target.value.replace(/\D+/g, '');
     e.target.value = digits;
     const n = digits ? parseInt(digits, 10) : 0;
-    state.newCustomer.musterMengen[key] = { mode:'stueck', ve:0, stueck:n, gesamt:n };
+    state.newCustomer.musterMengen[key] = { status, mode:'stueck', ve:0, stueck:n, gesamt:n };
     const weiterBtn = $('[data-action="muster-zyklus-weiter"]');
     if (weiterBtn) weiterBtn.disabled = !(n > 0);
   });
