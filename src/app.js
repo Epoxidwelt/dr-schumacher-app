@@ -384,6 +384,8 @@ const state = {
   favorites: migrateFavorites(localStorage.getItem('favorites')),
   size: '',
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
+  dashboardToolOrder: JSON.parse(localStorage.getItem('dashboardToolOrder') || 'null'),
+  dashboardArrangeMode: false,
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
   vsCompare: {productId:'', size:'', competitorName:'', competitorCustom:false, competitorPrice:'', competitorUnits:'', annualUnits:'', ...(JSON.parse(localStorage.getItem('vsCompare') || 'null') || {})},
   advisor: {category:'', subtype:'', need:''},
@@ -624,6 +626,32 @@ function coreCategoryGrid() {
   ];
   return `<div class="category-grid">${coreCards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>`;
 }
+// Reihenfolge der "Weitere Funktionen"-Kacheln — jeder Mitarbeiter kann sie sich über den
+// "Anordnen"-Modus selbst zurechtlegen (lokal auf dem eigenen Gerät gespeichert). Diese Liste
+// ist nur der Ausgangszustand; neu hinzukommende Kacheln werden an bestehende Reihenfolgen
+// automatisch hinten angehängt.
+const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','compare','competition','offer','summary','report','dashboard','messe','pm','downloads','all'];
+function orderedToolCards(toolCards) {
+  const order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder : DASHBOARD_TOOL_KEYS_DEFAULT;
+  const byKey = new Map(toolCards.map(c => [c[0], c]));
+  const ordered = [];
+  order.forEach(key => { if (byKey.has(key)) { ordered.push(byKey.get(key)); byKey.delete(key); } });
+  byKey.forEach(c => ordered.push(c));
+  return ordered;
+}
+function moveToolCard(key, dir, visibleKeys) {
+  const idx = visibleKeys.indexOf(key);
+  const swapIdx = idx + dir;
+  if (idx < 0 || swapIdx < 0 || swapIdx >= visibleKeys.length) return;
+  const neighborKey = visibleKeys[swapIdx];
+  let order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder.slice() : DASHBOARD_TOOL_KEYS_DEFAULT.slice();
+  DASHBOARD_TOOL_KEYS_DEFAULT.forEach(k => { if (!order.includes(k)) order.push(k); });
+  const a = order.indexOf(key), b = order.indexOf(neighborKey);
+  if (a < 0 || b < 0) return;
+  [order[a], order[b]] = [order[b], order[a]];
+  state.dashboardToolOrder = order;
+  localStorage.setItem('dashboardToolOrder', JSON.stringify(order));
+}
 function menuScreen() {
   let cards = [
     ['surface','Fläche','Desinfektion & Reinigung'],
@@ -650,7 +678,7 @@ function menuScreen() {
   if (!can('sales')) cards = cards.filter(card => !['compare','offer','summary','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
   if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
-  const toolCards = cards.filter(c => !coreKeys.includes(c[0]));
+  const toolCards = orderedToolCards(cards.filter(c => !coreKeys.includes(c[0])));
   const today = new Date().toISOString().slice(0,10);
   const openReports = state.savedReports.filter(r => (r.taskStatus || 'Offen') !== 'Erledigt');
   const due = openReports.filter(r => r.followUp && r.followUp <= today).length;
@@ -672,8 +700,11 @@ function menuScreen() {
       <button data-category="recent"><strong>${state.recent.length}</strong><span>Zuletzt angesehen</span><small>Verlauf öffnen →</small></button>
       <button data-category="settings"><strong>${Object.keys(state.priceByArt).length}</strong><span>Preisdatensätze</span><small>Import verwalten →</small></button>
     </section>
-    <div class="section-heading"><div><span class="eyebrow">Weitere Funktionen</span><h2>Werkzeuge</h2></div></div>
-    <div class="category-grid compact-grid">${toolCards.map(([key,title,sub]) => `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`).join('')}</div>
+    <div class="section-heading"><div><span class="eyebrow">Weitere Funktionen</span><h2>Werkzeuge</h2></div><button class="secondary-button compact" data-action="toggle-arrange-tools">${state.dashboardArrangeMode ? 'Fertig' : 'Anordnen'}</button></div>
+    <div class="category-grid compact-grid">${toolCards.map(([key,title,sub],i) => state.dashboardArrangeMode
+      ? `<div class="category-card arrange-card ${key}" data-tool-key="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><div class="arrange-controls"><button type="button" class="arrange-btn" data-arrange-up="${key}" ${i===0?'disabled':''} aria-label="${escapeHtml(title)} nach oben verschieben">↑</button><button type="button" class="arrange-btn" data-arrange-down="${key}" ${i===toolCards.length-1?'disabled':''} aria-label="${escapeHtml(title)} nach unten verschieben">↓</button></div></div>`
+      : `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`
+    ).join('')}</div>
     <section class="online-card"><div class="online-dot"></div><div><strong>Unterlagen immer aktuell</strong><p>Produktinformationen, Datenblätter und Bilder werden direkt von schumacher-online.com geöffnet.</p></div><a href="${OFFICIAL.home}" target="_blank" rel="noopener">Website öffnen</a></section>
   </main>`;
 }
@@ -2844,6 +2875,17 @@ function bind() {
   $('#search')?.addEventListener('input', event => { state.query=event.target.value; debouncedRender(); });
   $('#globalSearch')?.addEventListener('input', event => { state.globalQuery=event.target.value; debouncedRender(); });
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
+  $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
+  document.querySelectorAll('[data-arrange-up]').forEach(button => button.addEventListener('click', () => {
+    const visibleKeys = Array.from(document.querySelectorAll('.arrange-card')).map(el => el.dataset.toolKey);
+    moveToolCard(button.dataset.arrangeUp, -1, visibleKeys);
+    render();
+  }));
+  document.querySelectorAll('[data-arrange-down]').forEach(button => button.addEventListener('click', () => {
+    const visibleKeys = Array.from(document.querySelectorAll('.arrange-card')).map(el => el.dataset.toolKey);
+    moveToolCard(button.dataset.arrangeDown, 1, visibleKeys);
+    render();
+  }));
   $('#excel')?.addEventListener('change', importExcel);
   document.querySelectorAll('[data-advisor]').forEach(button => button.onclick = () => { state.advisor[button.dataset.advisor]=button.dataset.value; render(); });
   $('[data-action="reset-advisor"]')?.addEventListener('click', () => { state.advisor={category:'',subtype:'',need:''}; render(); });
