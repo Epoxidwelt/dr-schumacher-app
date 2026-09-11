@@ -1361,7 +1361,7 @@ function newCustomerSave(){
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
     produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', '),
     musterWanted: !!nc.musterWanted, musterListe,
-    wettbewerber: (nc.crmWettbewerber || '').trim(),
+    wettbewerber: [...(nc.crmWettbewerber || []), (nc.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
     feedback: (nc.crmFeedback || '').trim(), samples: nc.crmSamples || 'Keine', result: nc.crmResult || 'Offen',
     nextFollowUp: (nc.crmFollowUpWanted && nc.crmFollowUpDate) ? nc.crmFollowUpDate : null
   };
@@ -1458,6 +1458,18 @@ const ERGEBNIS_SAMPLES_OPTIONS = ['Keine','Unterlagen gesendet','Muster übergeb
 const ERGEBNIS_RESULT_OPTIONS = ['Offen','Interesse vorhanden','Testphase','Angebot erforderlich','Kein aktueller Bedarf','Abschluss vorbereitet'];
 const ERGEBNIS_FOLLOWUP_QUICK = [['Morgen',1],['In 1 Woche',7],['In 2 Wochen',14],['In 1 Monat',30]];
 const ERGEBNIS_WETTBEWERBER_OPTIONS = ['Schülke','Bode','Ecolab','B. Braun'];
+// Baustein-Text beim erneuten Antippen wieder herausnehmen (Toggle statt Duplikat). Wurde der
+// eingefügte Satz zwischenzeitlich manuell verändert, greift kein Fall mehr — dann bleibt der
+// Text unangetastet, statt versehentlich fremden Text zu löschen.
+function removeFeedbackBausteinText(value, text) {
+  if (value === text) return '';
+  if (value.startsWith(text + ' ')) return value.slice(text.length + 1);
+  if (value.endsWith(' ' + text)) return value.slice(0, value.length - text.length - 1);
+  const mid = ' ' + text + ' ';
+  const idx = value.indexOf(mid);
+  if (idx >= 0) return value.slice(0, idx) + ' ' + value.slice(idx + mid.length);
+  return value;
+}
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
@@ -1619,16 +1631,16 @@ function occasionPromptModal() {
         <h2>Rückmeldung &amp; Ergebnis</h2>
         <p>Schnell erfassen — für den CRM-Eintrag und das Follow-up Dashboard.</p>
         <div class="ergebnis-block">
-          <span class="notiz-baustein-label">Aktueller Wettbewerber (optional)</span>
+          <span class="notiz-baustein-label">Aktueller Wettbewerber (optional, Mehrfachauswahl)</span>
           <div class="notiz-baustein-chips">
-            ${ERGEBNIS_WETTBEWERBER_OPTIONS.map(o => `<button type="button" class="notiz-chip ${!nc.crmWettbewerberCustom && nc.crmWettbewerber===o?'active':''}" data-wettbewerber-choice="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
-            <button type="button" class="notiz-chip ${nc.crmWettbewerberCustom?'active':''}" data-wettbewerber-choice="__custom__">Sonstiger</button>
+            ${ERGEBNIS_WETTBEWERBER_OPTIONS.map(o => `<button type="button" class="notiz-chip ${(nc.crmWettbewerber||[]).includes(o)?'active':''}" data-wettbewerber-toggle="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
+            <button type="button" class="notiz-chip ${nc.crmWettbewerberCustomOpen?'active':''}" data-wettbewerber-custom-toggle="1">Sonstiger</button>
           </div>
-          ${nc.crmWettbewerberCustom ? `<label class="modal-field"><input id="ergebnisWettbewerberCustom" type="text" placeholder="Hersteller / Produktname" value="${escapeHtml(nc.crmWettbewerber)}"></label>` : ''}
+          ${nc.crmWettbewerberCustomOpen ? `<label class="modal-field"><input id="ergebnisWettbewerberCustom" type="text" placeholder="Weiterer Hersteller / Produktname" value="${escapeHtml(nc.crmWettbewerberCustomText || '')}"></label>` : ''}
         </div>
         <div class="ergebnis-block">
           <span class="notiz-baustein-label">Feedback / Bedarf</span>
-          <div class="notiz-baustein-chips">${ERGEBNIS_FEEDBACK_BAUSTEINE.map((text,i) => `<button type="button" class="notiz-chip" data-feedback-idx="${i}">${escapeHtml(text)}</button>`).join('')}</div>
+          <div class="notiz-baustein-chips">${ERGEBNIS_FEEDBACK_BAUSTEINE.map((text,i) => `<button type="button" class="notiz-chip ${(nc.crmFeedbackSelected||[]).includes(i)?'active':''}" data-feedback-idx="${i}">${escapeHtml(text)}</button>`).join('')}</div>
           <label class="modal-field"><textarea id="ergebnisFeedback" rows="2" placeholder="Eigener Text (optional)">${escapeHtml(nc.crmFeedback || '')}</textarea></label>
         </div>
         <div class="ergebnis-block">
@@ -2714,7 +2726,7 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {}, crmWettbewerber: '', crmWettbewerberCustom: false, crmFeedback: '', crmSamples: 'Keine', crmResult: 'Offen', crmFollowUpWanted: null, crmFollowUpDate: '' };
+      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {}, crmWettbewerber: [], crmWettbewerberCustomOpen: false, crmWettbewerberCustomText: '', crmFeedback: '', crmFeedbackSelected: [], crmSamples: 'Keine', crmResult: 'Offen', crmFollowUpWanted: null, crmFollowUpDate: '' };
       state.summaryStep = 'neukunde';
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
@@ -2843,19 +2855,35 @@ function bind() {
     state.summaryStep = (state.summaryPurpose === 'crm') ? 'ergebnis' : 'occasion';
     render();
   });
-  document.querySelectorAll('[data-wettbewerber-choice]').forEach(btn => btn.addEventListener('click', () => {
-    const val = btn.dataset.wettbewerberChoice;
-    if (val === '__custom__') { state.newCustomer.crmWettbewerberCustom = true; state.newCustomer.crmWettbewerber = ''; }
-    else { state.newCustomer.crmWettbewerberCustom = false; state.newCustomer.crmWettbewerber = val; }
+  document.querySelectorAll('[data-wettbewerber-toggle]').forEach(btn => btn.addEventListener('click', () => {
+    const val = btn.dataset.wettbewerberToggle;
+    const list = state.newCustomer.crmWettbewerber || (state.newCustomer.crmWettbewerber = []);
+    const pos = list.indexOf(val);
+    if (pos >= 0) list.splice(pos, 1); else list.push(val);
     render();
   }));
-  $('#ergebnisWettbewerberCustom')?.addEventListener('input', e => { state.newCustomer.crmWettbewerber = e.target.value; });
+  $('[data-wettbewerber-custom-toggle]')?.addEventListener('click', () => {
+    state.newCustomer.crmWettbewerberCustomOpen = !state.newCustomer.crmWettbewerberCustomOpen;
+    render();
+  });
+  $('#ergebnisWettbewerberCustom')?.addEventListener('input', e => { state.newCustomer.crmWettbewerberCustomText = e.target.value; });
   document.querySelectorAll('[data-feedback-idx]').forEach(btn => btn.addEventListener('click', () => {
-    const text = ERGEBNIS_FEEDBACK_BAUSTEINE[+btn.dataset.feedbackIdx];
+    const idx = +btn.dataset.feedbackIdx;
+    const text = ERGEBNIS_FEEDBACK_BAUSTEINE[idx];
     const ta = $('#ergebnisFeedback');
     if (!text || !ta) return;
-    ta.value = ta.value.trim() ? ta.value.trim() + ' ' + text : text;
-    state.newCustomer.crmFeedback = ta.value;
+    const nc = state.newCustomer;
+    const selected = nc.crmFeedbackSelected || (nc.crmFeedbackSelected = []);
+    const pos = selected.indexOf(idx);
+    if (pos >= 0) {
+      selected.splice(pos, 1);
+      ta.value = removeFeedbackBausteinText(ta.value, text);
+    } else {
+      selected.push(idx);
+      ta.value = ta.value.trim() ? ta.value.trim() + ' ' + text : text;
+    }
+    nc.crmFeedback = ta.value;
+    render();
   }));
   $('#ergebnisFeedback')?.addEventListener('input', e => { state.newCustomer.crmFeedback = e.target.value; });
   document.querySelectorAll('[data-samples-choice]').forEach(btn => btn.addEventListener('click', () => { state.newCustomer.crmSamples = btn.dataset.samplesChoice; render(); }));
