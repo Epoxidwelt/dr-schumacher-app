@@ -523,6 +523,7 @@ function debounce(fn, wait) {
 const debouncedRender = debounce(render, 150);
 
 let lastViewKey = null;
+let lastModalStepKey = null;
 function currentViewKey() {
   return [state.screen, state.category, state.selected].join(':');
 }
@@ -540,6 +541,13 @@ function render() {
   const viewKey = currentViewKey();
   const viewChanged = viewKey !== lastViewKey;
   lastViewKey = viewKey;
+  // Modal-Inhalt (.modal-card) hat sein eigenes overflow-y:auto und wird bei jedem
+  // Klick (Chip-Auswahl etc.) komplett neu aufgebaut — ohne diese Rettung würde die
+  // Modal-Card dabei immer auf scrollTop 0 zurückspringen.
+  const modalStepKey = state.summaryStep || null;
+  const modalCardBefore = document.querySelector('.modal-card');
+  const modalScrollTop = (modalCardBefore && modalStepKey === lastModalStepKey) ? modalCardBefore.scrollTop : 0;
+  lastModalStepKey = modalStepKey;
   let html = '';
   if (state.screen === 'profile') html = profileScreen();
   if (state.screen === 'prices') html = priceScreen();
@@ -568,6 +576,10 @@ function render() {
   bind();
   if (state.screen === 'messe') initSignaturePad();
   if (state.screen === 'aroundme') initAroundMeMap();
+  if (modalStepKey) {
+    const modalCardAfter = document.querySelector('.modal-card');
+    if (modalCardAfter) modalCardAfter.scrollTop = modalScrollTop;
+  }
   if (focusState) {
     const el = document.getElementById(focusState.id);
     if (el) {
