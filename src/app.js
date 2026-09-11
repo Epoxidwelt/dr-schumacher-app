@@ -1360,7 +1360,9 @@ function newCustomerSave(){
     email:d.email.trim(), telefon:d.telefon.trim(), notiz:d.notiz.trim(),
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
     produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', '),
-    musterWanted: !!nc.musterWanted, musterListe
+    musterWanted: !!nc.musterWanted, musterListe,
+    feedback: (nc.crmFeedback || '').trim(), samples: nc.crmSamples || 'Keine', result: nc.crmResult || 'Offen',
+    nextFollowUp: (nc.crmFollowUpWanted && nc.crmFollowUpDate) ? nc.crmFollowUpDate : null
   };
   if (existing){
     Object.assign(existing, fields);
@@ -1446,11 +1448,25 @@ const NOTIZ_BAUSTEINE = {
     'Preisliste per E-Mail nachgereicht.'
   ]
 };
+const ERGEBNIS_FEEDBACK_BAUSTEINE = [
+  'Großes Interesse, konkreter Bedarf vorhanden.',
+  'Bedarf grundsätzlich vorhanden, aktuell aber kein akuter Handlungsdruck.',
+  'Preis ist das entscheidende Kriterium.',
+  'Aktuell kein Bedarf.'
+];
+const ERGEBNIS_SAMPLES_OPTIONS = ['Keine','Unterlagen gesendet','Muster übergeben','Test vereinbart','Angebot angefordert'];
+const ERGEBNIS_RESULT_OPTIONS = ['Offen','Interesse vorhanden','Testphase','Angebot erforderlich','Kein aktueller Bedarf','Abschluss vorbereitet'];
+const ERGEBNIS_FOLLOWUP_QUICK = [['Morgen',1],['In 1 Woche',7],['In 2 Wochen',14],['In 1 Monat',30]];
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
-  const total = isNew ? 7 : 5;
-  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, occasion: isNew?7:3, salutation:4, name:5 };
+  // Die schnelle Feedback/Muster/Ergebnis/Follow-up-Abfrage gilt nur, wenn direkt ein
+  // CRM-Eintrag entsteht (Einstieg über "Kundenbesuch" oder bewusst gewählt) — beim reinen
+  // Versand der Kundenzusammenfassung wird sie übersprungen, da dort ggf. gar kein
+  // CRM-Eintrag folgt.
+  const showErgebnis = isNew && isCrmFirst;
+  const total = isNew ? (showErgebnis ? 8 : 7) : 5;
+  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, ergebnis:7, occasion: isNew ? (showErgebnis?8:7) : 3, salutation:4, name:5 };
 
   if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
@@ -1590,6 +1606,48 @@ function occasionPromptModal() {
       </div>
     </div>`;
   }
+  if (state.summaryStep === 'ergebnis') {
+    const nc = state.newCustomer;
+    const samples = nc.crmSamples || 'Keine';
+    const result = nc.crmResult || 'Offen';
+    const followUpWanted = nc.crmFollowUpWanted;
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(560px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Schritt ${stepNum.ergebnis} von ${total}</span>
+        <h2>Rückmeldung &amp; Ergebnis</h2>
+        <p>Schnell erfassen — für den CRM-Eintrag und das Follow-up Dashboard.</p>
+        <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Feedback / Bedarf</span>
+          <div class="notiz-baustein-chips">${ERGEBNIS_FEEDBACK_BAUSTEINE.map((text,i) => `<button type="button" class="notiz-chip" data-feedback-idx="${i}">${escapeHtml(text)}</button>`).join('')}</div>
+          <label class="modal-field"><textarea id="ergebnisFeedback" rows="2" placeholder="Eigener Text (optional)">${escapeHtml(nc.crmFeedback || '')}</textarea></label>
+        </div>
+        <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Muster / Unterlagen</span>
+          <div class="notiz-baustein-chips">${ERGEBNIS_SAMPLES_OPTIONS.map(o => `<button type="button" class="notiz-chip ${samples===o?'active':''}" data-samples-choice="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}</div>
+        </div>
+        <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Ergebnis</span>
+          <div class="notiz-baustein-chips">${ERGEBNIS_RESULT_OPTIONS.map(o => `<button type="button" class="notiz-chip ${result===o?'active':''}" data-result-choice="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}</div>
+        </div>
+        <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Follow-up gewünscht?</span>
+          <div class="notiz-baustein-chips">
+            <button type="button" class="notiz-chip ${followUpWanted===false?'active':''}" data-followup-wanted="nein">Nein</button>
+            <button type="button" class="notiz-chip ${followUpWanted===true?'active':''}" data-followup-wanted="ja">Ja</button>
+          </div>
+          ${followUpWanted ? `<div class="notiz-baustein-chips" style="margin-top:8px">
+            ${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => `<button type="button" class="notiz-chip ${nc.crmFollowUpDate===oneAddDays(oneToday(),days)?'active':''}" data-followup-quick="${days}">${escapeHtml(label)}</button>`).join('')}
+          </div>
+          <label class="modal-field"><span class="ergebnis-sublabel">oder Datum wählen</span><input id="ergebnisFollowUpDate" type="date" value="${escapeHtml(nc.crmFollowUpDate || '')}"></label>` : ''}
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="occasion-back-notiz">Zurück</button>
+          <button class="primary-button compact" data-action="ergebnis-weiter" ${followUpWanted && !nc.crmFollowUpDate ? 'disabled':''}>Weiter</button>
+        </div>
+      </div>
+    </div>`;
+  }
   if (state.summaryStep === 'name') {
     return `<div class="modal-overlay">
       <div class="modal-card">
@@ -1666,7 +1724,7 @@ function occasionPromptModal() {
       <h2>Telefonat oder Termin vor Ort?</h2>
       <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt.</p>
       <div class="modal-choices">${SUMMARY_OCCASIONS.map(o => `<button class="modal-choice" data-occasion-choice="${escapeHtml(o.value)}">${icon(o.icon)}<span>${escapeHtml(o.short)}</span></button>`).join('')}</div>
-      <div class="modal-actions"><button class="secondary-button compact" data-action="${isNew?'occasion-back-notiz':'occasion-back-kundentyp'}">Zurück</button></div>
+      <div class="modal-actions"><button class="secondary-button compact" data-action="${isNew?(showErgebnis?'occasion-back-ergebnis':'occasion-back-notiz'):'occasion-back-kundentyp'}">Zurück</button></div>
     </div>
   </div>`;
 }
@@ -2230,11 +2288,15 @@ function buildCrmSummary(report = state.visitReport) {
       `Besprochene Produktbereiche: ${report.produktbereicheText || '-'}`,
       `Besprochene Produkte: ${report.produkteText || '-'}`,
       `Gesprächsnotiz: ${report.notiz || '-'}`,
+      `Feedback / Bedarf: ${report.feedback || '-'}`,
+      `Muster / Unterlagen: ${report.samples || 'Keine'}`,
+      `Ergebnis: ${report.result || 'Offen'}`,
       `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
       ...(report.musterWanted ? [
         `Musteranfrage (Bestellung über Onlineshop durch Außendienst):`,
         ...((report.musterListe && report.musterListe.length) ? report.musterListe.map(musterLineText) : ['– keine Menge ausgewählt –'])
       ] : []),
+      `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
       `Nächster Schritt: ${report.nextSteps || report.type || '-'}`,
       `Zuständiger Mitarbeiter: ${report.owner || '-'}`
     ];
@@ -2271,6 +2333,7 @@ function buildQuickCrmEntry(){
       produkteText: c.produkte || '',
       notiz: c.notiz || '', herkunft: c.herkunft || '',
       musterWanted: !!c.musterWanted, musterListe: c.musterListe || [],
+      feedback: c.feedback || '', samples: c.samples || 'Keine', result: c.result || 'Offen', followUp: c.nextFollowUp || '',
       date: oneToday(), type: state.summaryOccasion.trim() || 'Produktvorstellung',
       nextSteps: '', owner: state.repName || '-'
     };
@@ -2647,7 +2710,7 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {} };
+      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {}, crmFeedback: '', crmSamples: 'Keine', crmResult: 'Offen', crmFollowUpWanted: null, crmFollowUpDate: '' };
       state.summaryStep = 'neukunde';
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
@@ -2772,6 +2835,36 @@ function bind() {
   }));
   $('[data-action="notiz-weiter"]')?.addEventListener('click', () => {
     state.newCustomer.draft.notiz = (($('#occasionNotiz')||{}).value || '').trim();
+    newCustomerSave();
+    state.summaryStep = (state.summaryPurpose === 'crm') ? 'ergebnis' : 'occasion';
+    render();
+  });
+  document.querySelectorAll('[data-feedback-idx]').forEach(btn => btn.addEventListener('click', () => {
+    const text = ERGEBNIS_FEEDBACK_BAUSTEINE[+btn.dataset.feedbackIdx];
+    const ta = $('#ergebnisFeedback');
+    if (!text || !ta) return;
+    ta.value = ta.value.trim() ? ta.value.trim() + ' ' + text : text;
+    state.newCustomer.crmFeedback = ta.value;
+  }));
+  $('#ergebnisFeedback')?.addEventListener('input', e => { state.newCustomer.crmFeedback = e.target.value; });
+  document.querySelectorAll('[data-samples-choice]').forEach(btn => btn.addEventListener('click', () => { state.newCustomer.crmSamples = btn.dataset.samplesChoice; render(); }));
+  document.querySelectorAll('[data-result-choice]').forEach(btn => btn.addEventListener('click', () => { state.newCustomer.crmResult = btn.dataset.resultChoice; render(); }));
+  document.querySelectorAll('[data-followup-wanted]').forEach(btn => btn.addEventListener('click', () => {
+    state.newCustomer.crmFollowUpWanted = btn.dataset.followupWanted === 'ja';
+    if (!state.newCustomer.crmFollowUpWanted) state.newCustomer.crmFollowUpDate = '';
+    render();
+  }));
+  document.querySelectorAll('[data-followup-quick]').forEach(btn => btn.addEventListener('click', () => {
+    state.newCustomer.crmFollowUpDate = oneAddDays(oneToday(), +btn.dataset.followupQuick);
+    render();
+  }));
+  $('#ergebnisFollowUpDate')?.addEventListener('input', e => {
+    state.newCustomer.crmFollowUpDate = e.target.value;
+    const weiterBtn = $('[data-action="ergebnis-weiter"]');
+    if (weiterBtn) weiterBtn.disabled = !e.target.value;
+  });
+  $('[data-action="occasion-back-ergebnis"]')?.addEventListener('click', () => { state.summaryStep = 'ergebnis'; render(); });
+  $('[data-action="ergebnis-weiter"]')?.addEventListener('click', () => {
     newCustomerSave();
     state.summaryStep = 'occasion';
     render();
