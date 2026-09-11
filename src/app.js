@@ -1334,12 +1334,12 @@ function newCustomerDraftDefault(){
   return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
 }
 function isValidEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||'').trim()); }
-// Bei der Kaltakquise gibt es bewusst kein Pflichtfeld — vor Ort sind oft noch nicht alle
-// Angaben bekannt, und der Kontakt soll trotzdem gespeichert werden können. Ist ein Wert
-// eingetragen (z. B. eine E-Mail-Adresse), muss er aber ein gültiges Format haben.
+// Aktuell bewusst kein Pflichtfeld bei der Neukunden-/Kaltakquise-Erfassung — vor Ort sind
+// oft noch nicht alle Angaben bekannt, und der Kontakt soll trotzdem gespeichert werden
+// können. Ist ein Wert eingetragen (z. B. eine E-Mail-Adresse), muss er aber ein gültiges
+// Format haben. (Später sollen hier wieder Pflichtfelder greifen — aktuell nicht.)
 function newCustomerValid(d){
-  if (state.summaryKaltakquise) return !d.email.trim() || isValidEmail(d.email);
-  return !!(d.firma.trim() && d.nachname.trim() && d.plz.trim() && isValidEmail(d.email));
+  return !d.email.trim() || isValidEmail(d.email);
 }
 function newCustomerSave(){
   const nc = state.newCustomer;
@@ -1390,11 +1390,10 @@ function newCustomerAnsprechpartner(d){
   return [d.anrede, d.vorname, d.nachname].filter(Boolean).join(' ').trim();
 }
 function newCustomerFormFieldsHtml(d){
-  // Bei der Kaltakquise gibt es bewusst kein Pflichtfeld — der Kontakt muss auch mit nur
-  // wenigen (oder gar keinen) Angaben gespeichert werden können. Bei der klassischen
-  // Neukunde-Erfassung über die Kundenzusammenfassung bleiben Firma/Nachname/PLZ/E-Mail
-  // dagegen Pflicht, weil daraus direkt eine Kunden-E-Mail verschickt wird.
-  const required = !state.summaryKaltakquise;
+  // Aktuell bewusst kein Pflichtfeld — der Kontakt muss auch mit nur wenigen (oder gar
+  // keinen) Angaben gespeichert werden können, das vereinfacht die Ersterfassung. Später
+  // sollen hier wieder Pflichtfelder greifen — aktuell nicht.
+  const required = false;
   const fields = [
     ['firma','Firma / Einrichtung', required, 'text'], ['vorname','Vorname', false, 'text'], ['nachname','Nachname', required, 'text'],
     ['strasse','Straße', false, 'text'], ['hausnummer','Hausnummer', false, 'tel'],
@@ -1507,7 +1506,7 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.neukunde} von ${total}</span>
         <h2>Adresse des Neukunden</h2>
-        <p>${state.summaryKaltakquise ? 'So einfach wie möglich – kein Feld ist Pflicht. Alle Angaben können später ergänzt werden.' : 'So einfach wie möglich – nur Name, PLZ und E-Mail sind Pflicht.'}</p>
+        <p>So einfach wie möglich – aktuell ist kein Feld Pflicht. Alle Angaben können später ergänzt werden.</p>
         ${newCustomerFormFieldsHtml(d)}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-kundentyp">Zurück</button>
