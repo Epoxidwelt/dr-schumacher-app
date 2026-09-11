@@ -391,6 +391,13 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
+  summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
+  // Rückmeldung-&-Ergebnis-Schritt: bewusst auf dem Top-Level-State statt in state.newCustomer,
+  // weil dieser Schritt für Bestandskunde (kein state.newCustomer) genauso greift wie für
+  // Neukunde/Kaltakquise.
+  crmWettbewerber: [], crmWettbewerberCustomOpen: false, crmWettbewerberCustomText: '',
+  crmFeedback: '', crmFeedbackSelected: [], crmSamples: 'Keine', crmResult: 'Offen',
+  crmFollowUpWanted: null, crmFollowUpDate: '',
   summarySalutation: localStorage.getItem('summarySalutation') || 'Herr',
   summaryOccasion: localStorage.getItem('summaryOccasion') || SUMMARY_OCCASIONS[0].value,
   summaryIncludePrices: localStorage.getItem('summaryIncludePrices') === 'true',
@@ -431,9 +438,7 @@ const state = {
   summaryKaltakquise: false,
   summaryKundenbesuch: false,
   summarySent: false,
-  angebotOptionen: {pif:false, sdb:false, ba:false, muster:false},
-  angebotMusterMengen: {},
-  angebotMusterCycleIndex: 0,
+  angebotOptionen: {pif:false, sdb:false, ba:false},
   newCustomer: null,
   inviteWelcome: null
 };
@@ -1398,9 +1403,7 @@ function closeAnyModal(){
   state.summaryKaltakquise = false;
   state.summaryKundenbesuch = false;
   state.newCustomer = null;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false, muster:false};
-  state.angebotMusterMengen = {};
-  state.angebotMusterCycleIndex = 0;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false};
   render();
 }
 function startSummaryFlow(){
@@ -1413,9 +1416,7 @@ function startSummaryFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false, muster:false};
-  state.angebotMusterMengen = {};
-  state.angebotMusterCycleIndex = 0;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false};
 }
 // Einstieg über die Kachel "Kundenbesuch": fragt zuerst, ob es sich um einen Bestandskunden
 // oder eine Kaltakquise handelt (state.summaryKundenbesuch markiert diesen Einstiegsweg für den
@@ -1431,9 +1432,7 @@ function startKundenbesuchFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false, muster:false};
-  state.angebotMusterMengen = {};
-  state.angebotMusterCycleIndex = 0;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false};
 }
 function newCustomerDraftDefault(){
   return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
@@ -1466,9 +1465,9 @@ function newCustomerSave(){
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
     produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', '),
     musterWanted: !!nc.musterWanted, musterListe,
-    wettbewerber: [...(nc.crmWettbewerber || []), (nc.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
-    feedback: (nc.crmFeedback || '').trim(), samples: nc.crmSamples || 'Keine', result: nc.crmResult || 'Offen',
-    nextFollowUp: (nc.crmFollowUpWanted && nc.crmFollowUpDate) ? nc.crmFollowUpDate : null
+    wettbewerber: [...(state.crmWettbewerber || []), (state.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
+    feedback: (state.crmFeedback || '').trim(), samples: state.crmSamples || 'Keine', result: state.crmResult || 'Offen',
+    nextFollowUp: (state.crmFollowUpWanted && state.crmFollowUpDate) ? state.crmFollowUpDate : null
   };
   if (existing){
     Object.assign(existing, fields);
@@ -1578,13 +1577,13 @@ function removeFeedbackBausteinText(value, text) {
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
-  // Die schnelle Feedback/Muster/Ergebnis/Follow-up-Abfrage gilt nur, wenn direkt ein
-  // CRM-Eintrag entsteht (Einstieg über "Kundenbesuch" oder bewusst gewählt) — beim reinen
-  // Versand der Kundenzusammenfassung wird sie übersprungen, da dort ggf. gar kein
+  // Die schnelle Wettbewerber/Feedback/Muster/Ergebnis/Follow-up-Abfrage gilt für Bestandskunde
+  // genauso wie für Neukunde/Kaltakquise, aber nur wenn direkt ein CRM-Eintrag entsteht — beim
+  // reinen Versand der Kundenzusammenfassung wird sie übersprungen, da dort ggf. gar kein
   // CRM-Eintrag folgt.
-  const showErgebnis = isNew && isCrmFirst;
-  const total = isNew ? (showErgebnis ? 8 : 7) : 5;
-  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, ergebnis:7, occasion: isNew ? (showErgebnis?8:7) : 3, salutation:4, name:5 };
+  const showErgebnis = isCrmFirst;
+  const total = isNew ? (showErgebnis ? 8 : 7) : (showErgebnis ? 6 : 5);
+  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, ergebnis: isNew?7:6, occasion: isNew ? (showErgebnis?8:7) : 3, salutation:4, name:5 };
 
   if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
@@ -1733,10 +1732,9 @@ function occasionPromptModal() {
     </div>`;
   }
   if (state.summaryStep === 'ergebnis') {
-    const nc = state.newCustomer;
-    const samples = nc.crmSamples || 'Keine';
-    const result = nc.crmResult || 'Offen';
-    const followUpWanted = nc.crmFollowUpWanted;
+    const samples = state.crmSamples || 'Keine';
+    const result = state.crmResult || 'Offen';
+    const followUpWanted = state.crmFollowUpWanted;
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(560px,100%)">
         ${modalCloseBtn()}
@@ -1746,15 +1744,15 @@ function occasionPromptModal() {
         <div class="ergebnis-block">
           <span class="notiz-baustein-label">Aktueller Wettbewerber (optional, Mehrfachauswahl)</span>
           <div class="notiz-baustein-chips">
-            ${ERGEBNIS_WETTBEWERBER_OPTIONS.map(o => `<button type="button" class="notiz-chip ${(nc.crmWettbewerber||[]).includes(o)?'active':''}" data-wettbewerber-toggle="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
-            <button type="button" class="notiz-chip ${nc.crmWettbewerberCustomOpen?'active':''}" data-wettbewerber-custom-toggle="1">Sonstiger</button>
+            ${ERGEBNIS_WETTBEWERBER_OPTIONS.map(o => `<button type="button" class="notiz-chip ${(state.crmWettbewerber||[]).includes(o)?'active':''}" data-wettbewerber-toggle="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
+            <button type="button" class="notiz-chip ${state.crmWettbewerberCustomOpen?'active':''}" data-wettbewerber-custom-toggle="1">Sonstiger</button>
           </div>
-          ${nc.crmWettbewerberCustomOpen ? `<label class="modal-field"><input id="ergebnisWettbewerberCustom" type="text" placeholder="Weiterer Hersteller / Produktname" value="${escapeHtml(nc.crmWettbewerberCustomText || '')}"></label>` : ''}
+          ${state.crmWettbewerberCustomOpen ? `<label class="modal-field"><input id="ergebnisWettbewerberCustom" type="text" placeholder="Weiterer Hersteller / Produktname" value="${escapeHtml(state.crmWettbewerberCustomText || '')}"></label>` : ''}
         </div>
         <div class="ergebnis-block">
           <span class="notiz-baustein-label">Feedback / Bedarf</span>
-          <div class="notiz-baustein-chips">${ERGEBNIS_FEEDBACK_BAUSTEINE.map((text,i) => `<button type="button" class="notiz-chip ${(nc.crmFeedbackSelected||[]).includes(i)?'active':''}" data-feedback-idx="${i}">${escapeHtml(text)}</button>`).join('')}</div>
-          <label class="modal-field"><textarea id="ergebnisFeedback" rows="2" placeholder="Eigener Text (optional)">${escapeHtml(nc.crmFeedback || '')}</textarea></label>
+          <div class="notiz-baustein-chips">${ERGEBNIS_FEEDBACK_BAUSTEINE.map((text,i) => `<button type="button" class="notiz-chip ${(state.crmFeedbackSelected||[]).includes(i)?'active':''}" data-feedback-idx="${i}">${escapeHtml(text)}</button>`).join('')}</div>
+          <label class="modal-field"><textarea id="ergebnisFeedback" rows="2" placeholder="Eigener Text (optional)">${escapeHtml(state.crmFeedback || '')}</textarea></label>
         </div>
         <div class="ergebnis-block">
           <span class="notiz-baustein-label">Muster / Unterlagen</span>
@@ -1771,13 +1769,13 @@ function occasionPromptModal() {
             <button type="button" class="notiz-chip ${followUpWanted===true?'active':''}" data-followup-wanted="ja">Ja</button>
           </div>
           ${followUpWanted ? `<div class="notiz-baustein-chips" style="margin-top:8px">
-            ${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => `<button type="button" class="notiz-chip ${nc.crmFollowUpDate===oneAddDays(oneToday(),days)?'active':''}" data-followup-quick="${days}">${escapeHtml(label)}</button>`).join('')}
+            ${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => `<button type="button" class="notiz-chip ${state.crmFollowUpDate===oneAddDays(oneToday(),days)?'active':''}" data-followup-quick="${days}">${escapeHtml(label)}</button>`).join('')}
           </div>
-          <label class="modal-field"><span class="ergebnis-sublabel">oder Datum wählen</span><input id="ergebnisFollowUpDate" type="date" value="${escapeHtml(nc.crmFollowUpDate || '')}"></label>` : ''}
+          <label class="modal-field"><span class="ergebnis-sublabel">oder Datum wählen</span><input id="ergebnisFollowUpDate" type="date" value="${escapeHtml(state.crmFollowUpDate || '')}"></label>` : ''}
         </div>
         <div class="modal-actions">
-          <button class="secondary-button compact" data-action="occasion-back-notiz">Zurück</button>
-          <button class="primary-button compact" data-action="ergebnis-weiter" ${followUpWanted && !nc.crmFollowUpDate ? 'disabled':''}>Weiter</button>
+          <button class="secondary-button compact" data-action="${state.newCustomer ? 'occasion-back-notiz' : 'ergebnis-back-name'}">Zurück</button>
+          <button class="primary-button compact" data-action="ergebnis-weiter" ${followUpWanted && !state.crmFollowUpDate ? 'disabled':''}>Weiter</button>
         </div>
       </div>
     </div>`;
@@ -1790,9 +1788,12 @@ function occasionPromptModal() {
         <h2>Wie heißt der Ansprechpartner?</h2>
         <p>${isCrmFirst ? 'Für den CRM-Eintrag als Ansprechpartner.' : `Die E-Mail beginnt damit automatisch mit „Hallo ${state.summarySalutation} ${state.summaryCustomer.trim() || 'Name'}".`}</p>
         <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller" autofocus></label>
+        <label class="modal-field"><input id="occasionKundenNr" type="text" value="${escapeHtml(state.summaryKundenNr)}" placeholder="KD-Nr. (optional)"></label>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-name">Zurück</button>
-          <button class="primary-button compact" data-action="${isCrmFirst?'occasion-send-crm':'occasion-send'}">${icon('talk')}<span>${isCrmFirst?'CRM-Eintrag erstellen':'E-Mail senden'}</span></button>
+          ${isCrmFirst
+            ? `<button class="primary-button compact" data-action="name-to-ergebnis">Weiter</button>`
+            : `<button class="primary-button compact" data-action="occasion-send">${icon('talk')}<span>E-Mail senden</span></button>`}
         </div>
       </div>
     </div>`;
@@ -1866,49 +1867,10 @@ function occasionPromptModal() {
           <button type="button" class="notiz-chip ${opts.pif?'active':''}" data-angebot-toggle="pif">Produktinformation</button>
           <button type="button" class="notiz-chip ${opts.sdb?'active':''}" data-angebot-toggle="sdb">Sicherheitsdatenblatt</button>
           <button type="button" class="notiz-chip ${opts.ba?'active':''}" data-angebot-toggle="ba">Betriebsanweisung</button>
-          <button type="button" class="notiz-chip ${opts.muster?'active':''}" data-angebot-toggle="muster">Muster</button>
         </div>
-        ${opts.muster ? `<div class="ergebnis-block">
-          <span class="notiz-baustein-label">Muster-Menge je Produkt</span>
-          ${entries.map(({product,size}) => {
-            const m = state.angebotMusterMengen[musterEntryKey(product, size)];
-            const desc = (!m || !m.mode) ? 'Menge noch nicht festgelegt' : (m.mode==='skip' ? 'kein Muster' : m.mode==='ve' ? `${m.ve} VE (${m.gesamt} Stück)` : `${m.gesamt} Stück`);
-            return `<div class="muster-summary-row"><span>${escapeHtml(product.name)}${size?' · '+escapeHtml(size):''}</span><small>${escapeHtml(desc)}</small></div>`;
-          }).join('')}
-          <button type="button" class="secondary-button compact" data-action="angebot-muster-mengen">Menge festlegen</button>
-        </div>` : ''}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-angebotask">Zurück</button>
           <button class="primary-button compact" data-action="angebot-senden" ${entries.length?'':'disabled'}>${icon('talk')}<span>An Innendienst senden</span></button>
-        </div>
-      </div>
-    </div>`;
-  }
-  if (state.summaryStep === 'angebotMusterZyklus') {
-    const entries = favoriteEntries();
-    const idx = Math.min(state.angebotMusterCycleIndex || 0, entries.length - 1);
-    const entry = entries[idx];
-    const key = musterEntryKey(entry.product, entry.size);
-    const veCount = veStueckCount(entry.product, entry.size);
-    const m = state.angebotMusterMengen[key];
-    const stueckMode = !!(m && m.mode === 'stueck');
-    const canContinue = !!(m && m.mode && (m.mode !== 'stueck' || m.stueck > 0));
-    return `<div class="modal-overlay">
-      <div class="modal-card" style="width:min(480px,100%)">
-        ${modalCloseBtn()}
-        <span class="eyebrow">Muster zum Angebot · Produkt ${idx+1} von ${entries.length}</span>
-        <h2>${escapeHtml(entry.product.name)}${entry.size ? ` · ${escapeHtml(entry.size)}` : ''}</h2>
-        ${veCount ? `<p class="muster-ve-info">1 VE = <strong>${veCount} Stück</strong></p>` : `<p class="muster-ve-info muted">VE-Größe nicht hinterlegt — bitte Stückzahl angeben.</p>`}
-        <div class="muster-tiles">
-          ${veCount ? `<button type="button" class="muster-tile ${m && m.mode==='ve' && m.ve===1 ? 'active':''}" data-angebot-muster-tile="ve1"><strong>1 VE</strong><small>${veCount} Stück</small></button>
-          <button type="button" class="muster-tile ${m && m.mode==='ve' && m.ve===2 ? 'active':''}" data-angebot-muster-tile="ve2"><strong>2 VE</strong><small>${veCount*2} Stück</small></button>` : ''}
-          <button type="button" class="muster-tile muster-tile-wide ${stueckMode ? 'active':''}" data-angebot-muster-tile="stueck"><strong>Stück</strong><small>individuelle Menge eingeben</small></button>
-        </div>
-        ${stueckMode ? `<label class="modal-field"><input id="angebotMusterStueckInput" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="z. B. 3" value="${m.stueck || ''}" autofocus></label>` : ''}
-        <button type="button" class="muster-skip-link ${m && m.mode==='skip' ? 'active':''}" data-angebot-muster-tile="skip">Kein Muster für dieses Produkt</button>
-        <div class="modal-actions">
-          <button class="secondary-button compact" data-action="angebot-muster-zyklus-zurueck">Zurück</button>
-          <button class="primary-button compact" data-action="angebot-muster-zyklus-weiter" ${canContinue?'':'disabled'}>Weiter</button>
         </div>
       </div>
     </div>`;
@@ -1976,6 +1938,7 @@ function buildAngebotInnendienstEmail(){
     `bitte für ${customerName || 'den Kunden'} ein Angebot erstellen und versenden für folgende Produkte:`,
     ''
   ];
+  if (!contact && state.summaryKundenNr.trim()) lines.push(`KD-Nr.: ${state.summaryKundenNr.trim()}`, '');
   entries.forEach(({product, size}) => {
     lines.push(`PRODUKT: ${product.name}`, `Artikelnummer: ${resolveArtNr(product, size)}`, `Gebinde: ${size}`, '');
   });
@@ -1984,14 +1947,6 @@ function buildAngebotInnendienstEmail(){
   if (opts.sdb) extras.push('Sicherheitsdatenblatt');
   if (opts.ba) extras.push('Betriebsanweisung');
   if (extras.length) lines.push(`Bitte zusätzlich mit dem Angebot mitsenden: ${extras.join(', ')}`, '');
-  if (opts.muster) {
-    const musterItems = entries.map(({product, size}) => {
-      const m = state.angebotMusterMengen[musterEntryKey(product, size)];
-      return (m && m.mode && m.mode !== 'skip') ? { name: product.name, size, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt } : null;
-    }).filter(Boolean);
-    lines.push('Bitte zusätzlich folgende Muster mit dem Angebot mitsenden:');
-    lines.push(...(musterItems.length ? musterItems.map(musterLineText) : ['– keine Menge ausgewählt –']), '');
-  }
   lines.push('Danke und Grüße' + (state.repName ? ', ' + state.repName : ''));
   return { subject: `Angebotsanfrage${customerName ? ' für ' + customerName : ''} – Dr. Schumacher`, body: lines.join('\n') };
 }
@@ -2541,10 +2496,12 @@ function buildCrmSummary(report = state.visitReport) {
   const parts = [
     `Besuchsbericht vom ${date}`,
     `Kunde/Einrichtung: ${report.customer || '-'}`,
+    `KD-Nr.: ${report.kundenNr || '-'}`,
     `Ansprechpartner: ${report.contacts || '-'}`,
     `Terminart: ${report.type || 'Produktvorstellung'}`,
     `Ausgangssituation / aktuelle Produkte: ${report.current || '-'}`,
     `Besprochene Produkte: ${report.products || '-'}`,
+    `Aktueller Wettbewerber: ${report.wettbewerber || '-'}`,
     `Feedback und Bedarf: ${report.feedback || '-'}`,
     `Muster / Unterlagen: ${report.samples || 'Keine'}`,
     `Ergebnis: ${report.result || 'Offen'}`,
@@ -2579,10 +2536,14 @@ function buildQuickCrmEntry(){
   const products = entries.map(({product: p, size}) => `${p.name}${size ? ' (' + size + ')' : ''}`).join(', ');
   return {
     customer: state.summaryCustomer.trim() || '-',
+    kundenNr: state.summaryKundenNr.trim(),
     date: oneToday(),
     contacts: state.summaryCustomer.trim() || '-',
     type: state.summaryOccasion.trim() || 'Produktvorstellung',
     products,
+    wettbewerber: [...(state.crmWettbewerber || []), (state.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
+    feedback: (state.crmFeedback || '').trim(), samples: state.crmSamples || 'Keine', result: state.crmResult || 'Offen',
+    followUp: (state.crmFollowUpWanted && state.crmFollowUpDate) ? state.crmFollowUpDate : '',
     owner: state.repName || '-'
   };
 }
@@ -2962,7 +2923,7 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {}, crmWettbewerber: [], crmWettbewerberCustomOpen: false, crmWettbewerberCustomText: '', crmFeedback: '', crmFeedbackSelected: [], crmSamples: 'Keine', crmResult: 'Offen', crmFollowUpWanted: null, crmFollowUpDate: '' };
+      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {} };
       state.summaryStep = 'neukunde';
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
@@ -3108,23 +3069,22 @@ function bind() {
   });
   document.querySelectorAll('[data-wettbewerber-toggle]').forEach(btn => btn.addEventListener('click', () => {
     const val = btn.dataset.wettbewerberToggle;
-    const list = state.newCustomer.crmWettbewerber || (state.newCustomer.crmWettbewerber = []);
+    const list = state.crmWettbewerber || (state.crmWettbewerber = []);
     const pos = list.indexOf(val);
     if (pos >= 0) list.splice(pos, 1); else list.push(val);
     render();
   }));
   $('[data-wettbewerber-custom-toggle]')?.addEventListener('click', () => {
-    state.newCustomer.crmWettbewerberCustomOpen = !state.newCustomer.crmWettbewerberCustomOpen;
+    state.crmWettbewerberCustomOpen = !state.crmWettbewerberCustomOpen;
     render();
   });
-  $('#ergebnisWettbewerberCustom')?.addEventListener('input', e => { state.newCustomer.crmWettbewerberCustomText = e.target.value; });
+  $('#ergebnisWettbewerberCustom')?.addEventListener('input', e => { state.crmWettbewerberCustomText = e.target.value; });
   document.querySelectorAll('[data-feedback-idx]').forEach(btn => btn.addEventListener('click', () => {
     const idx = +btn.dataset.feedbackIdx;
     const text = ERGEBNIS_FEEDBACK_BAUSTEINE[idx];
     const ta = $('#ergebnisFeedback');
     if (!text || !ta) return;
-    const nc = state.newCustomer;
-    const selected = nc.crmFeedbackSelected || (nc.crmFeedbackSelected = []);
+    const selected = state.crmFeedbackSelected || (state.crmFeedbackSelected = []);
     const pos = selected.indexOf(idx);
     if (pos >= 0) {
       selected.splice(pos, 1);
@@ -3133,32 +3093,42 @@ function bind() {
       selected.push(idx);
       ta.value = ta.value.trim() ? ta.value.trim() + ' ' + text : text;
     }
-    nc.crmFeedback = ta.value;
+    state.crmFeedback = ta.value;
     render();
   }));
-  $('#ergebnisFeedback')?.addEventListener('input', e => { state.newCustomer.crmFeedback = e.target.value; });
-  document.querySelectorAll('[data-samples-choice]').forEach(btn => btn.addEventListener('click', () => { state.newCustomer.crmSamples = btn.dataset.samplesChoice; render(); }));
-  document.querySelectorAll('[data-result-choice]').forEach(btn => btn.addEventListener('click', () => { state.newCustomer.crmResult = btn.dataset.resultChoice; render(); }));
+  $('#ergebnisFeedback')?.addEventListener('input', e => { state.crmFeedback = e.target.value; });
+  document.querySelectorAll('[data-samples-choice]').forEach(btn => btn.addEventListener('click', () => { state.crmSamples = btn.dataset.samplesChoice; render(); }));
+  document.querySelectorAll('[data-result-choice]').forEach(btn => btn.addEventListener('click', () => { state.crmResult = btn.dataset.resultChoice; render(); }));
   document.querySelectorAll('[data-followup-wanted]').forEach(btn => btn.addEventListener('click', () => {
-    state.newCustomer.crmFollowUpWanted = btn.dataset.followupWanted === 'ja';
-    if (!state.newCustomer.crmFollowUpWanted) state.newCustomer.crmFollowUpDate = '';
+    state.crmFollowUpWanted = btn.dataset.followupWanted === 'ja';
+    if (!state.crmFollowUpWanted) state.crmFollowUpDate = '';
     render();
   }));
   document.querySelectorAll('[data-followup-quick]').forEach(btn => btn.addEventListener('click', () => {
-    state.newCustomer.crmFollowUpDate = oneAddDays(oneToday(), +btn.dataset.followupQuick);
+    state.crmFollowUpDate = oneAddDays(oneToday(), +btn.dataset.followupQuick);
     render();
   }));
   $('#ergebnisFollowUpDate')?.addEventListener('input', e => {
-    state.newCustomer.crmFollowUpDate = e.target.value;
+    state.crmFollowUpDate = e.target.value;
     const weiterBtn = $('[data-action="ergebnis-weiter"]');
     if (weiterBtn) weiterBtn.disabled = !e.target.value;
   });
   $('[data-action="occasion-back-ergebnis"]')?.addEventListener('click', () => { state.summaryStep = 'ergebnis'; render(); });
   $('[data-action="ergebnis-weiter"]')?.addEventListener('click', () => {
-    newCustomerSave();
-    state.summaryStep = 'occasion';
+    if (state.newCustomer) {
+      newCustomerSave();
+      state.summaryStep = 'occasion';
+    } else {
+      // Bestandskunde: die Rückmeldung-&-Ergebnis-Fragen sind hier der letzte Schritt vor dem
+      // eigentlichen Versand — vorher stand an dieser Stelle "occasion-send-crm".
+      sendQuickCrmEntry();
+      state.summaryStep = 'kundeask';
+      state.summaryIsNewCustomer = null;
+    }
     render();
   });
+  $('[data-action="name-to-ergebnis"]')?.addEventListener('click', () => { state.summaryStep = 'ergebnis'; render(); });
+  $('[data-action="ergebnis-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'name'; render(); });
   $('[data-action="new-customer-send-innendienst"]')?.addEventListener('click', () => sendNewCustomerInnendienstEmail());
   document.querySelectorAll('[data-occasion-choice]').forEach(button => button.addEventListener('click', () => {
     const value = button.dataset.occasionChoice;
@@ -3187,6 +3157,7 @@ function bind() {
     render();
   }));
   $('#occasionContact')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
+  $('#occasionKundenNr')?.addEventListener('input', e => { state.summaryKundenNr=e.target.value; localStorage.setItem('summaryKundenNr', e.target.value); });
   $('[data-action="occasion-back-salutation"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
   $('[data-action="occasion-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'salutation'; render(); });
   $('[data-action="occasion-send"]')?.addEventListener('click', () => {
@@ -3194,12 +3165,6 @@ function bind() {
     state.summaryIsNewCustomer = null;
     state.summarySent = true;
     sendCustomerSummaryEmail();
-    render();
-  });
-  $('[data-action="occasion-send-crm"]')?.addEventListener('click', () => {
-    sendQuickCrmEntry();
-    state.summaryStep = 'kundeask';
-    state.summaryIsNewCustomer = null;
     render();
   });
   $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
@@ -3214,71 +3179,13 @@ function bind() {
   $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
   $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = 'angebotask'; render(); });
   $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
-  $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => {
-    // Wurden im Gespräch bereits Muster mit "noch zusenden" markiert (Kaltakquise/Neukunde),
-    // fließt das direkt in die Angebotsanfrage ein — die Menge muss nicht erneut abgefragt werden.
-    const nc = state.newCustomer;
-    if (nc && nc.musterWanted) {
-      const zusenden = Object.entries(nc.musterMengen || {}).filter(([,m]) => m.status === 'zusenden');
-      if (zusenden.length) {
-        state.angebotOptionen.muster = true;
-        zusenden.forEach(([key, m]) => { state.angebotMusterMengen[key] = {...m}; });
-      }
-    }
-    state.summaryStep = 'angebotOptionen';
-    render();
-  });
+  $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => { state.summaryStep = 'angebotOptionen'; render(); });
   $('[data-action="occasion-back-angebotask"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
   document.querySelectorAll('[data-angebot-toggle]').forEach(button => button.addEventListener('click', () => {
     const key = button.dataset.angebotToggle;
     state.angebotOptionen[key] = !state.angebotOptionen[key];
     render();
   }));
-  $('[data-action="angebot-muster-mengen"]')?.addEventListener('click', () => { state.angebotMusterCycleIndex = 0; state.summaryStep = 'angebotMusterZyklus'; render(); });
-  document.querySelectorAll('[data-angebot-muster-tile]').forEach(button => button.addEventListener('click', () => {
-    const entries = favoriteEntries();
-    const idx = Math.min(state.angebotMusterCycleIndex || 0, entries.length - 1);
-    const entry = entries[idx];
-    if (!entry) return;
-    const key = musterEntryKey(entry.product, entry.size);
-    const veCount = veStueckCount(entry.product, entry.size);
-    const mode = button.dataset.angebotMusterTile;
-    if (mode === 've1' && veCount) state.angebotMusterMengen[key] = { mode:'ve', ve:1, stueck:0, gesamt:veCount };
-    else if (mode === 've2' && veCount) state.angebotMusterMengen[key] = { mode:'ve', ve:2, stueck:0, gesamt:veCount*2 };
-    else if (mode === 'skip') state.angebotMusterMengen[key] = { mode:'skip', ve:0, stueck:0, gesamt:0 };
-    else if (mode === 'stueck') {
-      const prev = state.angebotMusterMengen[key];
-      const stueck = (prev && prev.mode === 'stueck') ? prev.stueck : 0;
-      state.angebotMusterMengen[key] = { mode:'stueck', ve:0, stueck, gesamt:stueck };
-    }
-    render();
-  }));
-  $('#angebotMusterStueckInput')?.addEventListener('input', e => {
-    const entries = favoriteEntries();
-    const idx = Math.min(state.angebotMusterCycleIndex || 0, entries.length - 1);
-    const entry = entries[idx];
-    if (!entry) return;
-    const key = musterEntryKey(entry.product, entry.size);
-    const digits = e.target.value.replace(/\D+/g, '');
-    e.target.value = digits;
-    const n = digits ? parseInt(digits, 10) : 0;
-    state.angebotMusterMengen[key] = { mode:'stueck', ve:0, stueck:n, gesamt:n };
-    const weiterBtn = $('[data-action="angebot-muster-zyklus-weiter"]');
-    if (weiterBtn) weiterBtn.disabled = !(n > 0);
-  });
-  $('[data-action="angebot-muster-zyklus-zurueck"]')?.addEventListener('click', () => {
-    const idx = state.angebotMusterCycleIndex || 0;
-    if (idx > 0) state.angebotMusterCycleIndex = idx - 1;
-    else state.summaryStep = 'angebotOptionen';
-    render();
-  });
-  $('[data-action="angebot-muster-zyklus-weiter"]')?.addEventListener('click', () => {
-    const entries = favoriteEntries();
-    const idx = state.angebotMusterCycleIndex || 0;
-    if (idx < entries.length - 1) state.angebotMusterCycleIndex = idx + 1;
-    else state.summaryStep = 'angebotOptionen';
-    render();
-  });
   $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; render(); });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
@@ -3400,7 +3307,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','liveFacts','factsImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryCustomer','summarySalutation','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
+  'summaryCustomer','summaryKundenNr','summarySalutation','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
   'messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeDatum','messeAusgefuelltVon','messeGespraechsinhalt','messeMuster',
   'messeKontaktaufnahme','messeBemusterung','messeNewsletter'
 ];
@@ -3492,12 +3399,16 @@ function customerHistoryScreen() {
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf und Messe-Erfassung werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','summaryCustomer','summarySalutation','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summaryCustomer','summaryKundenNr','summarySalutation','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
+  state.summaryKundenNr = '';
   state.summarySalutation = 'Herr';
   state.summaryOccasion = SUMMARY_OCCASIONS[0].value;
   state.summaryIncludePrices = false;
+  state.crmWettbewerber = []; state.crmWettbewerberCustomOpen = false; state.crmWettbewerberCustomText = '';
+  state.crmFeedback = ''; state.crmFeedbackSelected = []; state.crmSamples = 'Keine'; state.crmResult = 'Offen';
+  state.crmFollowUpWanted = null; state.crmFollowUpDate = '';
   state.quoteCustomer = '';
   state.quoteContact = '';
   state.quoteNote = '';
