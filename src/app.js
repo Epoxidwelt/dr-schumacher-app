@@ -1347,12 +1347,20 @@ function newCustomerSave(){
   if (!newCustomerValid(d)) return;
   const existing = nc.contactId ? state.one.contacts.find(c => c.id === nc.contactId) : null;
   const entries = favoriteEntries();
+  // Muster-Mengen gelten ausschließlich für Neukunde/Kaltakquise (NC) — dort muss der
+  // Außendienst die Muster selbst über den Onlineshop bestellen und braucht deshalb die
+  // genaue VE-/Stückzahl je Produkt; beim Bestandskunden übernimmt das der Innendienst.
+  const musterListe = nc.musterWanted ? entries.map(({product, size}) => {
+    const m = nc.musterMengen[musterEntryKey(product, size)];
+    return (m && m.mode !== 'skip') ? { name: product.name, size, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt } : null;
+  }).filter(Boolean) : [];
   const fields = {
     name:d.firma.trim(), anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
     plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(),
     email:d.email.trim(), telefon:d.telefon.trim(), notiz:d.notiz.trim(),
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
-    produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', ')
+    produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', '),
+    musterWanted: !!nc.musterWanted, musterListe
   };
   if (existing){
     Object.assign(existing, fields);
@@ -1441,8 +1449,8 @@ const NOTIZ_BAUSTEINE = {
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
-  const total = isNew ? 6 : 5;
-  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, notiz:5, occasion: isNew?6:3, salutation:4, name:5 };
+  const total = isNew ? 7 : 5;
+  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, occasion: isNew?7:3, salutation:4, name:5 };
 
   if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
@@ -1509,6 +1517,50 @@ function occasionPromptModal() {
       </div>
     </div>`;
   }
+  if (state.summaryStep === 'musterfrage') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Schritt ${stepNum.musterfrage} von ${total}</span>
+        <h2>Muster gewünscht?</h2>
+        <p>Bei Bedarf fragen wir im nächsten Schritt für jedes Produkt einzeln die gewünschte Menge ab.</p>
+        <div class="modal-choices">
+          <button class="modal-choice" data-muster-wanted="nein">${icon('pm')}<span>Nein, keine Muster</span></button>
+          <button class="modal-choice" data-muster-wanted="ja">${icon('pm')}<span>Ja, Muster gewünscht</span></button>
+        </div>
+        <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-produktbereiche">Zurück</button></div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'musterzyklus') {
+    const entries = favoriteEntries();
+    const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
+    const entry = entries[idx];
+    const key = musterEntryKey(entry.product, entry.size);
+    const veCount = veStueckCount(entry.product, entry.size);
+    const m = state.newCustomer.musterMengen[key];
+    const stueckMode = !!(m && m.mode === 'stueck');
+    const canContinue = !!m && (m.mode !== 'stueck' || m.stueck > 0);
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(480px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Muster · Produkt ${idx+1} von ${entries.length}</span>
+        <h2>${escapeHtml(entry.product.name)}${entry.size ? ` · ${escapeHtml(entry.size)}` : ''}</h2>
+        ${veCount ? `<p class="muster-ve-info">1 VE = <strong>${veCount} Stück</strong></p>` : `<p class="muster-ve-info muted">VE-Größe nicht hinterlegt — bitte Stückzahl angeben.</p>`}
+        <div class="muster-tiles">
+          ${veCount ? `<button type="button" class="muster-tile ${m && m.mode==='ve' && m.ve===1 ? 'active':''}" data-muster-tile="ve1"><strong>1 VE</strong><small>${veCount} Stück</small></button>
+          <button type="button" class="muster-tile ${m && m.mode==='ve' && m.ve===2 ? 'active':''}" data-muster-tile="ve2"><strong>2 VE</strong><small>${veCount*2} Stück</small></button>` : ''}
+          <button type="button" class="muster-tile muster-tile-wide ${stueckMode ? 'active':''}" data-muster-tile="stueck"><strong>Stück</strong><small>individuelle Menge eingeben</small></button>
+        </div>
+        ${stueckMode ? `<label class="modal-field"><input id="musterStueckInput" type="tel" inputmode="numeric" pattern="[0-9]*" placeholder="z. B. 3" value="${m.stueck || ''}" autofocus></label>` : ''}
+        <button type="button" class="muster-skip-link ${m && m.mode==='skip' ? 'active':''}" data-muster-tile="skip">Kein Muster für dieses Produkt</button>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="muster-zyklus-zurueck">Zurück</button>
+          <button class="primary-button compact" data-action="muster-zyklus-weiter" ${canContinue?'':'disabled'}>Weiter</button>
+        </div>
+      </div>
+    </div>`;
+  }
   if (state.summaryStep === 'notiz') {
     const d = state.newCustomer.draft;
     const selectedCats = Array.from(new Set(favoriteEntries().map(({product}) => product.category)));
@@ -1532,7 +1584,7 @@ function occasionPromptModal() {
         </div>
         <label class="modal-field"><textarea id="occasionNotiz" rows="4" placeholder="Gesprächsnotiz (optional)">${escapeHtml(d.notiz)}</textarea></label>
         <div class="modal-actions">
-          <button class="secondary-button compact" data-action="occasion-back-produktbereiche">Zurück</button>
+          <button class="secondary-button compact" data-action="occasion-back-musterfrage">Zurück</button>
           <button class="primary-button compact" data-action="notiz-weiter">Weiter</button>
         </div>
       </div>
@@ -1636,6 +1688,10 @@ function buildNewCustomerInnendienstEmail(contact){
     `Besprochene Produktbereiche: ${(contact.produktbereiche||[]).map(produktbereichLabel).join(', ') || '–'}`,
     `Besprochene Produkte: ${contact.produkte || '–'}`,
     `Gesprächsnotiz: ${contact.notiz || '–'}`,
+    ...(contact.musterWanted ? [
+      `Musteranfrage: Muster gewünscht — wird vom Außendienst selbst über den Onlineshop bestellt.`,
+      ...((contact.musterListe && contact.musterListe.length) ? contact.musterListe.map(musterLineText) : ['– keine Menge ausgewählt –'])
+    ] : []),
     '',
     'Danke und Grüße' + (state.repName ? ', ' + state.repName : '')
   ];
@@ -2175,6 +2231,10 @@ function buildCrmSummary(report = state.visitReport) {
       `Besprochene Produkte: ${report.produkteText || '-'}`,
       `Gesprächsnotiz: ${report.notiz || '-'}`,
       `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
+      ...(report.musterWanted ? [
+        `Musteranfrage (Bestellung über Onlineshop durch Außendienst):`,
+        ...((report.musterListe && report.musterListe.length) ? report.musterListe.map(musterLineText) : ['– keine Menge ausgewählt –'])
+      ] : []),
       `Nächster Schritt: ${report.nextSteps || report.type || '-'}`,
       `Zuständiger Mitarbeiter: ${report.owner || '-'}`
     ];
@@ -2210,6 +2270,7 @@ function buildQuickCrmEntry(){
       produktbereicheText: (c.produktbereiche||[]).map(produktbereichLabel).join(', '),
       produkteText: c.produkte || '',
       notiz: c.notiz || '', herkunft: c.herkunft || '',
+      musterWanted: !!c.musterWanted, musterListe: c.musterListe || [],
       date: oneToday(), type: state.summaryOccasion.trim() || 'Produktvorstellung',
       nextSteps: '', owner: state.repName || '-'
     };
@@ -2410,6 +2471,17 @@ function resolvePal(product, size='') {
   const row = state.priceByArt[resolveArtNr(product, size)];
   return (row && row.pal) || '';
 }
+function musterEntryKey(product, size) { return product.id + '::' + (size || ''); }
+// Nur wenn die importierte Preisliste eine plausible VE-Größe für den Artikel kennt, können
+// wir "1 VE"/"2 VE" als Schnellauswahl anbieten — sonst bleibt nur die Stückzahl-Eingabe.
+function veStueckCount(product, size='') {
+  const n = parseFloat(String(resolveVE(product, size)).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+function musterLineText(item) {
+  const label = item.name + (item.size ? ' · ' + item.size : '');
+  return item.mode === 've' ? `${label} — ${item.ve} VE (${item.gesamt} Stück gesamt)` : `${label} — ${item.gesamt} Stück`;
+}
 function unitsInSize(size) {
   const m = /^(\d+)\s*Tücher/i.exec(size || '');
   return m ? Number(m[1]) : null;
@@ -2575,7 +2647,7 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
+      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {} };
       state.summaryStep = 'neukunde';
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
@@ -2637,7 +2709,59 @@ function bind() {
     state.spectrum = 'all';
     render();
   }));
-  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { newCustomerSave(); state.summaryStep = 'notiz'; render(); });
+  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { newCustomerSave(); state.summaryStep = 'musterfrage'; render(); });
+  $('[data-action="occasion-back-musterfrage"]')?.addEventListener('click', () => { state.summaryStep = 'musterfrage'; render(); });
+  document.querySelectorAll('[data-muster-wanted]').forEach(button => button.addEventListener('click', () => {
+    const ja = button.dataset.musterWanted === 'ja';
+    state.newCustomer.musterWanted = ja;
+    if (ja) { state.newCustomer.musterCycleIndex = 0; state.summaryStep = 'musterzyklus'; }
+    else state.summaryStep = 'notiz';
+    render();
+  }));
+  document.querySelectorAll('[data-muster-tile]').forEach(button => button.addEventListener('click', () => {
+    const entries = favoriteEntries();
+    const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
+    const entry = entries[idx];
+    if (!entry) return;
+    const key = musterEntryKey(entry.product, entry.size);
+    const veCount = veStueckCount(entry.product, entry.size);
+    const mode = button.dataset.musterTile;
+    if (mode === 've1' && veCount) state.newCustomer.musterMengen[key] = { mode:'ve', ve:1, stueck:0, gesamt:veCount };
+    else if (mode === 've2' && veCount) state.newCustomer.musterMengen[key] = { mode:'ve', ve:2, stueck:0, gesamt:veCount*2 };
+    else if (mode === 'skip') state.newCustomer.musterMengen[key] = { mode:'skip', ve:0, stueck:0, gesamt:0 };
+    else if (mode === 'stueck') {
+      const prev = state.newCustomer.musterMengen[key];
+      const stueck = (prev && prev.mode === 'stueck') ? prev.stueck : 0;
+      state.newCustomer.musterMengen[key] = { mode:'stueck', ve:0, stueck, gesamt:stueck };
+    }
+    render();
+  }));
+  $('#musterStueckInput')?.addEventListener('input', e => {
+    const entries = favoriteEntries();
+    const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
+    const entry = entries[idx];
+    if (!entry) return;
+    const key = musterEntryKey(entry.product, entry.size);
+    const digits = e.target.value.replace(/\D+/g, '');
+    e.target.value = digits;
+    const n = digits ? parseInt(digits, 10) : 0;
+    state.newCustomer.musterMengen[key] = { mode:'stueck', ve:0, stueck:n, gesamt:n };
+    const weiterBtn = $('[data-action="muster-zyklus-weiter"]');
+    if (weiterBtn) weiterBtn.disabled = !(n > 0);
+  });
+  $('[data-action="muster-zyklus-zurueck"]')?.addEventListener('click', () => {
+    const idx = state.newCustomer.musterCycleIndex || 0;
+    if (idx > 0) state.newCustomer.musterCycleIndex = idx - 1;
+    else state.summaryStep = 'musterfrage';
+    render();
+  });
+  $('[data-action="muster-zyklus-weiter"]')?.addEventListener('click', () => {
+    const entries = favoriteEntries();
+    const idx = state.newCustomer.musterCycleIndex || 0;
+    if (idx < entries.length - 1) state.newCustomer.musterCycleIndex = idx + 1;
+    else state.summaryStep = 'notiz';
+    render();
+  });
   $('[data-action="occasion-back-notiz"]')?.addEventListener('click', () => { state.summaryStep = 'notiz'; render(); });
   document.querySelectorAll('[data-notiz-cat]').forEach(btn => btn.addEventListener('click', () => {
     const text = (NOTIZ_BAUSTEINE[btn.dataset.notizCat] || [])[+btn.dataset.notizIdx];
