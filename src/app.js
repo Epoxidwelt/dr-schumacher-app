@@ -392,6 +392,10 @@ const state = {
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
+  summaryNotiz: localStorage.getItem('summaryNotiz') || '',
+  // Muster-Abfrage: für Bestandskunde genauso wie für Neukunde/Kaltakquise, deshalb hier auf
+  // dem Top-Level-State statt in state.newCustomer (das es für Bestandskunde nicht gibt).
+  musterWanted: null, musterCycleIndex: 0, musterMengen: {},
   // Rückmeldung-&-Ergebnis-Schritt: bewusst auf dem Top-Level-State statt in state.newCustomer,
   // weil dieser Schritt für Bestandskunde (kein state.newCustomer) genauso greift wie für
   // Neukunde/Kaltakquise.
@@ -1451,20 +1455,13 @@ function newCustomerSave(){
   if (!newCustomerValid(d)) return;
   const existing = nc.contactId ? state.one.contacts.find(c => c.id === nc.contactId) : null;
   const entries = favoriteEntries();
-  // Muster-Mengen gelten ausschließlich für Neukunde/Kaltakquise (NC) — dort muss der
-  // Außendienst die Muster selbst über den Onlineshop bestellen und braucht deshalb die
-  // genaue VE-/Stückzahl je Produkt; beim Bestandskunden übernimmt das der Innendienst.
-  const musterListe = nc.musterWanted ? entries.map(({product, size}) => {
-    const m = nc.musterMengen[musterEntryKey(product, size)];
-    return (m && m.status && m.status !== 'skip') ? { name: product.name, size, status: m.status, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt } : null;
-  }).filter(Boolean) : [];
   const fields = {
     name:d.firma.trim(), anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
     plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(),
-    email:d.email.trim(), telefon:d.telefon.trim(), notiz:d.notiz.trim(),
+    email:d.email.trim(), telefon:d.telefon.trim(), notiz:state.summaryNotiz.trim(),
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
     produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', '),
-    musterWanted: !!nc.musterWanted, musterListe,
+    musterWanted: !!state.musterWanted, musterListe: computeMusterListe(entries),
     wettbewerber: [...(state.crmWettbewerber || []), (state.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
     feedback: (state.crmFeedback || '').trim(), samples: state.crmSamples || 'Keine', result: state.crmResult || 'Offen',
     nextFollowUp: (state.crmFollowUpWanted && state.crmFollowUpDate) ? state.crmFollowUpDate : null
@@ -1577,13 +1574,15 @@ function removeFeedbackBausteinText(value, text) {
 function occasionPromptModal() {
   const isNew = state.summaryIsNewCustomer;
   const isCrmFirst = state.summaryPurpose === 'crm';
-  // Die schnelle Wettbewerber/Feedback/Muster/Ergebnis/Follow-up-Abfrage gilt für Bestandskunde
-  // genauso wie für Neukunde/Kaltakquise, aber nur wenn direkt ein CRM-Eintrag entsteht — beim
-  // reinen Versand der Kundenzusammenfassung wird sie übersprungen, da dort ggf. gar kein
-  // CRM-Eintrag folgt.
-  const showErgebnis = isCrmFirst;
-  const total = isNew ? (showErgebnis ? 8 : 7) : (showErgebnis ? 6 : 5);
-  const stepNum = { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, ergebnis: isNew?7:6, occasion: isNew ? (showErgebnis?8:7) : 3, salutation:4, name:5 };
+  // Bestandskunde durchläuft jetzt exakt dieselben Abfragen wie Neukunde/Kaltakquise —
+  // Produktbereiche, Muster, Gesprächsnotiz, Rückmeldung & Ergebnis (inkl. Follow-up) — und
+  // zwar unabhängig davon, ob zuerst ein CRM-Eintrag oder die Kundenzusammenfassung gewählt
+  // wurde. Nur der Identitäts-Schritt unterscheidet sich: Neukunde bekommt das kombinierte
+  // Adressformular, Bestandskunde Anrede+Name(+KD-Nr.), weil die Adresse schon vorliegt.
+  const stepNum = isNew
+    ? { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, ergebnis:7, occasion:8 }
+    : { kundentyp:2, salutation:3, name:4, produktbereiche:5, musterfrage:6, notiz:7, ergebnis:8, occasion:9 };
+  const total = isNew ? 8 : 9;
 
   if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
@@ -1644,7 +1643,7 @@ function occasionPromptModal() {
         <div class="category-grid">${PRODUKTBEREICHE.map(([key,title,sub]) => { const count = countByCat[key] || 0; return `<button type="button" class="category-card ${key} ${count?'on':''}" data-produktbereich-open="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${count ? count + ' ausgewählt' : sub}</small></span><b>${count ? '✓' : '›'}</b></button>`; }).join('')}</div>
         ${entries.length ? `<div class="produkte-picked">${entries.map(({product,size}) => `<span>${escapeHtml(product.name)}${size?` · ${escapeHtml(size)}`:''}</span>`).join('')}</div>` : `<p class="muted-copy">Noch keine Produkte ausgewählt.</p>`}
         <div class="modal-actions">
-          <button class="secondary-button compact" data-action="occasion-back-neukunde">Zurück</button>
+          <button class="secondary-button compact" data-action="${state.newCustomer ? 'occasion-back-neukunde' : 'produktbereiche-back-name'}">Zurück</button>
           <button class="primary-button compact" data-action="produktbereiche-weiter" ${entries.length?'':'disabled'}>Weiter</button>
         </div>
       </div>
@@ -1667,11 +1666,11 @@ function occasionPromptModal() {
   }
   if (state.summaryStep === 'musterzyklus') {
     const entries = favoriteEntries();
-    const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
+    const idx = Math.min(state.musterCycleIndex || 0, entries.length - 1);
     const entry = entries[idx];
     const key = musterEntryKey(entry.product, entry.size);
     const veCount = veStueckCount(entry.product, entry.size);
-    const m = state.newCustomer.musterMengen[key];
+    const m = state.musterMengen[key];
     const stueckMode = !!(m && m.mode === 'stueck');
     const showQty = !!(m && (m.status === 'dagelassen' || m.status === 'zusenden'));
     // "Bereits dagelassen" dokumentiert nur, was beim Termin schon übergeben wurde — keine
@@ -1703,7 +1702,6 @@ function occasionPromptModal() {
     </div>`;
   }
   if (state.summaryStep === 'notiz') {
-    const d = state.newCustomer.draft;
     const selectedCats = Array.from(new Set(favoriteEntries().map(({product}) => product.category)));
     const bausteinGroups = selectedCats
       .map(key => [key, (PRODUKTBEREICHE.find(p => p[0] === key) || [])[1] || key])
@@ -1723,7 +1721,7 @@ function occasionPromptModal() {
             </div>
           </div>`).join('')}
         </div>
-        <label class="modal-field"><textarea id="occasionNotiz" rows="4" placeholder="Gesprächsnotiz (optional)">${escapeHtml(d.notiz)}</textarea></label>
+        <label class="modal-field"><textarea id="occasionNotiz" rows="4" placeholder="Gesprächsnotiz (optional)">${escapeHtml(state.summaryNotiz)}</textarea></label>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-musterfrage">Zurück</button>
           <button class="primary-button compact" data-action="notiz-weiter">Weiter</button>
@@ -1774,7 +1772,7 @@ function occasionPromptModal() {
           <label class="modal-field"><span class="ergebnis-sublabel">oder Datum wählen</span><input id="ergebnisFollowUpDate" type="date" value="${escapeHtml(state.crmFollowUpDate || '')}"></label>` : ''}
         </div>
         <div class="modal-actions">
-          <button class="secondary-button compact" data-action="${state.newCustomer ? 'occasion-back-notiz' : 'ergebnis-back-name'}">Zurück</button>
+          <button class="secondary-button compact" data-action="occasion-back-notiz">Zurück</button>
           <button class="primary-button compact" data-action="ergebnis-weiter" ${followUpWanted && !state.crmFollowUpDate ? 'disabled':''}>Weiter</button>
         </div>
       </div>
@@ -1786,14 +1784,12 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.name} von ${total}</span>
         <h2>Wie heißt der Ansprechpartner?</h2>
-        <p>${isCrmFirst ? 'Für den CRM-Eintrag als Ansprechpartner.' : `Die E-Mail beginnt damit automatisch mit „Hallo ${state.summarySalutation} ${state.summaryCustomer.trim() || 'Name'}".`}</p>
+        <p>${isCrmFirst ? 'Für den CRM-Eintrag als Ansprechpartner.' : `Für die spätere Anrede „Hallo ${state.summarySalutation} ${state.summaryCustomer.trim() || 'Name'}" in der E-Mail an den Kunden.`}</p>
         <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller" autofocus></label>
         <label class="modal-field"><input id="occasionKundenNr" type="text" value="${escapeHtml(state.summaryKundenNr)}" placeholder="KD-Nr. (optional)"></label>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-name">Zurück</button>
-          ${isCrmFirst
-            ? `<button class="primary-button compact" data-action="name-to-ergebnis">Weiter</button>`
-            : `<button class="primary-button compact" data-action="occasion-send">${icon('talk')}<span>E-Mail senden</span></button>`}
+          <button class="primary-button compact" data-action="name-to-produktbereiche">Weiter</button>
         </div>
       </div>
     </div>`;
@@ -1894,7 +1890,7 @@ function occasionPromptModal() {
       <h2>Telefonat oder Termin vor Ort?</h2>
       <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt.</p>
       <div class="modal-choices">${SUMMARY_OCCASIONS.map(o => `<button class="modal-choice" data-occasion-choice="${escapeHtml(o.value)}">${icon(o.icon)}<span>${escapeHtml(o.short)}</span></button>`).join('')}</div>
-      <div class="modal-actions"><button class="secondary-button compact" data-action="${isNew?(showErgebnis?'occasion-back-ergebnis':'occasion-back-notiz'):'occasion-back-kundentyp'}">Zurück</button></div>
+      <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-ergebnis">Zurück</button></div>
     </div>
   </div>`;
 }
@@ -2501,10 +2497,12 @@ function buildCrmSummary(report = state.visitReport) {
     `Terminart: ${report.type || 'Produktvorstellung'}`,
     `Ausgangssituation / aktuelle Produkte: ${report.current || '-'}`,
     `Besprochene Produkte: ${report.products || '-'}`,
+    `Gesprächsnotiz: ${report.notiz || '-'}`,
     `Aktueller Wettbewerber: ${report.wettbewerber || '-'}`,
     `Feedback und Bedarf: ${report.feedback || '-'}`,
     `Muster / Unterlagen: ${report.samples || 'Keine'}`,
     `Ergebnis: ${report.result || 'Offen'}`,
+    ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
     `Nächste Schritte: ${report.nextSteps || '-'}`,
     `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
     `Verantwortlich: ${report.owner || '-'}`
@@ -2537,6 +2535,8 @@ function buildQuickCrmEntry(){
   return {
     customer: state.summaryCustomer.trim() || '-',
     kundenNr: state.summaryKundenNr.trim(),
+    notiz: state.summaryNotiz.trim(),
+    musterWanted: !!state.musterWanted, musterListe: computeMusterListe(entries),
     date: oneToday(),
     contacts: state.summaryCustomer.trim() || '-',
     type: state.summaryOccasion.trim() || 'Produktvorstellung',
@@ -2733,6 +2733,16 @@ function resolvePal(product, size='') {
   return (row && row.pal) || '';
 }
 function musterEntryKey(product, size) { return product.id + '::' + (size || ''); }
+// Gilt jetzt für Bestandskunde genauso wie für Neukunde/Kaltakquise — beide sprechen im
+// Gespräch über Muster, nur die Bestellung selbst läuft immer über den Onlineshop des
+// Außendienstes, nie über den Innendienst.
+function computeMusterListe(entries) {
+  if (!state.musterWanted) return [];
+  return entries.map(({product, size}) => {
+    const m = state.musterMengen[musterEntryKey(product, size)];
+    return (m && m.status && m.status !== 'skip') ? { name: product.name, size, status: m.status, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt } : null;
+  }).filter(Boolean);
+}
 // Nur wenn die importierte Preisliste eine plausible VE-Größe für den Artikel kennt, können
 // wir "1 VE"/"2 VE" als Schnellauswahl anbieten — sonst bleibt nur die Stückzahl-Eingabe.
 function veStueckCount(product, size='') {
@@ -2860,7 +2870,7 @@ function bind() {
   $('[data-action="back"]')?.addEventListener('click', () => {
     if (state.screen === 'detail') { state.screen = 'products'; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'messe') { state.previousScreen = null; state.screen = 'messe'; render(); return; }
-    if (state.screen === 'products' && state.previousScreen === 'kaltakquise-produkte' && state.newCustomer) { state.previousScreen = null; newCustomerSave(); state.screen = 'summary'; state.summaryStep = 'produktbereiche'; render(); return; }
+    if (state.screen === 'products' && state.previousScreen === 'kaltakquise-produkte') { state.previousScreen = null; if (state.newCustomer) newCustomerSave(); state.screen = 'summary'; state.summaryStep = 'produktbereiche'; render(); return; }
     state.previousScreen = null;
     state.screen = 'menu';
     render();
@@ -2923,13 +2933,16 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'', musterWanted: null, musterCycleIndex: 0, musterMengen: {} };
+      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
       state.summaryStep = 'neukunde';
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
       if (state.summaryKundenbesuch) state.summaryKaltakquise = true;
     } else {
-      state.summaryStep = 'occasion';
+      // Bestandskunde durchläuft jetzt denselben Ablauf wie Neukunde: erst Ansprechpartner
+      // (hier per Anrede+Name statt Adressformular, da schon bekannt), dann Produktbereiche,
+      // Muster, Gesprächsnotiz und Rückmeldung & Ergebnis — exakt dieselben Abfragen.
+      state.summaryStep = 'salutation';
     }
     render();
   }));
@@ -2985,71 +2998,73 @@ function bind() {
     state.spectrum = 'all';
     render();
   }));
-  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { newCustomerSave(); state.summaryStep = 'musterfrage'; render(); });
+  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { if (state.newCustomer) newCustomerSave(); state.summaryStep = 'musterfrage'; render(); });
+  $('[data-action="produktbereiche-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'name'; render(); });
+  $('[data-action="name-to-produktbereiche"]')?.addEventListener('click', () => { state.summaryStep = 'produktbereiche'; render(); });
   $('[data-action="occasion-back-musterfrage"]')?.addEventListener('click', () => { state.summaryStep = 'musterfrage'; render(); });
   document.querySelectorAll('[data-muster-wanted]').forEach(button => button.addEventListener('click', () => {
     const ja = button.dataset.musterWanted === 'ja';
-    state.newCustomer.musterWanted = ja;
-    if (ja) { state.newCustomer.musterCycleIndex = 0; state.summaryStep = 'musterzyklus'; }
+    state.musterWanted = ja;
+    if (ja) { state.musterCycleIndex = 0; state.summaryStep = 'musterzyklus'; }
     else state.summaryStep = 'notiz';
     render();
   }));
   document.querySelectorAll('[data-muster-status]').forEach(button => button.addEventListener('click', () => {
     const entries = favoriteEntries();
-    const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
+    const idx = Math.min(state.musterCycleIndex || 0, entries.length - 1);
     const entry = entries[idx];
     if (!entry) return;
     const key = musterEntryKey(entry.product, entry.size);
     const status = button.dataset.musterStatus;
-    if (status === 'skip') { state.newCustomer.musterMengen[key] = { status:'skip', mode:null, ve:0, stueck:0, gesamt:0 }; }
+    if (status === 'skip') { state.musterMengen[key] = { status:'skip', mode:null, ve:0, stueck:0, gesamt:0 }; }
     else {
-      const prev = state.newCustomer.musterMengen[key];
-      state.newCustomer.musterMengen[key] = { status, mode:(prev&&prev.mode)||null, ve:(prev&&prev.ve)||0, stueck:(prev&&prev.stueck)||0, gesamt:(prev&&prev.gesamt)||0 };
+      const prev = state.musterMengen[key];
+      state.musterMengen[key] = { status, mode:(prev&&prev.mode)||null, ve:(prev&&prev.ve)||0, stueck:(prev&&prev.stueck)||0, gesamt:(prev&&prev.gesamt)||0 };
     }
     render();
   }));
   document.querySelectorAll('[data-muster-tile]').forEach(button => button.addEventListener('click', () => {
     const entries = favoriteEntries();
-    const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
+    const idx = Math.min(state.musterCycleIndex || 0, entries.length - 1);
     const entry = entries[idx];
     if (!entry) return;
     const key = musterEntryKey(entry.product, entry.size);
     const veCount = veStueckCount(entry.product, entry.size);
-    const status = state.newCustomer.musterMengen[key]?.status;
+    const status = state.musterMengen[key]?.status;
     const mode = button.dataset.musterTile;
-    if (mode === 've1' && veCount) state.newCustomer.musterMengen[key] = { status, mode:'ve', ve:1, stueck:0, gesamt:veCount };
-    else if (mode === 've2' && veCount) state.newCustomer.musterMengen[key] = { status, mode:'ve', ve:2, stueck:0, gesamt:veCount*2 };
+    if (mode === 've1' && veCount) state.musterMengen[key] = { status, mode:'ve', ve:1, stueck:0, gesamt:veCount };
+    else if (mode === 've2' && veCount) state.musterMengen[key] = { status, mode:'ve', ve:2, stueck:0, gesamt:veCount*2 };
     else if (mode === 'stueck') {
-      const prev = state.newCustomer.musterMengen[key];
+      const prev = state.musterMengen[key];
       const stueck = (prev && prev.mode === 'stueck') ? prev.stueck : 0;
-      state.newCustomer.musterMengen[key] = { status, mode:'stueck', ve:0, stueck, gesamt:stueck };
+      state.musterMengen[key] = { status, mode:'stueck', ve:0, stueck, gesamt:stueck };
     }
     render();
   }));
   $('#musterStueckInput')?.addEventListener('input', e => {
     const entries = favoriteEntries();
-    const idx = Math.min(state.newCustomer.musterCycleIndex || 0, entries.length - 1);
+    const idx = Math.min(state.musterCycleIndex || 0, entries.length - 1);
     const entry = entries[idx];
     if (!entry) return;
     const key = musterEntryKey(entry.product, entry.size);
-    const status = state.newCustomer.musterMengen[key]?.status;
+    const status = state.musterMengen[key]?.status;
     const digits = e.target.value.replace(/\D+/g, '');
     e.target.value = digits;
     const n = digits ? parseInt(digits, 10) : 0;
-    state.newCustomer.musterMengen[key] = { status, mode:'stueck', ve:0, stueck:n, gesamt:n };
+    state.musterMengen[key] = { status, mode:'stueck', ve:0, stueck:n, gesamt:n };
     const weiterBtn = $('[data-action="muster-zyklus-weiter"]');
     if (weiterBtn) weiterBtn.disabled = !(n > 0);
   });
   $('[data-action="muster-zyklus-zurueck"]')?.addEventListener('click', () => {
-    const idx = state.newCustomer.musterCycleIndex || 0;
-    if (idx > 0) state.newCustomer.musterCycleIndex = idx - 1;
+    const idx = state.musterCycleIndex || 0;
+    if (idx > 0) state.musterCycleIndex = idx - 1;
     else state.summaryStep = 'musterfrage';
     render();
   });
   $('[data-action="muster-zyklus-weiter"]')?.addEventListener('click', () => {
     const entries = favoriteEntries();
-    const idx = state.newCustomer.musterCycleIndex || 0;
-    if (idx < entries.length - 1) state.newCustomer.musterCycleIndex = idx + 1;
+    const idx = state.musterCycleIndex || 0;
+    if (idx < entries.length - 1) state.musterCycleIndex = idx + 1;
     else state.summaryStep = 'notiz';
     render();
   });
@@ -3059,12 +3074,13 @@ function bind() {
     const ta = $('#occasionNotiz');
     if (!text || !ta) return;
     ta.value = ta.value.trim() ? ta.value.trim() + ' ' + text : text;
-    state.newCustomer.draft.notiz = ta.value;
+    state.summaryNotiz = ta.value;
   }));
   $('[data-action="notiz-weiter"]')?.addEventListener('click', () => {
-    state.newCustomer.draft.notiz = (($('#occasionNotiz')||{}).value || '').trim();
-    newCustomerSave();
-    state.summaryStep = (state.summaryPurpose === 'crm') ? 'ergebnis' : 'occasion';
+    state.summaryNotiz = (($('#occasionNotiz')||{}).value || '').trim();
+    localStorage.setItem('summaryNotiz', state.summaryNotiz);
+    if (state.newCustomer) newCustomerSave();
+    state.summaryStep = 'ergebnis';
     render();
   });
   document.querySelectorAll('[data-wettbewerber-toggle]').forEach(btn => btn.addEventListener('click', () => {
@@ -3115,38 +3131,25 @@ function bind() {
   });
   $('[data-action="occasion-back-ergebnis"]')?.addEventListener('click', () => { state.summaryStep = 'ergebnis'; render(); });
   $('[data-action="ergebnis-weiter"]')?.addEventListener('click', () => {
-    if (state.newCustomer) {
-      newCustomerSave();
-      state.summaryStep = 'occasion';
-    } else {
-      // Bestandskunde: die Rückmeldung-&-Ergebnis-Fragen sind hier der letzte Schritt vor dem
-      // eigentlichen Versand — vorher stand an dieser Stelle "occasion-send-crm".
-      sendQuickCrmEntry();
-      state.summaryStep = 'kundeask';
-      state.summaryIsNewCustomer = null;
-    }
+    if (state.newCustomer) newCustomerSave();
+    state.summaryStep = 'occasion';
     render();
   });
-  $('[data-action="name-to-ergebnis"]')?.addEventListener('click', () => { state.summaryStep = 'ergebnis'; render(); });
-  $('[data-action="ergebnis-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'name'; render(); });
   $('[data-action="new-customer-send-innendienst"]')?.addEventListener('click', () => sendNewCustomerInnendienstEmail());
   document.querySelectorAll('[data-occasion-choice]').forEach(button => button.addEventListener('click', () => {
     const value = button.dataset.occasionChoice;
     state.summaryOccasion = value;
     localStorage.setItem('summaryOccasion', value);
-    if (state.summaryIsNewCustomer) {
-      // Anrede und Ansprechpartner sind bereits aus dem Neukunden-Formular bekannt —
-      // kein erneutes Abfragen nötig, direkt zur passenden Aktion weiterspringen.
-      if (state.summaryPurpose === 'crm') {
-        sendQuickCrmEntry();
-        state.summaryStep = 'kundeask';
-      } else {
-        state.summarySent = true;
-        sendCustomerSummaryEmail();
-        state.summaryStep = 'crmask';
-      }
+    // Ansprechpartner (und bei Neukunde die ganze Adresse) sind zu diesem Zeitpunkt bereits
+    // erfasst — Bestandskunde und Neukunde/Kaltakquise landen hier über denselben Weg und
+    // lösen dieselbe Aktion aus.
+    if (state.summaryPurpose === 'crm') {
+      sendQuickCrmEntry();
+      state.summaryStep = 'kundeask';
     } else {
-      state.summaryStep = 'salutation';
+      state.summarySent = true;
+      sendCustomerSummaryEmail();
+      state.summaryStep = 'crmask';
     }
     render();
   }));
@@ -3158,15 +3161,8 @@ function bind() {
   }));
   $('#occasionContact')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#occasionKundenNr')?.addEventListener('input', e => { state.summaryKundenNr=e.target.value; localStorage.setItem('summaryKundenNr', e.target.value); });
-  $('[data-action="occasion-back-salutation"]')?.addEventListener('click', () => { state.summaryStep = 'occasion'; render(); });
+  $('[data-action="occasion-back-salutation"]')?.addEventListener('click', () => { state.summaryStep = 'kundentyp'; render(); });
   $('[data-action="occasion-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'salutation'; render(); });
-  $('[data-action="occasion-send"]')?.addEventListener('click', () => {
-    state.summaryStep = 'crmask';
-    state.summaryIsNewCustomer = null;
-    state.summarySent = true;
-    sendCustomerSummaryEmail();
-    render();
-  });
   $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
   $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
   $('[data-action="kunde-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
@@ -3307,7 +3303,7 @@ function saveQuoteField(key, value) { state[key]=value; localStorage.setItem(key
 const BACKUP_KEYS = [
   'prices','priceImportMeta','liveFacts','factsImportMeta','favorites','recentProducts','compareIds',
   'quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','savedVisitReports',
-  'summaryCustomer','summaryKundenNr','summarySalutation','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
+  'summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryOccasion','summaryIncludePrices','customerHistory','region','activeProfile','priceList',
   'messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeDatum','messeAusgefuelltVon','messeGespraechsinhalt','messeMuster',
   'messeKontaktaufnahme','messeBemusterung','messeNewsletter'
 ];
@@ -3399,13 +3395,15 @@ function customerHistoryScreen() {
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf und Messe-Erfassung werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','summaryCustomer','summaryKundenNr','summarySalutation','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
   state.summaryKundenNr = '';
+  state.summaryNotiz = '';
   state.summarySalutation = 'Herr';
   state.summaryOccasion = SUMMARY_OCCASIONS[0].value;
   state.summaryIncludePrices = false;
+  state.musterWanted = null; state.musterCycleIndex = 0; state.musterMengen = {};
   state.crmWettbewerber = []; state.crmWettbewerberCustomOpen = false; state.crmWettbewerberCustomText = '';
   state.crmFeedback = ''; state.crmFeedbackSelected = []; state.crmSamples = 'Keine'; state.crmResult = 'Offen';
   state.crmFollowUpWanted = null; state.crmFollowUpDate = '';
