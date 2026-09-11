@@ -639,18 +639,79 @@ function orderedToolCards(toolCards) {
   byKey.forEach(c => ordered.push(c));
   return ordered;
 }
-function moveToolCard(key, dir, visibleKeys) {
-  const idx = visibleKeys.indexOf(key);
-  const swapIdx = idx + dir;
-  if (idx < 0 || swapIdx < 0 || swapIdx >= visibleKeys.length) return;
-  const neighborKey = visibleKeys[swapIdx];
-  let order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder.slice() : DASHBOARD_TOOL_KEYS_DEFAULT.slice();
-  DASHBOARD_TOOL_KEYS_DEFAULT.forEach(k => { if (!order.includes(k)) order.push(k); });
-  const a = order.indexOf(key), b = order.indexOf(neighborKey);
-  if (a < 0 || b < 0) return;
-  [order[a], order[b]] = [order[b], order[a]];
-  state.dashboardToolOrder = order;
-  localStorage.setItem('dashboardToolOrder', JSON.stringify(order));
+function persistToolOrder(order) {
+  const full = order.slice();
+  DASHBOARD_TOOL_KEYS_DEFAULT.forEach(k => { if (!full.includes(k)) full.push(k); });
+  state.dashboardToolOrder = full;
+  localStorage.setItem('dashboardToolOrder', JSON.stringify(full));
+}
+// Kacheln per Ziehen (Maus + Touch über Pointer Events) statt über Pfeil-Buttons anordnen.
+// Während des Ziehens werden nur die CSS-"order"-Werte der Geschwisterkacheln angepasst statt
+// die DOM-Knoten zu verschieben — sonst würde ein render()-Zwischenstand die gerade gezogene
+// Kachel samt Pointer-Capture zerstören und die Geste abbrechen. Erst beim Loslassen wird die
+// neue Reihenfolge persistiert und einmalig sauber neu gerendert.
+let tileDrag = null;
+function bindTileDrag() {
+  document.querySelectorAll('.arrange-card').forEach(card => {
+    card.addEventListener('pointerdown', e => startTileDrag(e, card));
+  });
+}
+function startTileDrag(e, card) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const grid = card.parentElement;
+  const order = Array.from(grid.querySelectorAll('.arrange-card')).map(c => c.dataset.toolKey);
+  tileDrag = {
+    key: card.dataset.toolKey, el: card, grid, order,
+    pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, moved: false
+  };
+  card.setPointerCapture(e.pointerId);
+  card.addEventListener('pointermove', onTileDragMove);
+  card.addEventListener('pointerup', endTileDrag);
+  card.addEventListener('pointercancel', endTileDrag);
+}
+function onTileDragMove(e) {
+  if (!tileDrag || e.pointerId !== tileDrag.pointerId) return;
+  const dx = e.clientX - tileDrag.startX, dy = e.clientY - tileDrag.startY;
+  if (!tileDrag.moved && Math.hypot(dx, dy) < 6) return;
+  if (!tileDrag.moved) {
+    tileDrag.moved = true;
+    tileDrag.el.classList.add('dragging');
+    Array.from(tileDrag.grid.querySelectorAll('.arrange-card')).forEach((c, i) => { c.style.order = i; });
+  }
+  tileDrag.el.style.transform = `translate(${dx}px, ${dy}px)`;
+  const siblings = Array.from(tileDrag.grid.querySelectorAll('.arrange-card')).filter(c => c !== tileDrag.el);
+  let nearest = null, nearestDist = Infinity;
+  siblings.forEach(sib => {
+    const r = sib.getBoundingClientRect();
+    const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+    if (d < nearestDist) { nearestDist = d; nearest = sib; }
+  });
+  if (nearest) {
+    const fromIdx = tileDrag.order.indexOf(tileDrag.key);
+    const toIdx = tileDrag.order.indexOf(nearest.dataset.toolKey);
+    if (fromIdx !== toIdx) {
+      tileDrag.order.splice(fromIdx, 1);
+      tileDrag.order.splice(toIdx, 0, tileDrag.key);
+      tileDrag.order.forEach((key, i) => {
+        if (key === tileDrag.key) return;
+        const el = tileDrag.grid.querySelector(`.arrange-card[data-tool-key="${key}"]`);
+        if (el) el.style.order = i;
+      });
+    }
+  }
+}
+function endTileDrag(e) {
+  if (!tileDrag || e.pointerId !== tileDrag.pointerId) return;
+  const { el, moved, order } = tileDrag;
+  el.releasePointerCapture(e.pointerId);
+  el.removeEventListener('pointermove', onTileDragMove);
+  el.removeEventListener('pointerup', endTileDrag);
+  el.removeEventListener('pointercancel', endTileDrag);
+  el.style.transform = '';
+  el.classList.remove('dragging');
+  if (moved) persistToolOrder(order);
+  tileDrag = null;
+  render();
 }
 function menuScreen() {
   let cards = [
@@ -701,8 +762,9 @@ function menuScreen() {
       <button data-category="settings"><strong>${Object.keys(state.priceByArt).length}</strong><span>Preisdatensätze</span><small>Import verwalten →</small></button>
     </section>
     <div class="section-heading"><div><span class="eyebrow">Weitere Funktionen</span><h2>Werkzeuge</h2></div><button class="secondary-button compact" data-action="toggle-arrange-tools">${state.dashboardArrangeMode ? 'Fertig' : 'Anordnen'}</button></div>
-    <div class="category-grid compact-grid">${toolCards.map(([key,title,sub],i) => state.dashboardArrangeMode
-      ? `<div class="category-card arrange-card ${key}" data-tool-key="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><div class="arrange-controls"><button type="button" class="arrange-btn" data-arrange-up="${key}" ${i===0?'disabled':''} aria-label="${escapeHtml(title)} nach oben verschieben">↑</button><button type="button" class="arrange-btn" data-arrange-down="${key}" ${i===toolCards.length-1?'disabled':''} aria-label="${escapeHtml(title)} nach unten verschieben">↓</button></div></div>`
+    ${state.dashboardArrangeMode ? '<p class="muted-copy arrange-hint">Kachel gedrückt halten und an die gewünschte Stelle ziehen.</p>' : ''}
+    <div class="category-grid compact-grid">${toolCards.map(([key,title,sub]) => state.dashboardArrangeMode
+      ? `<div class="category-card arrange-card ${key}" data-tool-key="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><span class="drag-handle" aria-hidden="true">⠿</span></div>`
       : `<button class="category-card ${key}" data-category="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${sub}</small></span><b>›</b></button>`
     ).join('')}</div>
     <section class="online-card"><div class="online-dot"></div><div><strong>Unterlagen immer aktuell</strong><p>Produktinformationen, Datenblätter und Bilder werden direkt von schumacher-online.com geöffnet.</p></div><a href="${OFFICIAL.home}" target="_blank" rel="noopener">Website öffnen</a></section>
@@ -2876,16 +2938,7 @@ function bind() {
   $('#globalSearch')?.addEventListener('input', event => { state.globalQuery=event.target.value; debouncedRender(); });
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
   $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
-  document.querySelectorAll('[data-arrange-up]').forEach(button => button.addEventListener('click', () => {
-    const visibleKeys = Array.from(document.querySelectorAll('.arrange-card')).map(el => el.dataset.toolKey);
-    moveToolCard(button.dataset.arrangeUp, -1, visibleKeys);
-    render();
-  }));
-  document.querySelectorAll('[data-arrange-down]').forEach(button => button.addEventListener('click', () => {
-    const visibleKeys = Array.from(document.querySelectorAll('.arrange-card')).map(el => el.dataset.toolKey);
-    moveToolCard(button.dataset.arrangeDown, 1, visibleKeys);
-    render();
-  }));
+  if (state.dashboardArrangeMode) bindTileDrag();
   $('#excel')?.addEventListener('change', importExcel);
   document.querySelectorAll('[data-advisor]').forEach(button => button.onclick = () => { state.advisor[button.dataset.advisor]=button.dataset.value; render(); });
   $('[data-action="reset-advisor"]')?.addEventListener('click', () => { state.advisor={category:'',subtype:'',need:''}; render(); });
