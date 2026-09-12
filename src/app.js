@@ -3365,32 +3365,45 @@ function bind() {
     const snap = state.customerHistory[Number(button.dataset.resumeHistory)];
     if (!snap || !snap.resumable) return;
     if ((state.newCustomer || state.favorites.length) && !confirm('Die aktuell erfassten Daten des laufenden Kundengesprächs werden dabei ersetzt. Fortfahren?')) return;
-    state.favorites = snap.products.filter(p => p.id).map(p => ({id: p.id, size: p.size}));
-    localStorage.setItem('favorites', JSON.stringify(state.favorites));
-    state.summaryKaltakquise = !!snap.kaltakquise;
-    state.summaryKundenbesuch = false;
+    restoreHistorySnapshotIdentity(snap);
     state.summaryPurpose = 'crm';
     state.screen = 'summary';
-    if (snap.resumable === 'neukunde') {
-      // Adress-Entwurf war noch nicht abgeschlossen — zurück in die Adressmaske, mit allem
-      // bereits Eingetragenen vorausgefüllt, damit Fehlendes ergänzt werden kann.
-      state.newCustomer = { draft: {...newCustomerDraftDefault(), ...snap.draft}, contactId: snap.contactId || null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
-      state.summaryIsNewCustomer = true;
-      state.summaryKundenNr = '';
-      localStorage.setItem('summaryKundenNr', '');
-      state.summaryStep = 'neukunde';
-    } else {
-      // Bestandskunde: Name/KD-Nr. sind schon bekannt — zurück zur Ansprechpartner-Frage,
-      // von dort aus geht es normal weiter (Produktbereiche, Muster, Notiz, Ergebnis …).
-      state.newCustomer = null;
-      state.summaryIsNewCustomer = false;
-      state.summaryCustomer = snap.customer || '';
-      localStorage.setItem('summaryCustomer', state.summaryCustomer);
-      state.summaryKundenNr = snap.kundenNr || '';
-      localStorage.setItem('summaryKundenNr', state.summaryKundenNr);
-      state.summarySalutation = snap.salutation || 'Herr';
-      localStorage.setItem('summarySalutation', state.summarySalutation);
-      state.summaryStep = 'name';
+    // Adress-Entwurf (Neukunde) bzw. Ansprechpartner-Frage (Bestandskunde) erneut zeigen, mit
+    // allem bereits Eingetragenen vorausgefüllt, damit Fehlendes ergänzt werden kann — von dort
+    // geht es ganz normal weiter (Produktbereiche, Muster, Notiz, Ergebnis …).
+    state.summaryStep = snap.resumable === 'neukunde' ? 'neukunde' : 'name';
+    render();
+  }));
+  // Schnellaktionen direkt aus dem Kundenverlauf: CRM-Eintrag/Angebotsanfrage/Innendienst-Mail
+  // ohne Namen, KD-Nr. oder Adresse erneut eingeben zu müssen. Bei "angebot" wird nur der
+  // Optionen-Schritt gezeigt (Preisliste/Anhänge sind pro Anfrage neu zu wählen); "crm" und
+  // "innendienst" lösen die jeweilige E-Mail sofort aus, ganz ohne weiteren Dialog.
+  document.querySelectorAll('[data-history-action]').forEach(button => button.addEventListener('click', () => {
+    const idx = Number(button.dataset.historyIdx);
+    const snap = state.customerHistory[idx];
+    if (!snap || !snap.resumable) return;
+    if ((state.newCustomer || state.favorites.length) && !confirm('Die aktuell erfassten Daten des laufenden Kundengesprächs werden dabei ersetzt. Fortfahren?')) return;
+    restoreHistorySnapshotIdentity(snap);
+    if (state.newCustomer && !state.newCustomer.contactId) {
+      newCustomerSave();
+      // Neu angelegten Kontakt im Verlaufs-Eintrag nachtragen — sonst würde eine zweite
+      // Schnellaktion auf derselben Karte (z. B. erst CRM-Eintrag, dann Angebot) mangels
+      // bekannter contactId einen zweiten, doppelten Kontakt anlegen statt denselben zu nutzen.
+      if (state.newCustomer.contactId) {
+        state.customerHistory[idx] = {...snap, contactId: state.newCustomer.contactId};
+        localStorage.setItem('customerHistory', JSON.stringify(state.customerHistory));
+      }
+    }
+    const action = button.dataset.historyAction;
+    if (action === 'crm') {
+      sendQuickCrmEntry();
+    } else if (action === 'innendienst') {
+      sendNewCustomerInnendienstEmail();
+    } else if (action === 'angebot') {
+      state.angebotOptionen = {pif:false, sdb:false, ba:false};
+      state.summaryPurpose = 'angebot';
+      state.screen = 'summary';
+      state.summaryStep = 'angebotOptionen';
     }
     render();
   }));
@@ -3571,6 +3584,11 @@ function archiveUnsavedNewCustomerDraft() {
   const draft = nc ? nc.draft : null;
   const draftHasData = !!draft && Object.values(draft).some(v => typeof v === 'string' && v.trim());
   if (!draftHasData) return;
+  // Wurde dieser Entwurf gerade erst über "Weiter bearbeiten" aus dem Verlauf zurückgeholt und
+  // ohne jede Änderung wieder geschlossen, entspricht er 1:1 dem jüngsten Eintrag dort — dann
+  // keinen zweiten, identischen Eintrag anlegen.
+  const mostRecent = state.customerHistory[0];
+  if (mostRecent && mostRecent.resumable === 'neukunde' && (mostRecent.contactId || null) === (nc.contactId || null) && JSON.stringify(mostRecent.draft) === JSON.stringify(draft)) return;
   const entries = favoriteEntries().map(e => ({id: e.product.id, name: e.product.name, size: e.size}));
   const customer = draft.firma.trim() || [draft.vorname, draft.nachname].filter(Boolean).join(' ').trim();
   const snapshot = {
@@ -3588,6 +3606,34 @@ function archiveUnsavedNewCustomerDraft() {
   state.customerHistory = [snapshot, ...state.customerHistory].slice(0,50);
   localStorage.setItem('customerHistory', JSON.stringify(state.customerHistory));
 }
+// Setzt Favoriten + Kundenidentität aus einem Verlaufs-Eintrag wieder ein — gemeinsame Basis
+// für "Weiter bearbeiten" (geht danach in die Adress-/Namensmaske) und die Schnellaktionen
+// CRM-Eintrag/Angebot/Innendienst (die direkt eine E-Mail auslösen, ohne noch einen
+// Wizard-Schritt zu zeigen). Legt bewusst noch keinen CRM-Kontakt an — das entscheidet jeder
+// Aufrufer selbst, je nachdem ob nur die Maske geöffnet oder direkt gesendet werden soll.
+function restoreHistorySnapshotIdentity(snap) {
+  state.favorites = snap.products.filter(p => p.id).map(p => ({id: p.id, size: p.size}));
+  localStorage.setItem('favorites', JSON.stringify(state.favorites));
+  state.summaryKaltakquise = !!snap.kaltakquise;
+  state.summaryKundenbesuch = false;
+  state.summaryOccasion = snap.occasion || SUMMARY_OCCASIONS[0].value;
+  localStorage.setItem('summaryOccasion', state.summaryOccasion);
+  if (snap.resumable === 'neukunde') {
+    state.newCustomer = { draft: {...newCustomerDraftDefault(), ...snap.draft}, contactId: snap.contactId || null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
+    state.summaryIsNewCustomer = true;
+    state.summaryKundenNr = '';
+    localStorage.setItem('summaryKundenNr', '');
+  } else {
+    state.newCustomer = null;
+    state.summaryIsNewCustomer = false;
+    state.summaryCustomer = snap.customer || '';
+    localStorage.setItem('summaryCustomer', state.summaryCustomer);
+    state.summaryKundenNr = snap.kundenNr || '';
+    localStorage.setItem('summaryKundenNr', state.summaryKundenNr);
+    state.summarySalutation = snap.salutation || 'Herr';
+    localStorage.setItem('summarySalutation', state.summarySalutation);
+  }
+}
 
 function clearFavoritesOnly() {
   if (!state.favorites.length) return;
@@ -3600,8 +3646,23 @@ function clearFavoritesOnly() {
 
 function customerHistoryScreen() {
   const items = state.customerHistory;
-  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Rückblick</span><h1>Letzte Kundengespräche</h1><p>Wird automatisch gesichert, sobald Sie „Speicher löschen – neuer Kunde" oder „Favoriten leeren" nutzen — die letzten 50 Kunden bleiben hier abrufbar.</p></div></div>
-  ${items.length ? items.map((snap,i) => `<section class="advisor-results" style="margin-bottom:14px"><div class="section-heading"><div><span class="eyebrow">${escapeHtml(new Date(snap.date).toLocaleString('de-DE'))}</span><h2>${escapeHtml(snap.customer || 'Ohne Namen')}</h2></div>${snap.resumable ? `<button class="secondary-button compact" data-resume-history="${i}">Weiter bearbeiten</button>` : ''}</div>${snap.kundenNr ? `<p class="muted-copy">KD-Nr.: ${escapeHtml(snap.kundenNr)}</p>` : ''}${snap.occasion ? `<p>${escapeHtml(snap.occasion)}</p>` : ''}${snap.products.length ? `<ul>${snap.products.map(p=>`<li>${escapeHtml(p.name)} – ${escapeHtml(p.size)}</li>`).join('')}</ul>` : '<p class="muted-copy">Keine Produkte markiert.</p>'}</section>`).join('') : '<div class="empty-state"><h2>Noch keine Einträge</h2><p>Sobald Sie den Speicher für einen neuen Kunden löschen, wird der vorherige Stand hier gesichert.</p></div>'}
+  const card = (snap, i) => {
+    const hasProducts = snap.products.length > 0;
+    const actions = [];
+    if (snap.resumable) actions.push(`<button class="secondary-button compact" data-resume-history="${i}">Weiter bearbeiten</button>`);
+    if (snap.resumable) actions.push(`<button class="secondary-button compact" data-history-action="crm" data-history-idx="${i}">CRM-Eintrag senden</button>`);
+    if (snap.resumable && hasProducts) actions.push(`<button class="secondary-button compact" data-history-action="angebot" data-history-idx="${i}">Angebot anfragen</button>`);
+    if (snap.resumable === 'neukunde') actions.push(`<button class="secondary-button compact" data-history-action="innendienst" data-history-idx="${i}">An Innendienst senden</button>`);
+    return `<section class="advisor-results" style="margin-bottom:14px">
+      <div class="section-heading"><div><span class="eyebrow">${escapeHtml(new Date(snap.date).toLocaleString('de-DE'))}</span><h2>${escapeHtml(snap.customer || 'Ohne Namen')}</h2></div></div>
+      ${snap.kundenNr ? `<p class="muted-copy">KD-Nr.: ${escapeHtml(snap.kundenNr)}</p>` : ''}
+      ${snap.occasion ? `<p>${escapeHtml(snap.occasion)}</p>` : ''}
+      ${hasProducts ? `<ul>${snap.products.map(p=>`<li>${escapeHtml(p.name)} – ${escapeHtml(p.size)}</li>`).join('')}</ul>` : '<p class="muted-copy">Keine Produkte markiert.</p>'}
+      ${actions.length ? `<div class="report-actions" style="margin-top:12px">${actions.join('')}</div>` : ''}
+    </section>`;
+  };
+  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Rückblick</span><h1>Letzte Kundengespräche</h1><p>Wird automatisch gesichert, sobald Sie „Speicher löschen – neuer Kunde" oder „Favoriten leeren" nutzen — die letzten 50 Kunden bleiben hier abrufbar. Direkt von hier aus lässt sich auch ohne erneute Eingabe ein CRM-Eintrag oder eine Angebotsanfrage auslösen.</p></div></div>
+  ${items.length ? items.map(card).join('') : '<div class="empty-state"><h2>Noch keine Einträge</h2><p>Sobald Sie den Speicher für einen neuen Kunden löschen, wird der vorherige Stand hier gesichert.</p></div>'}
   </main>`;
 }
 
