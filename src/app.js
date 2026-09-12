@@ -136,6 +136,14 @@ const REGIONS = [
 ];
 function regionLabel(key) { return (REGIONS.find(r => r.key === key) || {}).label || ''; }
 function innendienstEmail() { return (REGIONS.find(r => r.key === state.region) || {}).email || ''; }
+// Eigene E-Mail-Adresse des angemeldeten Mitarbeiters — für CRM-Einträge, die immer an einen
+// selbst gehen (siehe currentRepUser(), löst zuerst über die Login-ID auf).
+function myOwnEmail() { return (currentRepUser() || {}).email || ''; }
+// Sichtbarer Hinweis in den Versand-Schritten, an wen die E-Mail tatsächlich geht — Angebote
+// und Kontaktdaten immer an den zuständigen Innendienst, CRM-Einträge immer an einen selbst.
+function sendToHint(email) {
+  return `<p class="muster-ve-info muted">Wird gesendet an: ${escapeHtml(email || '–')}</p>`;
+}
 
 const SUMMARY_OCCASIONS = [
   {value:'das freundliche Telefonat', label:'Telefonat – „vielen Dank für das freundliche Telefonat"', short:'Telefonat', icon:'phone'},
@@ -1119,6 +1127,7 @@ function emailCard(p) {
   return `<div class="email-card">
     <span>Kundeninfo per E-Mail${count ? ` · ${count} mit ★ markiert` : ''}</span>
     <div class="email-chips">${chips.map(([key,label,available]) => available ? `<button class="filter-chip email-chip ${state.emailInclude[key]?'active':''}" data-email-toggle="${key}">${label}</button>` : '').join('')}</div>
+    ${count ? sendToHint(innendienstEmail()) : ''}
     <button class="primary-button compact" data-action="send-email" ${count?'':'disabled'}>${icon('talk')}<span>Info an Innendienst${count>1?` (${count} Produkte)`:''}</span></button>
     <button class="secondary-button compact" data-action="send-summary" ${count?'':'disabled'}>${icon('talk')}<span>Kundenzusammenfassung</span></button>
     ${count===0 ? '<small class="muted-copy">Markieren Sie zuerst mindestens ein Produkt mit dem Stern (★).</small>' : ''}
@@ -1855,6 +1864,7 @@ function occasionPromptModal() {
         <span class="eyebrow">${newCustomerContact() ? 'Vorletzter Schritt' : 'Letzter Schritt'}</span>
         <h2>Benötigen Sie noch einen CRM-Eintrag?</h2>
         <p>Wir fassen die besprochenen Produkte automatisch zusammen und schicken Ihnen den Eintrag als Gesprächsnotiz per E-Mail zu.</p>
+        ${sendToHint(myOwnEmail())}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="crm-entry-no">Nein, fertig</button>
           <button class="primary-button compact" data-action="crm-entry-yes">${icon('talk')}<span>Ja, CRM-Eintrag erstellen</span></button>
@@ -1883,6 +1893,7 @@ function occasionPromptModal() {
         <span class="eyebrow">Vorletzter Schritt</span>
         <h2>Kontaktdaten an Innendienst senden?</h2>
         <p>Der Innendienst kann den Neukunden dann mit allen erfassten Daten direkt im CRM-System anlegen.</p>
+        ${sendToHint(innendienstEmail())}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="innendienst-ask-no">Nein, fertig</button>
           <button class="primary-button compact" data-action="innendienst-ask-yes">${icon('talk')}<span>Ja, senden</span></button>
@@ -1935,6 +1946,7 @@ function occasionPromptModal() {
         <span class="eyebrow">Letzter Schritt</span>
         <h2>Angaben für den Innendienst</h2>
         <p>Wird zusammen mit der Angebotsanfrage übermittelt.</p>
+        ${sendToHint(innendienstEmail())}
         <div class="ergebnis-block">
           <span class="notiz-baustein-label">Preisliste für das Angebot</span>
           <div class="notiz-baustein-chips">
@@ -2214,6 +2226,7 @@ function offerScreen() {
   const total = subtotal + vat;
   const validUntil = state.quoteValidUntil || new Date(Date.now()+14*86400000).toISOString().slice(0,10);
   return `<main class="page offer-page"><div class="section-heading no-print"><div><span class="eyebrow">Angebotsentwurf</span><h1>Kundenübersicht & Kalkulation</h1><p>Erstellt aus den mit ★ markierten Produkten.</p></div></div>
+    ${sendToHint(innendienstEmail())}
     <section class="offer-config no-print"><label>Kunde / Einrichtung<input id="quoteCustomer" value="${escapeHtml(state.quoteCustomer)}" placeholder="z. B. Klinikum Dortmund"></label><label>Ansprechpartner<input id="quoteContact" value="${escapeHtml(state.quoteContact)}" placeholder="Name oder Funktion"></label><label>Gültig bis<input id="quoteValidUntil" type="date" value="${escapeHtml(validUntil)}"></label><label class="wide">Notiz<textarea id="quoteNote" placeholder="Ziel, nächste Schritte oder besondere Anforderungen">${escapeHtml(state.quoteNote)}</textarea></label><div class="offer-actions wide"><button class="secondary-button" data-action="customer-mode">${state.customerMode?'Preise wieder anzeigen':'Preise für Kunden ausblenden'}</button><button class="secondary-button" data-action="export-offer">CSV für Innendienst</button><button class="secondary-button" data-action="copy-offer" ${entries.length?'':'disabled'}>${icon('copy')}<span>Text kopieren</span></button><button class="secondary-button" data-action="email-offer" ${entries.length?'':'disabled'}>${icon('talk')}<span>Per E-Mail-Programm öffnen</span></button><button class="primary-button compact" data-action="print-offer">Drucken / als PDF speichern</button></div></section>
     <section class="offer-sheet"><div class="offer-brand"><img src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher"><div><span>Angebotsentwurf</span><strong>${escapeHtml(state.quoteCustomer || 'Kundentermin')}</strong><small>${escapeHtml(state.quoteContact || '')}</small></div></div><div class="offer-meta"><span>Markierte Produkte: ${entries.length}</span><span>Preisbasis: ${state.customerMode?'ohne Preise':escapeHtml(state.priceList)}</span><span>Gültig bis: ${new Date(validUntil+'T12:00:00').toLocaleDateString('de-DE')}</span><span>Stand: ${new Date().toLocaleDateString('de-DE')}</span></div>
       ${entries.length ? `<div class="offer-table-wrap"><table class="offer-table offer-calculation"><thead><tr><th>Produkt</th><th>Menge</th><th>Rabatt</th><th>Einzelpreis</th><th>Gesamt</th></tr></thead><tbody>${rows}</tbody></table></div>${state.customerMode?'':`<div class="offer-totals"><div><span>Zwischensumme</span><strong>${money(subtotal)}</strong></div><div><span>zzgl. 19 % MwSt.</span><strong>${money(vat)}</strong></div><div class="grand-total"><span>Gesamtsumme</span><strong>${money(total)}</strong></div></div>`}` : '<div class="empty-state"><h2>Keine Produkte markiert</h2><p>Markieren Sie zuerst Produkte im Gespräch mit dem Stern (★).</p></div>'}
@@ -2393,6 +2406,7 @@ function messeScreen() {
       </div>
     </section>
     <h2 class="messe-step no-print">3. Abschließen</h2>
+    ${innendienstEmail() ? sendToHint(innendienstEmail()) : ''}
     <div class="offer-actions wide no-print"><button class="primary-button compact" data-action="send-messe" ${canSend ? '' : 'disabled'}>${icon('talk')}<span>An Innendienst senden${state.region ? ` (Team ${regionLabel(state.region)})` : ''}</span></button></div>
     ${!innendienstEmail() ? '<small class="muted-copy no-print">Bitte zuerst in den Einstellungen Ihre Team-Region wählen, damit die E-Mail an das richtige Innendienst-Team geht.</small>' : ''}
   </main>`;
