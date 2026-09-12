@@ -1916,16 +1916,26 @@ function occasionPromptModal() {
     const angebotBackAction = state.summaryPurpose === 'angebot'
       ? (state.newCustomer ? 'occasion-back-innendienstask' : 'occasion-back-angebotkunde')
       : 'occasion-back-angebotask';
+    const priceListOptions = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'];
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(480px,100%)">
         ${modalCloseBtn()}
         <span class="eyebrow">Letzter Schritt</span>
-        <h2>Was soll der Innendienst mitsenden?</h2>
-        <p>Wird zusammen mit dem Angebot direkt an den Kunden verschickt.</p>
-        <div class="notiz-baustein-chips">
-          <button type="button" class="notiz-chip ${opts.pif?'active':''}" data-angebot-toggle="pif">Produktinformation</button>
-          <button type="button" class="notiz-chip ${opts.sdb?'active':''}" data-angebot-toggle="sdb">Sicherheitsdatenblatt</button>
-          <button type="button" class="notiz-chip ${opts.ba?'active':''}" data-angebot-toggle="ba">Betriebsanweisung</button>
+        <h2>Angaben für den Innendienst</h2>
+        <p>Wird zusammen mit der Angebotsanfrage übermittelt.</p>
+        <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Preisliste für das Angebot</span>
+          <div class="notiz-baustein-chips">
+            ${priceListOptions.map(o => `<button type="button" class="notiz-chip ${state.priceList===o?'active':''}" data-angebot-pricelist="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Was soll mitgesendet werden?</span>
+          <div class="notiz-baustein-chips">
+            <button type="button" class="notiz-chip ${opts.pif?'active':''}" data-angebot-toggle="pif">Produktinformation</button>
+            <button type="button" class="notiz-chip ${opts.sdb?'active':''}" data-angebot-toggle="sdb">Sicherheitsdatenblatt</button>
+            <button type="button" class="notiz-chip ${opts.ba?'active':''}" data-angebot-toggle="ba">Betriebsanweisung</button>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="${angebotBackAction}">Zurück</button>
@@ -1998,6 +2008,7 @@ function buildAngebotInnendienstEmail(){
     ''
   ];
   if (!contact && state.summaryKundenNr.trim()) lines.push(`KD-Nr.: ${state.summaryKundenNr.trim()}`, '');
+  lines.push(`Preisliste: ${state.priceList}`, '');
   entries.forEach(({product, size}) => {
     lines.push(`PRODUKT: ${product.name}`, `Artikelnummer: ${resolveArtNr(product, size)}`, `Gebinde: ${size}`, '');
   });
@@ -3252,6 +3263,11 @@ function bind() {
   document.querySelectorAll('[data-angebot-toggle]').forEach(button => button.addEventListener('click', () => {
     const key = button.dataset.angebotToggle;
     state.angebotOptionen[key] = !state.angebotOptionen[key];
+    render();
+  }));
+  document.querySelectorAll('[data-angebot-pricelist]').forEach(button => button.addEventListener('click', () => {
+    state.priceList = button.dataset.angebotPricelist;
+    localStorage.setItem('priceList', state.priceList);
     render();
   }));
   $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; render(); });
