@@ -3056,7 +3056,13 @@ function bind() {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
     if (isNew){
-      state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
+      // Existiert bereits ein Entwurf (z. B. weil man aus der Adressmaske per "Zurück" hierher
+      // kam, etwa nach "Weiter bearbeiten" aus dem Kundenverlauf), diesen nicht überschreiben —
+      // sonst gehen bereits eingetragene Adressdaten beim erneuten Antippen von "Neukunde"
+      // verloren, nur weil man kurz auf diesem Schritt war.
+      if (!state.newCustomer) {
+        state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
+      }
       state.summaryStep = 'neukunde';
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
@@ -3413,6 +3419,8 @@ function bind() {
       sendQuickCrmEntry();
     } else if (action === 'innendienst') {
       sendNewCustomerInnendienstEmail();
+    } else if (action === 'kunde') {
+      sendCustomerSummaryEmail();
     } else if (action === 'angebot') {
       state.angebotOptionen = {pif:false, sdb:false, ba:false};
       state.summaryPurpose = 'angebot';
@@ -3637,6 +3645,16 @@ function restoreHistorySnapshotIdentity(snap) {
     state.summaryIsNewCustomer = true;
     state.summaryKundenNr = '';
     localStorage.setItem('summaryKundenNr', '');
+    // Dieselbe Ableitung wie im "Weiter"-Handler der Adressmaske (neukunde-weiter): Anrede und
+    // Ansprechpartner-Name für die Kundenmail vorbereiten, E-Mail-Adresse als Empfänger, falls
+    // erfasst — sonst würde die Kundenzusammenfassung ohne Namen/Anrede und ohne Empfänger
+    // losgeschickt, obwohl beides im Entwurf bereits steht.
+    const d = state.newCustomer.draft;
+    if (d.anrede) { state.summarySalutation = d.anrede; localStorage.setItem('summarySalutation', d.anrede); }
+    const plainName = [d.vorname, d.nachname].filter(Boolean).join(' ').trim();
+    state.summaryCustomer = plainName || d.nachname || '';
+    localStorage.setItem('summaryCustomer', state.summaryCustomer);
+    state.summaryPendingRecipient = d.email.trim() || null;
   } else {
     state.newCustomer = null;
     state.summaryIsNewCustomer = false;
@@ -3646,6 +3664,7 @@ function restoreHistorySnapshotIdentity(snap) {
     localStorage.setItem('summaryKundenNr', state.summaryKundenNr);
     state.summarySalutation = snap.salutation || 'Herr';
     localStorage.setItem('summarySalutation', state.summarySalutation);
+    state.summaryPendingRecipient = null;
   }
 }
 
@@ -3666,6 +3685,7 @@ function customerHistoryScreen() {
     if (snap.resumable) actions.push(`<button class="secondary-button compact" data-resume-history="${i}">Weiter bearbeiten</button>`);
     if (snap.resumable) actions.push(`<button class="secondary-button compact" data-history-action="crm" data-history-idx="${i}">CRM-Eintrag senden</button>`);
     if (snap.resumable && hasProducts) actions.push(`<button class="secondary-button compact" data-history-action="angebot" data-history-idx="${i}">Angebot anfragen</button>`);
+    if (snap.resumable && hasProducts) actions.push(`<button class="secondary-button compact" data-history-action="kunde" data-history-idx="${i}">Kundenzusammenfassung senden</button>`);
     if (snap.resumable === 'neukunde') actions.push(`<button class="secondary-button compact" data-history-action="innendienst" data-history-idx="${i}">An Innendienst senden</button>`);
     return `<section class="advisor-results" style="margin-bottom:14px">
       <div class="section-heading"><div><span class="eyebrow">${escapeHtml(new Date(snap.date).toLocaleString('de-DE'))}</span><h2>${escapeHtml(snap.customer || 'Ohne Namen')}</h2></div></div>
