@@ -1413,7 +1413,12 @@ function vsCalculation() {
 function modalCloseBtn(){
   return `<button type="button" class="modal-close" data-action="modal-close" aria-label="Abbrechen und schließen">×</button>`;
 }
+// Bevor state.newCustomer verworfen wird, den ggf. unfertigen Neukunden-Entwurf in den
+// Kundenverlauf sichern (snapshotCustomerData() speichert nur, wenn wirklich Daten drinstehen)
+// — sonst gehen Adressangaben verloren, die noch nirgends gespeichert wurden, nur weil der
+// Dialog geschlossen oder ein neuer Ablauf gestartet wurde.
 function closeAnyModal(){
+  snapshotCustomerData();
   state.summaryStep = null;
   state.summaryPurpose = null;
   state.summaryPendingRecipient = null;
@@ -1425,6 +1430,7 @@ function closeAnyModal(){
   render();
 }
 function startSummaryFlow(){
+  snapshotCustomerData();
   state.screen = 'summary';
   state.summaryStep = 'purpose';
   state.summaryPurpose = null;
@@ -1441,6 +1447,7 @@ function startSummaryFlow(){
 // [data-kundentyp-choice]-Handler), statt wie früher direkt in die Kaltakquise-Adresserfassung
 // zu springen.
 function startKundenbesuchFlow(){
+  snapshotCustomerData();
   state.screen = 'summary';
   state.summaryStep = 'kundentyp';
   state.summaryPurpose = 'crm';
@@ -1459,6 +1466,7 @@ function startKundenbesuchFlow(){
 // Neukunde eine Adresse braucht und der Innendienst dafür zusätzlich informiert werden muss,
 // dass der Kontakt neu angelegt werden soll.
 function startAngebotFlow(){
+  snapshotCustomerData();
   state.screen = 'summary';
   state.summaryStep = 'kundentyp';
   state.summaryPurpose = 'angebot';
@@ -1999,15 +2007,25 @@ function sendNewCustomerInnendienstEmail(){
 function buildAngebotInnendienstEmail(){
   const entries = favoriteEntries();
   const contact = newCustomerContact();
-  const customerName = contact ? contact.name : state.summaryCustomer.trim();
+  // Firma und Ansprechpartner sind bei Neukunde zwei getrennte Angaben (Firmenname vs. die
+  // Person, die man vor Ort gesprochen hat) — bei Bestandskunde gibt es keine erfasste Firma
+  // (die kennt der Innendienst über die KD-Nr.), das eingegebene Feld ist dort selbst schon
+  // der Ansprechpartner. Beides bekommt eine eigene, klar beschriftete Zeile statt in einem
+  // Fließtext-Satz zu verschwinden.
+  const ansprechpartner = contact
+    ? [contact.anrede, contact.ansprechpartnerVorname, contact.ansprechpartnerNachname].filter(Boolean).join(' ')
+    : state.summaryCustomer.trim();
+  const customerName = contact ? contact.name : ansprechpartner;
   const opts = state.angebotOptionen;
   const lines = [
     'Hallo Team,',
     '',
-    `bitte für ${customerName || 'den Kunden'} ein Angebot erstellen und versenden für folgende Produkte:`,
+    'bitte für folgenden Kunden ein Angebot erstellen und versenden:',
     ''
   ];
-  if (!contact && state.summaryKundenNr.trim()) lines.push(`KD-Nr.: ${state.summaryKundenNr.trim()}`, '');
+  if (contact) lines.push(`Firma: ${contact.name || '(Firma bitte ergänzen)'}`);
+  lines.push(`Ansprechpartner: ${ansprechpartner || '–'}`);
+  if (!contact && state.summaryKundenNr.trim()) lines.push(`KD-Nr.: ${state.summaryKundenNr.trim()}`);
   lines.push(`Preisliste: ${state.priceList}`, '');
   entries.forEach(({product, size}) => {
     lines.push(`PRODUKT: ${product.name}`, `Artikelnummer: ${resolveArtNr(product, size)}`, `Gebinde: ${size}`, '');
@@ -2018,7 +2036,7 @@ function buildAngebotInnendienstEmail(){
   if (opts.ba) extras.push('Betriebsanweisung');
   if (extras.length) lines.push(`Bitte zusätzlich mit dem Angebot mitsenden: ${extras.join(', ')}`, '');
   lines.push('Danke und Grüße' + (state.repName ? ', ' + state.repName : ''));
-  return { subject: `Angebotsanfrage${customerName ? ' für ' + customerName : ''} – Dr. Schumacher`, body: lines.join('\n') };
+  return { subject: `Angebot ${customerName || 'Kundentermin'} – Dr. Schumacher`, body: lines.join('\n') };
 }
 function sendAngebotInnendienstEmail(){
   const {subject, body} = buildAngebotInnendienstEmail();
@@ -2097,9 +2115,19 @@ function buildCustomerSummaryEmail(){
 function sendCustomerSummaryEmail(){
   if(!state.favorites.length)return;
   const {subject,body}=buildCustomerSummaryEmail();
-  const to = state.summaryPendingRecipient || 'gerald.gampp@schumacher-online.com';
+  // Bei Neukunde ist die E-Mail-Adresse bereits aus dem Adressformular bekannt
+  // (summaryPendingRecipient). Bei Bestandskunde gibt es kein E-Mail-Feld im Ablauf — dafür
+  // aber die KD-Nr., über die sich der hinterlegte Kontakt (inkl. E-Mail) im CRM finden lässt.
+  // Ohne Treffer bewusst mit leerem Empfänger öffnen statt an eine falsche, fremde Adresse zu
+  // schicken — die Zusammenfassung ist für den Kunden bestimmt, nicht für eine feste Postfach.
+  let to = state.summaryPendingRecipient;
+  if (!to && state.summaryKundenNr.trim()) {
+    const kundenNr = state.summaryKundenNr.trim().toLowerCase();
+    const match = state.one.contacts.find(c => (c.kundenNr || '').trim().toLowerCase() === kundenNr);
+    if (match && match.email) to = match.email;
+  }
   state.summaryPendingRecipient = null;
-  openMailto(subject,body,to);
+  openMailto(subject, body, to || '');
 }
 
 function competitionScreen(){
@@ -2585,7 +2613,10 @@ function buildCrmSummary(report = state.visitReport) {
 }
 
 function currentRepUser(){
-  return state.repName ? state.one.users.find(u => u.name.trim().toLowerCase() === state.repName.trim().toLowerCase()) : null;
+  // Erst über die feste Login-ID auflösen (kann nicht durch Namensänderungen/Groß-Klein-
+  // schreibung/Leerzeichen brechen) — der Namensabgleich bleibt nur als Rückfallebene, damit
+  // die CRM-Eintrags-Mail immer eine gültige Empfängeradresse des angemeldeten Mitarbeiters hat.
+  return oneCurrentUser() || (state.repName ? state.one.users.find(u => u.name.trim().toLowerCase() === state.repName.trim().toLowerCase()) : null);
 }
 function buildQuickCrmEntry(){
   const c = newCustomerContact();
@@ -3326,6 +3357,23 @@ function bind() {
   $('[data-action="export-prices"]')?.addEventListener('click', exportPrices);
   $('[data-action="reset-customer"]')?.addEventListener('click', resetCustomerData);
   $('[data-action="customer-history"]')?.addEventListener('click', () => { state.screen='customer-history'; render(); });
+  document.querySelectorAll('[data-resume-history]').forEach(button => button.addEventListener('click', () => {
+    const snap = state.customerHistory[Number(button.dataset.resumeHistory)];
+    if (!snap || !snap.draft) return;
+    if ((state.newCustomer || state.favorites.length) && !confirm('Die aktuell erfassten Daten des laufenden Kundengesprächs werden dabei ersetzt. Fortfahren?')) return;
+    state.newCustomer = { draft: {...newCustomerDraftDefault(), ...snap.draft}, contactId: snap.contactId || null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
+    state.favorites = snap.products.filter(p => p.id).map(p => ({id: p.id, size: p.size}));
+    localStorage.setItem('favorites', JSON.stringify(state.favorites));
+    state.summaryIsNewCustomer = true;
+    state.summaryKaltakquise = !!snap.kaltakquise;
+    state.summaryKundenbesuch = false;
+    state.summaryPurpose = 'crm';
+    state.summaryKundenNr = snap.kundenNr || '';
+    localStorage.setItem('summaryKundenNr', state.summaryKundenNr);
+    state.screen = 'summary';
+    state.summaryStep = 'neukunde';
+    render();
+  }));
   $('[data-action="clear-favorites"]')?.addEventListener('click', clearFavoritesOnly);
   $('[data-action="export-backup"]')?.addEventListener('click', exportDeviceBackup);
   $('#backupImport')?.addEventListener('change', importDeviceBackup);
@@ -3451,16 +3499,34 @@ async function importDeviceBackup(event) {
 }
 
 function snapshotCustomerData() {
-  const entries = favoriteEntries().map(e => ({name: e.product.name, size: e.size}));
-  const customer = state.summaryCustomer.trim() || state.quoteCustomer.trim();
-  if (!entries.length && !customer) return;
+  const entries = favoriteEntries().map(e => ({id: e.product.id, name: e.product.name, size: e.size}));
+  const nc = state.newCustomer;
+  const draft = nc ? nc.draft : null;
+  const draftHasData = !!draft && Object.values(draft).some(v => typeof v === 'string' && v.trim());
+  // Bei einem Neukunden-Entwurf die Firma als Überschrift bevorzugen (leichter wiederzuerkennen
+  // als der Ansprechpartner) und erst danach auf den Ansprechpartnernamen zurückfallen.
+  const customer = draft
+    ? (draft.firma.trim() || [draft.vorname, draft.nachname].filter(Boolean).join(' ').trim() || state.summaryCustomer.trim())
+    : (state.summaryCustomer.trim() || state.quoteCustomer.trim());
+  if (!entries.length && !customer && !draftHasData) return;
   const snapshot = {
     date: new Date().toISOString(),
     customer: customer || '',
+    // Bei einem Neukunden-Entwurf gibt es noch keine KD-Nr. — state.summaryKundenNr könnte hier
+    // noch einen Altwert von einem vorherigen Bestandskunden derselben Sitzung enthalten, der
+    // mit diesem Neukunden nichts zu tun hat.
+    kundenNr: draft ? '' : state.summaryKundenNr.trim(),
     occasion: state.summaryOccasion.trim(),
-    products: entries
+    products: entries,
+    // Bei einem noch nicht abgeschlossenen Neukunden/Kaltakquise-Formular den Entwurf sichern,
+    // damit man ihn über „Weiter bearbeiten" später fortsetzen kann, statt eingetippte Adress-
+    // daten beim nächsten Kunden zu verlieren. contactId verweist auf einen ggf. schon
+    // angelegten CRM-Kontakt, damit „Weiter bearbeiten" diesen aktualisiert statt zu duplizieren.
+    draft: draftHasData ? draft : null,
+    contactId: nc ? nc.contactId : null,
+    kaltakquise: !!state.summaryKaltakquise
   };
-  state.customerHistory = [snapshot, ...state.customerHistory].slice(0,5);
+  state.customerHistory = [snapshot, ...state.customerHistory].slice(0,50);
   localStorage.setItem('customerHistory', JSON.stringify(state.customerHistory));
 }
 
@@ -3475,8 +3541,8 @@ function clearFavoritesOnly() {
 
 function customerHistoryScreen() {
   const items = state.customerHistory;
-  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Rückblick</span><h1>Letzte Kundengespräche</h1><p>Wird automatisch gesichert, sobald Sie „Speicher löschen – neuer Kunde" oder „Favoriten leeren" nutzen.</p></div></div>
-  ${items.length ? items.map(snap => `<section class="advisor-results" style="margin-bottom:14px"><div class="section-heading"><div><span class="eyebrow">${escapeHtml(new Date(snap.date).toLocaleString('de-DE'))}</span><h2>${escapeHtml(snap.customer || 'Ohne Namen')}</h2></div></div>${snap.occasion ? `<p>${escapeHtml(snap.occasion)}</p>` : ''}${snap.products.length ? `<ul>${snap.products.map(p=>`<li>${escapeHtml(p.name)} – ${escapeHtml(p.size)}</li>`).join('')}</ul>` : '<p class="muted-copy">Keine Produkte markiert.</p>'}</section>`).join('') : '<div class="empty-state"><h2>Noch keine Einträge</h2><p>Sobald Sie den Speicher für einen neuen Kunden löschen, wird der vorherige Stand hier gesichert.</p></div>'}
+  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Rückblick</span><h1>Letzte Kundengespräche</h1><p>Wird automatisch gesichert, sobald Sie „Speicher löschen – neuer Kunde" oder „Favoriten leeren" nutzen — die letzten 50 Kunden bleiben hier abrufbar.</p></div></div>
+  ${items.length ? items.map((snap,i) => `<section class="advisor-results" style="margin-bottom:14px"><div class="section-heading"><div><span class="eyebrow">${escapeHtml(new Date(snap.date).toLocaleString('de-DE'))}</span><h2>${escapeHtml(snap.customer || 'Ohne Namen')}</h2></div>${snap.draft ? `<button class="secondary-button compact" data-resume-history="${i}">Weiter bearbeiten</button>` : ''}</div>${snap.kundenNr ? `<p class="muted-copy">KD-Nr.: ${escapeHtml(snap.kundenNr)}</p>` : ''}${snap.occasion ? `<p>${escapeHtml(snap.occasion)}</p>` : ''}${snap.products.length ? `<ul>${snap.products.map(p=>`<li>${escapeHtml(p.name)} – ${escapeHtml(p.size)}</li>`).join('')}</ul>` : '<p class="muted-copy">Keine Produkte markiert.</p>'}</section>`).join('') : '<div class="empty-state"><h2>Noch keine Einträge</h2><p>Sobald Sie den Speicher für einen neuen Kunden löschen, wird der vorherige Stand hier gesichert.</p></div>'}
   </main>`;
 }
 
