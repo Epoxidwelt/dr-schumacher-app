@@ -1414,11 +1414,15 @@ function modalCloseBtn(){
   return `<button type="button" class="modal-close" data-action="modal-close" aria-label="Abbrechen und schließen">×</button>`;
 }
 // Bevor state.newCustomer verworfen wird, den ggf. unfertigen Neukunden-Entwurf in den
-// Kundenverlauf sichern (snapshotCustomerData() speichert nur, wenn wirklich Daten drinstehen)
-// — sonst gehen Adressangaben verloren, die noch nirgends gespeichert wurden, nur weil der
-// Dialog geschlossen oder ein neuer Ablauf gestartet wurde.
+// Kundenverlauf sichern (archiveUnsavedNewCustomerDraft() speichert nur, wenn wirklich Daten
+// drinstehen und noch kein Kontakt/keine Momentaufnahme dafür existiert) — sonst gehen
+// Adressangaben verloren, die noch nirgends gespeichert wurden, nur weil der Dialog
+// geschlossen oder ein neuer Ablauf gestartet wurde. Die laufenden Favoriten/der aktuelle
+// Kundenname werden hier bewusst NICHT mitgesichert — die gehören zum weiterlaufenden
+// Kundengespräch und sind erst mit "Speicher löschen – neuer Kunde" wirklich abgeschlossen
+// (sonst entstünde bei jedem Ablauf-Neustart ein Verlaufs-Eintrag für denselben Kunden).
 function closeAnyModal(){
-  snapshotCustomerData();
+  archiveUnsavedNewCustomerDraft();
   state.summaryStep = null;
   state.summaryPurpose = null;
   state.summaryPendingRecipient = null;
@@ -1430,7 +1434,7 @@ function closeAnyModal(){
   render();
 }
 function startSummaryFlow(){
-  snapshotCustomerData();
+  archiveUnsavedNewCustomerDraft();
   state.screen = 'summary';
   state.summaryStep = 'purpose';
   state.summaryPurpose = null;
@@ -1447,7 +1451,7 @@ function startSummaryFlow(){
 // [data-kundentyp-choice]-Handler), statt wie früher direkt in die Kaltakquise-Adresserfassung
 // zu springen.
 function startKundenbesuchFlow(){
-  snapshotCustomerData();
+  archiveUnsavedNewCustomerDraft();
   state.screen = 'summary';
   state.summaryStep = 'kundentyp';
   state.summaryPurpose = 'crm';
@@ -1466,7 +1470,7 @@ function startKundenbesuchFlow(){
 // Neukunde eine Adresse braucht und der Innendienst dafür zusätzlich informiert werden muss,
 // dass der Kontakt neu angelegt werden soll.
 function startAngebotFlow(){
-  snapshotCustomerData();
+  archiveUnsavedNewCustomerDraft();
   state.screen = 'summary';
   state.summaryStep = 'kundentyp';
   state.summaryPurpose = 'angebot';
@@ -3359,19 +3363,35 @@ function bind() {
   $('[data-action="customer-history"]')?.addEventListener('click', () => { state.screen='customer-history'; render(); });
   document.querySelectorAll('[data-resume-history]').forEach(button => button.addEventListener('click', () => {
     const snap = state.customerHistory[Number(button.dataset.resumeHistory)];
-    if (!snap || !snap.draft) return;
+    if (!snap || !snap.resumable) return;
     if ((state.newCustomer || state.favorites.length) && !confirm('Die aktuell erfassten Daten des laufenden Kundengesprächs werden dabei ersetzt. Fortfahren?')) return;
-    state.newCustomer = { draft: {...newCustomerDraftDefault(), ...snap.draft}, contactId: snap.contactId || null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
     state.favorites = snap.products.filter(p => p.id).map(p => ({id: p.id, size: p.size}));
     localStorage.setItem('favorites', JSON.stringify(state.favorites));
-    state.summaryIsNewCustomer = true;
     state.summaryKaltakquise = !!snap.kaltakquise;
     state.summaryKundenbesuch = false;
     state.summaryPurpose = 'crm';
-    state.summaryKundenNr = snap.kundenNr || '';
-    localStorage.setItem('summaryKundenNr', state.summaryKundenNr);
     state.screen = 'summary';
-    state.summaryStep = 'neukunde';
+    if (snap.resumable === 'neukunde') {
+      // Adress-Entwurf war noch nicht abgeschlossen — zurück in die Adressmaske, mit allem
+      // bereits Eingetragenen vorausgefüllt, damit Fehlendes ergänzt werden kann.
+      state.newCustomer = { draft: {...newCustomerDraftDefault(), ...snap.draft}, contactId: snap.contactId || null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
+      state.summaryIsNewCustomer = true;
+      state.summaryKundenNr = '';
+      localStorage.setItem('summaryKundenNr', '');
+      state.summaryStep = 'neukunde';
+    } else {
+      // Bestandskunde: Name/KD-Nr. sind schon bekannt — zurück zur Ansprechpartner-Frage,
+      // von dort aus geht es normal weiter (Produktbereiche, Muster, Notiz, Ergebnis …).
+      state.newCustomer = null;
+      state.summaryIsNewCustomer = false;
+      state.summaryCustomer = snap.customer || '';
+      localStorage.setItem('summaryCustomer', state.summaryCustomer);
+      state.summaryKundenNr = snap.kundenNr || '';
+      localStorage.setItem('summaryKundenNr', state.summaryKundenNr);
+      state.summarySalutation = snap.salutation || 'Herr';
+      localStorage.setItem('summarySalutation', state.summarySalutation);
+      state.summaryStep = 'name';
+    }
     render();
   }));
   $('[data-action="clear-favorites"]')?.addEventListener('click', clearFavoritesOnly);
@@ -3498,17 +3518,25 @@ async function importDeviceBackup(event) {
   }
 }
 
+// Voller Schnappschuss des gerade abgeschlossenen Kundengesprächs — für die expliziten
+// "fertig, nächster Kunde"-Aktionen (Speicher löschen, Favoriten leeren). Jeder Eintrag wird
+// als "resumable" markiert, wenn er später über "Weiter bearbeiten" wieder aufgerufen werden
+// kann: 'neukunde' bei einem (ggf. unfertigen) Adress-Entwurf, 'bestandskunde' wenn zumindest
+// Name/KD-Nr. aus dem Wizard bekannt sind, sonst null (z. B. reiner Angebotsentwurf ohne
+// Wizard-Bezug über state.quoteCustomer — der lässt sich nicht in den Wizard zurückladen).
 function snapshotCustomerData() {
   const entries = favoriteEntries().map(e => ({id: e.product.id, name: e.product.name, size: e.size}));
   const nc = state.newCustomer;
   const draft = nc ? nc.draft : null;
   const draftHasData = !!draft && Object.values(draft).some(v => typeof v === 'string' && v.trim());
+  const wizardCustomer = state.summaryCustomer.trim();
   // Bei einem Neukunden-Entwurf die Firma als Überschrift bevorzugen (leichter wiederzuerkennen
   // als der Ansprechpartner) und erst danach auf den Ansprechpartnernamen zurückfallen.
   const customer = draft
-    ? (draft.firma.trim() || [draft.vorname, draft.nachname].filter(Boolean).join(' ').trim() || state.summaryCustomer.trim())
-    : (state.summaryCustomer.trim() || state.quoteCustomer.trim());
+    ? (draft.firma.trim() || [draft.vorname, draft.nachname].filter(Boolean).join(' ').trim() || wizardCustomer)
+    : (wizardCustomer || state.quoteCustomer.trim());
   if (!entries.length && !customer && !draftHasData) return;
+  const resumable = draftHasData ? 'neukunde' : (wizardCustomer ? 'bestandskunde' : null);
   const snapshot = {
     date: new Date().toISOString(),
     customer: customer || '',
@@ -3516,6 +3544,7 @@ function snapshotCustomerData() {
     // noch einen Altwert von einem vorherigen Bestandskunden derselben Sitzung enthalten, der
     // mit diesem Neukunden nichts zu tun hat.
     kundenNr: draft ? '' : state.summaryKundenNr.trim(),
+    salutation: state.summarySalutation || '',
     occasion: state.summaryOccasion.trim(),
     products: entries,
     // Bei einem noch nicht abgeschlossenen Neukunden/Kaltakquise-Formular den Entwurf sichern,
@@ -3524,7 +3553,37 @@ function snapshotCustomerData() {
     // angelegten CRM-Kontakt, damit „Weiter bearbeiten" diesen aktualisiert statt zu duplizieren.
     draft: draftHasData ? draft : null,
     contactId: nc ? nc.contactId : null,
-    kaltakquise: !!state.summaryKaltakquise
+    kaltakquise: !!state.summaryKaltakquise,
+    resumable
+  };
+  state.customerHistory = [snapshot, ...state.customerHistory].slice(0,50);
+  localStorage.setItem('customerHistory', JSON.stringify(state.customerHistory));
+}
+// Schlanker als snapshotCustomerData(): sichert AUSSCHLIESSLICH einen noch nirgends
+// gespeicherten Neukunden/Kaltakquise-Entwurf, ohne die laufenden Favoriten oder den aktuellen
+// Kundennamen anzufassen. Wird beim Schließen des Dialogs bzw. Start eines neuen Ablaufs
+// aufgerufen — dort wäre state.newCustomer sonst ohne jede Sicherung weg. Läuft ins Leere,
+// wenn kein Entwurf (mehr) existiert oder er noch komplett leer ist, damit nicht bei jedem
+// erneuten Ablauf-Start ein Verlaufs-Eintrag für dasselbe, weiterlaufende Kundengespräch
+// entsteht.
+function archiveUnsavedNewCustomerDraft() {
+  const nc = state.newCustomer;
+  const draft = nc ? nc.draft : null;
+  const draftHasData = !!draft && Object.values(draft).some(v => typeof v === 'string' && v.trim());
+  if (!draftHasData) return;
+  const entries = favoriteEntries().map(e => ({id: e.product.id, name: e.product.name, size: e.size}));
+  const customer = draft.firma.trim() || [draft.vorname, draft.nachname].filter(Boolean).join(' ').trim();
+  const snapshot = {
+    date: new Date().toISOString(),
+    customer: customer || '',
+    kundenNr: '',
+    salutation: '',
+    occasion: state.summaryOccasion.trim(),
+    products: entries,
+    draft,
+    contactId: nc.contactId || null,
+    kaltakquise: !!state.summaryKaltakquise,
+    resumable: 'neukunde'
   };
   state.customerHistory = [snapshot, ...state.customerHistory].slice(0,50);
   localStorage.setItem('customerHistory', JSON.stringify(state.customerHistory));
@@ -3542,7 +3601,7 @@ function clearFavoritesOnly() {
 function customerHistoryScreen() {
   const items = state.customerHistory;
   return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Rückblick</span><h1>Letzte Kundengespräche</h1><p>Wird automatisch gesichert, sobald Sie „Speicher löschen – neuer Kunde" oder „Favoriten leeren" nutzen — die letzten 50 Kunden bleiben hier abrufbar.</p></div></div>
-  ${items.length ? items.map((snap,i) => `<section class="advisor-results" style="margin-bottom:14px"><div class="section-heading"><div><span class="eyebrow">${escapeHtml(new Date(snap.date).toLocaleString('de-DE'))}</span><h2>${escapeHtml(snap.customer || 'Ohne Namen')}</h2></div>${snap.draft ? `<button class="secondary-button compact" data-resume-history="${i}">Weiter bearbeiten</button>` : ''}</div>${snap.kundenNr ? `<p class="muted-copy">KD-Nr.: ${escapeHtml(snap.kundenNr)}</p>` : ''}${snap.occasion ? `<p>${escapeHtml(snap.occasion)}</p>` : ''}${snap.products.length ? `<ul>${snap.products.map(p=>`<li>${escapeHtml(p.name)} – ${escapeHtml(p.size)}</li>`).join('')}</ul>` : '<p class="muted-copy">Keine Produkte markiert.</p>'}</section>`).join('') : '<div class="empty-state"><h2>Noch keine Einträge</h2><p>Sobald Sie den Speicher für einen neuen Kunden löschen, wird der vorherige Stand hier gesichert.</p></div>'}
+  ${items.length ? items.map((snap,i) => `<section class="advisor-results" style="margin-bottom:14px"><div class="section-heading"><div><span class="eyebrow">${escapeHtml(new Date(snap.date).toLocaleString('de-DE'))}</span><h2>${escapeHtml(snap.customer || 'Ohne Namen')}</h2></div>${snap.resumable ? `<button class="secondary-button compact" data-resume-history="${i}">Weiter bearbeiten</button>` : ''}</div>${snap.kundenNr ? `<p class="muted-copy">KD-Nr.: ${escapeHtml(snap.kundenNr)}</p>` : ''}${snap.occasion ? `<p>${escapeHtml(snap.occasion)}</p>` : ''}${snap.products.length ? `<ul>${snap.products.map(p=>`<li>${escapeHtml(p.name)} – ${escapeHtml(p.size)}</li>`).join('')}</ul>` : '<p class="muted-copy">Keine Produkte markiert.</p>'}</section>`).join('') : '<div class="empty-state"><h2>Noch keine Einträge</h2><p>Sobald Sie den Speicher für einen neuen Kunden löschen, wird der vorherige Stand hier gesichert.</p></div>'}
   </main>`;
 }
 
