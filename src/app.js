@@ -445,6 +445,7 @@ const state = {
   messeScanPreview: null,
   kolQuery: '',
   kolRubrik: null,
+  kolProdukt: null,
   kolFormOpen: false,
   summaryStep: null,
   summaryPendingRecipient: null,
@@ -2382,16 +2383,20 @@ function kolScreen() {
   const query = state.kolQuery.trim().toLowerCase();
   const filtered = list.filter(k => {
     if (state.kolRubrik && k.rubrik !== state.kolRubrik) return false;
+    if (state.kolProdukt && !(k.produkte || []).includes(state.kolProdukt)) return false;
     if (!query) return true;
     const haystack = [k.name, k.notiz, ...(k.produkte || [])].join(' ').toLowerCase();
     return haystack.includes(query);
   });
   const countByRubrik = {};
   list.forEach(k => { countByRubrik[k.rubrik] = (countByRubrik[k.rubrik] || 0) + 1; });
+  const countByProdukt = {};
+  list.forEach(k => (k.produkte || []).forEach(p => { countByProdukt[p] = (countByProdukt[p] || 0) + 1; }));
+  const alleProdukte = Object.keys(countByProdukt).sort((a, b) => a.localeCompare(b, 'de'));
   const card = k => `<div class="kol-card">
     <div class="kol-card-head">
       <span class="kol-rubrik-badge">${escapeHtml(k.rubrik)}</span>
-      <button type="button" class="danger-link" data-kol-delete="${k.id}">Löschen</button>
+      ${can('admin') ? `<button type="button" class="danger-link" data-kol-delete="${k.id}">Löschen</button>` : ''}
     </div>
     <h3>${escapeHtml(k.name)}</h3>
     ${(k.produkte || []).length ? `<div class="kol-produkte">${k.produkte.map(p => `<span class="kol-produkt-tag">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
@@ -2404,15 +2409,21 @@ function kolScreen() {
     ${k.notiz ? `<p class="kol-notiz">${escapeHtml(k.notiz)}</p>` : ''}
   </div>`;
   return `<main class="page report-page kol-page">
-    <div class="section-heading no-print"><div><span class="eyebrow">Referenzkunden</span><h1>KOL – Key Opinion Leader</h1><p>Wird immer über das Produkt gesucht, nicht über das eigene Gebiet — jeder Referenzkunde ist für alle Kolleginnen und Kollegen sichtbar.</p></div>
+    <div class="section-heading no-print"><div><span class="eyebrow">Referenzkunden</span><h1>KOL – Key Opinion Leader</h1><p>Nach Produkt, Rubrik/Branche oder beidem zusammen filtern — jeder Referenzkunde ist für alle Kolleginnen und Kollegen sichtbar, unabhängig vom eigenen Gebiet.</p></div>
       <button class="secondary-button" data-action="kol-toggle-form">${state.kolFormOpen ? 'Abbrechen' : '+ KOL hinzufügen'}</button>
     </div>
     ${state.kolFormOpen ? kolFormHtml() : ''}
     <label class="search-box summary-search kol-search">${icon('search')}<input id="kolSearch" value="${escapeHtml(state.kolQuery)}" placeholder="Produkt suchen, z. B. Händedesinfektion oder DSW Wipes"></label>
+    <span class="notiz-baustein-label">Rubrik / Branche</span>
     <div class="kol-rubrik-filter">
       <button type="button" class="filter-chip ${!state.kolRubrik ? 'active' : ''}" data-kol-rubrik="">Alle (${list.length})</button>
       ${KOL_RUBRIKEN.map(r => `<button type="button" class="filter-chip ${state.kolRubrik === r ? 'active' : ''}" data-kol-rubrik="${escapeHtml(r)}">${escapeHtml(r)} (${countByRubrik[r] || 0})</button>`).join('')}
     </div>
+    ${alleProdukte.length ? `<span class="notiz-baustein-label">Produkt</span>
+    <div class="kol-rubrik-filter">
+      <button type="button" class="filter-chip ${!state.kolProdukt ? 'active' : ''}" data-kol-produkt="">Alle Produkte</button>
+      ${alleProdukte.map(p => `<button type="button" class="filter-chip ${state.kolProdukt === p ? 'active' : ''}" data-kol-produkt="${escapeHtml(p)}">${escapeHtml(p)} (${countByProdukt[p]})</button>`).join('')}
+    </div>` : ''}
     <div class="kol-list">
       ${filtered.length ? filtered.map(card).join('') : `<div class="empty-state"><h2>Keine Treffer</h2><p>${list.length ? 'Für diese Auswahl ist noch kein Referenzkunde hinterlegt.' : 'Noch keine KOL-Referenzen hinterlegt — mit „+ KOL hinzufügen" den ersten Eintrag anlegen.'}</p></div>`}
     </div>
@@ -3403,6 +3414,10 @@ function bind() {
     state.kolRubrik = button.dataset.kolRubrik || null;
     render();
   }));
+  document.querySelectorAll('[data-kol-produkt]').forEach(button => button.addEventListener('click', () => {
+    state.kolProdukt = button.dataset.kolProdukt || null;
+    render();
+  }));
   $('[data-action="kol-toggle-form"]')?.addEventListener('click', () => { state.kolFormOpen = !state.kolFormOpen; render(); });
   $('[data-action="kol-save"]')?.addEventListener('click', () => {
     const name = (($('#kolFieldName')||{}).value || '').trim();
@@ -3424,6 +3439,7 @@ function bind() {
     render();
   });
   document.querySelectorAll('[data-kol-delete]').forEach(button => button.addEventListener('click', () => {
+    if (!can('admin')) return;
     if (!confirm('Diesen KOL-Eintrag wirklich löschen?')) return;
     state.one.kol = state.one.kol.filter(k => k.id !== button.dataset.kolDelete);
     onePersistKol();
