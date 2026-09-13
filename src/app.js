@@ -443,6 +443,9 @@ const state = {
   messeQuery: '',
   messeScanStatus: '',
   messeScanPreview: null,
+  kolQuery: '',
+  kolRubrik: null,
+  kolFormOpen: false,
   summaryStep: null,
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
@@ -494,7 +497,8 @@ function icon(name) {
     aroundme:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="8"/></svg>',
     kundenbesuch:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/><path d="M14 3l3 3-3 3M17 6h-6"/></svg>',
     meinekontakte:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4M14 13h4"/></svg>',
-    smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>'
+    smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>',
+    kol:'<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c0-4 3.1-7 7-7s7 3 7 7"/><path d="m18.5 2 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z"/></svg>'
   };
   return icons[name] || '';
 }
@@ -579,6 +583,7 @@ function render() {
   if (state.screen === 'dashboard') html = header(true) + dashboardScreen() + bottomNav('home');
   if (state.screen === 'messe') html = header(true) + messeScreen() + bottomNav('home');
   if (state.screen === 'pm') html = header(true) + productManagementScreen() + bottomNav('home');
+  if (state.screen === 'kol') html = header(true) + kolScreen() + bottomNav('home');
   if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
   if (state.summaryStep) html += occasionPromptModal();
   app.innerHTML = html;
@@ -660,7 +665,7 @@ function coreCategoryGrid() {
 // "Anordnen"-Modus selbst zurechtlegen (lokal auf dem eigenen Gerät gespeichert). Diese Liste
 // ist nur der Ausgangszustand; neu hinzukommende Kacheln werden an bestehende Reihenfolgen
 // automatisch hinten angehängt.
-const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','downloads','all'];
+const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','downloads','all'];
 function orderedToolCards(toolCards) {
   const order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder : DASHBOARD_TOOL_KEYS_DEFAULT;
   const byKey = new Map(toolCards.map(c => [c[0], c]));
@@ -763,6 +768,7 @@ function menuScreen() {
     ['dashboard','Follow-up Dashboard','Offene Termine und Aufgaben im Blick'],
     ['messe','Messe','Kontakt live erfassen und an den Innendienst senden'],
     ['pm','Produktmanagement','Zuständigkeiten und Kontakte der Produktmanager'],
+    ['kol','KOL – Key Opinion Leader','Referenzkunden je Produkt finden – unabhängig vom eigenen Gebiet'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
@@ -1575,6 +1581,10 @@ const PRODUKTBEREICHE = [
   ['instruments','Instrumente','Aufbereitung & Desinfektion'],
   ['application','Applikation','Spendersysteme & Zubehör']
 ];
+// Rubriken für "KOL – Key Opinion Leader": Einrichtungstypen, in die sich Referenzkunden
+// einordnen lassen. Die eigentliche Suche läuft aber bewusst über das Produkt, nicht über
+// Gebiet/Rubrik — die Rubrik dient nur der groben Vorsortierung beim Durchblättern.
+const KOL_RUBRIKEN = ['Krankenhaus','Rettungsdienst','Pflegeheim','Dental','Veterinär','Arztpraxis'];
 const NOTIZ_BAUSTEINE = {
   surface: [
     'Setzt aktuell ein anderes Flächendesinfektionsmittel ein, ist aber offen für einen Vergleich.',
@@ -2352,6 +2362,62 @@ function productManagementScreen() {
     </section>
   </main>`;
 }
+function kolFormHtml() {
+  return `<section class="report-form no-print kol-form">
+    <label>Rubrik<select id="kolFieldRubrik">${KOL_RUBRIKEN.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}</select></label>
+    <label>Institution / Name<input id="kolFieldName" placeholder="z. B. Uniklinikum Aachen"></label>
+    <label>Ansprechpartner<input id="kolFieldAnsprechpartner" placeholder="Name, Funktion"></label>
+    <label>Telefon<input id="kolFieldTelefon" placeholder="Telefonnummer"></label>
+    <label>E-Mail<input id="kolFieldEmail" type="email" placeholder="E-Mail-Adresse"></label>
+    <label>Produkt(e)<input id="kolFieldProdukte" placeholder="Kommagetrennt, z. B. Vacubag, Ultrasol Active"></label>
+    <label class="wide">Notiz<textarea id="kolFieldNotiz" placeholder="Warum als Referenz geeignet, besondere Hinweise"></textarea></label>
+    <div class="report-actions wide"><button class="primary-button compact" data-action="kol-save">Speichern</button></div>
+  </section>`;
+}
+// KOL-Suche läuft bewusst immer über Produkt/Freitext, nicht über Gebiet — anders als
+// oneVisibleContacts() für normale Kunden gibt es hier keinerlei Gebietsfilterung: jeder
+// Referenzkunde ist für jeden Kollegen sichtbar, unabhängig von dessen eigenem Gebiet.
+function kolScreen() {
+  const list = state.one.kol || [];
+  const query = state.kolQuery.trim().toLowerCase();
+  const filtered = list.filter(k => {
+    if (state.kolRubrik && k.rubrik !== state.kolRubrik) return false;
+    if (!query) return true;
+    const haystack = [k.name, k.notiz, ...(k.produkte || [])].join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
+  const countByRubrik = {};
+  list.forEach(k => { countByRubrik[k.rubrik] = (countByRubrik[k.rubrik] || 0) + 1; });
+  const card = k => `<div class="kol-card">
+    <div class="kol-card-head">
+      <span class="kol-rubrik-badge">${escapeHtml(k.rubrik)}</span>
+      <button type="button" class="danger-link" data-kol-delete="${k.id}">Löschen</button>
+    </div>
+    <h3>${escapeHtml(k.name)}</h3>
+    ${(k.produkte || []).length ? `<div class="kol-produkte">${k.produkte.map(p => `<span class="kol-produkt-tag">${escapeHtml(p)}</span>`).join('')}</div>` : ''}
+    ${k.ansprechpartner ? `<p class="kol-contact-line"><strong>Ansprechpartner:</strong> ${escapeHtml(k.ansprechpartner)}</p>` : ''}
+    ${(k.telefon || k.email) ? `<div class="kol-contact-actions">
+      ${k.telefon ? `<a class="secondary-button compact" href="tel:${escapeHtml(k.telefon.replace(/\s+/g,''))}">${icon('phone')}<span>${escapeHtml(k.telefon)}</span></a>` : ''}
+      ${k.email ? `<a class="secondary-button compact" href="mailto:${escapeHtml(k.email)}">${icon('talk')}<span>${escapeHtml(k.email)}</span></a>` : ''}
+    </div>` : ''}
+    ${(!k.ansprechpartner && !k.telefon && !k.email) ? '<p class="muted-copy">Ansprechpartner/Kontakt noch zu ergänzen.</p>' : ''}
+    ${k.notiz ? `<p class="kol-notiz">${escapeHtml(k.notiz)}</p>` : ''}
+  </div>`;
+  return `<main class="page report-page kol-page">
+    <div class="section-heading no-print"><div><span class="eyebrow">Referenzkunden</span><h1>KOL – Key Opinion Leader</h1><p>Wird immer über das Produkt gesucht, nicht über das eigene Gebiet — jeder Referenzkunde ist für alle Kolleginnen und Kollegen sichtbar.</p></div>
+      <button class="secondary-button" data-action="kol-toggle-form">${state.kolFormOpen ? 'Abbrechen' : '+ KOL hinzufügen'}</button>
+    </div>
+    ${state.kolFormOpen ? kolFormHtml() : ''}
+    <label class="search-box summary-search kol-search">${icon('search')}<input id="kolSearch" value="${escapeHtml(state.kolQuery)}" placeholder="Produkt suchen, z. B. Händedesinfektion oder DSW Wipes"></label>
+    <div class="kol-rubrik-filter">
+      <button type="button" class="filter-chip ${!state.kolRubrik ? 'active' : ''}" data-kol-rubrik="">Alle (${list.length})</button>
+      ${KOL_RUBRIKEN.map(r => `<button type="button" class="filter-chip ${state.kolRubrik === r ? 'active' : ''}" data-kol-rubrik="${escapeHtml(r)}">${escapeHtml(r)} (${countByRubrik[r] || 0})</button>`).join('')}
+    </div>
+    <div class="kol-list">
+      ${filtered.length ? filtered.map(card).join('') : `<div class="empty-state"><h2>Keine Treffer</h2><p>${list.length ? 'Für diese Auswahl ist noch kein Referenzkunde hinterlegt.' : 'Noch keine KOL-Referenzen hinterlegt — mit „+ KOL hinzufügen" den ersten Eintrag anlegen.'}</p></div>`}
+    </div>
+  </main>`;
+}
 function messeScreen() {
   const chosen = favoriteEntries();
   const query = state.messeQuery || '';
@@ -3003,7 +3069,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
@@ -3332,6 +3398,37 @@ function bind() {
   document.querySelectorAll('[data-messe-toggle]').forEach(button => button.onclick = () => { const key = button.dataset.messeToggle; state[key] = !state[key]; localStorage.setItem(key, String(state[key])); render(); });
   $('#messeConsent')?.addEventListener('change', e => { state.messeConsent = e.target.checked; render(); });
   $('#messeSearch')?.addEventListener('input', e => { state.messeQuery = e.target.value; debouncedRender(); });
+  $('#kolSearch')?.addEventListener('input', e => { state.kolQuery = e.target.value; debouncedRender(); });
+  document.querySelectorAll('[data-kol-rubrik]').forEach(button => button.addEventListener('click', () => {
+    state.kolRubrik = button.dataset.kolRubrik || null;
+    render();
+  }));
+  $('[data-action="kol-toggle-form"]')?.addEventListener('click', () => { state.kolFormOpen = !state.kolFormOpen; render(); });
+  $('[data-action="kol-save"]')?.addEventListener('click', () => {
+    const name = (($('#kolFieldName')||{}).value || '').trim();
+    if (!name) { alert('Bitte mindestens den Namen der Institution/Einrichtung eintragen.'); return; }
+    const produkte = (($('#kolFieldProdukte')||{}).value || '').split(',').map(s => s.trim()).filter(Boolean);
+    const entry = {
+      id: 'kol' + Date.now().toString(36),
+      rubrik: ($('#kolFieldRubrik')||{}).value || KOL_RUBRIKEN[0],
+      name,
+      ansprechpartner: (($('#kolFieldAnsprechpartner')||{}).value || '').trim(),
+      telefon: (($('#kolFieldTelefon')||{}).value || '').trim(),
+      email: (($('#kolFieldEmail')||{}).value || '').trim(),
+      produkte,
+      notiz: (($('#kolFieldNotiz')||{}).value || '').trim()
+    };
+    state.one.kol = [entry, ...state.one.kol];
+    onePersistKol();
+    state.kolFormOpen = false;
+    render();
+  });
+  document.querySelectorAll('[data-kol-delete]').forEach(button => button.addEventListener('click', () => {
+    if (!confirm('Diesen KOL-Eintrag wirklich löschen?')) return;
+    state.one.kol = state.one.kol.filter(k => k.id !== button.dataset.kolDelete);
+    onePersistKol();
+    render();
+  }));
   $('[data-action="new-messe"]')?.addEventListener('click', () => { if (confirm('Neue Messe-Erfassung starten? Name, Adresse, Gesprächsinhalt und Unterschrift werden dabei gelöscht.')) resetMesseForm(); });
   $('[data-action="clear-signature"]')?.addEventListener('click', () => { state.messeSignatureData=''; const c=document.getElementById('messeSignature'); if (c) c.getContext('2d').clearRect(0,0,c.width,c.height); render(); });
   $('[data-action="send-messe"]')?.addEventListener('click', sendMesseEmail);
@@ -4000,6 +4097,17 @@ function oneSeed() {
       {id:'t5', name:'Anwendungsinformation',     promo:false, subject:'Anwendungshinweis zu {{produkt}}',              body:'zu {{produkt}} gibt es einen aktualisierten Anwendungshinweis, insbesondere zur Einwirkzeit.\n\nDie vollständige Produktinformation finden Sie im Anhang.'},
       {id:'t6', name:'Veranstaltung',             promo:true,  subject:'Einladung: {{produkt}}',                        body:'wir laden Sie herzlich zu unserer Fachveranstaltung ein.\n\nTermin und Programm entnehmen Sie bitte dem Anhang.'}
     ],
+    // Referenzkunden ("Key Opinion Leader") je Rubrik/Einrichtungstyp, mit Ansprechpartner und
+    // Produktbezug. Bewusst geräteübergreifend/ohne Gebietsbindung sichtbar (anders als
+    // contacts) — jeder Kollege soll unabhängig vom eigenen Gebiet danach suchen können, wer
+    // für ein bestimmtes Produkt als Referenz taugt. Ansprechpartner/Kontaktdaten sind hier
+    // absichtlich noch leer, da echte Ansprechpartner nur vom Team selbst ergänzt werden
+    // sollten — die beiden Einträge dienen nur als Ausgangspunkt für die beiden vom Team
+    // bereits genannten Referenzkunden.
+    kol:[
+      {id:'kol1', rubrik:'Krankenhaus', name:'Uniklinikum Aachen', ansprechpartner:'', telefon:'', email:'', produkte:['Vacubag'], notiz:''},
+      {id:'kol2', rubrik:'Rettungsdienst', name:'Rettungswache Essen', ansprechpartner:'', telefon:'', email:'', produkte:['Ultrasol Active'], notiz:''}
+    ],
     audit:[], auditSeq:0,
     loggedInUserId:null, loginName:'', loginPassword:'', loginError:'', forgotMode:false, forgotDone:false,
     view:'dashboard',
@@ -4041,11 +4149,16 @@ state.one = oneSeed();
     const savedBlocks = JSON.parse(localStorage.getItem('oneMailingBlocks') || 'null');
     if (savedBlocks && Array.isArray(savedBlocks.einstieg) && Array.isArray(savedBlocks.abschluss)) state.one.mailingBlocks = savedBlocks;
   } catch (e) { console.warn('Gespeicherte Mailing-Bausteine konnten nicht geladen werden', e); }
+  try {
+    const savedKol = JSON.parse(localStorage.getItem('oneKol') || 'null');
+    if (Array.isArray(savedKol)) state.one.kol = savedKol;
+  } catch (e) { console.warn('Gespeicherte KOL-Referenzen konnten nicht geladen werden', e); }
 })();
 function onePersistUsers(){ try { localStorage.setItem('oneUsers', JSON.stringify(state.one.users)); } catch (e) {} }
 function onePersistContacts(){ try { localStorage.setItem('oneContacts', JSON.stringify(state.one.contacts)); } catch (e) {} }
 function onePersistMailings(){ try { localStorage.setItem('oneMailings', JSON.stringify(state.one.mailings)); } catch (e) {} }
 function onePersistMailingBlocks(){ try { localStorage.setItem('oneMailingBlocks', JSON.stringify(state.one.mailingBlocks)); } catch (e) {} }
+function onePersistKol(){ try { localStorage.setItem('oneKol', JSON.stringify(state.one.kol)); } catch (e) {} }
 
 // ===================== ONE Smart Mailing =====================
 // "1 Aktion des Mitarbeiters = viele individuelle Einzel-E-Mails": der Mitarbeiter beantwortet
