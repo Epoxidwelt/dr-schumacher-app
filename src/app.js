@@ -447,6 +447,9 @@ const state = {
   kolRubrik: null,
   kolProdukt: null,
   kolFormOpen: false,
+  kolDraft: null,
+  kolDraftProdukte: [],
+  kolProduktSuche: '',
   summaryStep: null,
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
@@ -2363,15 +2366,39 @@ function productManagementScreen() {
     </section>
   </main>`;
 }
+function kolEmptyDraft() {
+  return { rubrik: KOL_RUBRIKEN[0], name: '', ansprechpartner: '', telefon: '', email: '', notiz: '' };
+}
+// Vorschläge kommen aus dem Produktkatalog PLUS allen bereits bei KOL-Einträgen
+// verwendeten Produktnamen (z. B. "Vacubag" – ein Zubehörartikel, der nicht im
+// PRODUCTS-Katalog geführt wird), damit die Autocomplete nichts ausschließt,
+// was Kolleginnen und Kollegen schon einmal eingetragen haben.
+function kolKnownProdukte() {
+  const fromCatalog = PRODUCTS.map(p => p.name);
+  const fromKol = (state.one.kol || []).flatMap(k => k.produkte || []);
+  return Array.from(new Set([...fromCatalog, ...fromKol])).sort((a, b) => a.localeCompare(b, 'de'));
+}
 function kolFormHtml() {
+  const draft = state.kolDraft || kolEmptyDraft();
+  const selected = state.kolDraftProdukte || [];
+  const query = (state.kolProduktSuche || '').trim().toLowerCase();
+  const suggestions = query
+    ? kolKnownProdukte().filter(p => !selected.includes(p) && p.toLowerCase().includes(query)).slice(0, 8)
+    : [];
   return `<section class="report-form no-print kol-form">
-    <label>Rubrik<select id="kolFieldRubrik">${KOL_RUBRIKEN.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}</select></label>
-    <label>Institution / Name<input id="kolFieldName" placeholder="z. B. Uniklinikum Aachen"></label>
-    <label>Ansprechpartner<input id="kolFieldAnsprechpartner" placeholder="Name, Funktion"></label>
-    <label>Telefon<input id="kolFieldTelefon" placeholder="Telefonnummer"></label>
-    <label>E-Mail<input id="kolFieldEmail" type="email" placeholder="E-Mail-Adresse"></label>
-    <label>Produkt(e)<input id="kolFieldProdukte" placeholder="Kommagetrennt, z. B. Vacubag, Ultrasol Active"></label>
-    <label class="wide">Notiz<textarea id="kolFieldNotiz" placeholder="Warum als Referenz geeignet, besondere Hinweise"></textarea></label>
+    <label>Rubrik<select id="kolFieldRubrik">${KOL_RUBRIKEN.map(r => `<option value="${escapeHtml(r)}" ${draft.rubrik === r ? 'selected' : ''}>${escapeHtml(r)}</option>`).join('')}</select></label>
+    <label>Institution / Name<input id="kolFieldName" value="${escapeHtml(draft.name)}" placeholder="z. B. Uniklinikum Aachen"></label>
+    <label>Ansprechpartner<input id="kolFieldAnsprechpartner" value="${escapeHtml(draft.ansprechpartner)}" placeholder="Name, Funktion"></label>
+    <label>Telefon<input id="kolFieldTelefon" value="${escapeHtml(draft.telefon)}" placeholder="Telefonnummer"></label>
+    <label>E-Mail<input id="kolFieldEmail" type="email" value="${escapeHtml(draft.email)}" placeholder="E-Mail-Adresse"></label>
+    <label class="wide">Produkt(e)
+      ${selected.length ? `<div class="kol-produkte kol-draft-tags">${selected.map((p, i) => `<span class="kol-produkt-tag">${escapeHtml(p)}<button type="button" class="kol-tag-remove" data-kol-draft-remove="${i}" aria-label="${escapeHtml(p)} entfernen">×</button></span>`).join('')}</div>` : ''}
+      <div class="kol-autocomplete">
+        <input id="kolProduktSuche" value="${escapeHtml(state.kolProduktSuche || '')}" placeholder="Produkt eintippen, z. B. Ultrasol oder Händedesinfektion" autocomplete="off">
+        ${suggestions.length ? `<div class="kol-suggestions">${suggestions.map(p => `<button type="button" class="kol-suggestion" data-kol-suggestion="${escapeHtml(p)}">${escapeHtml(p)}</button>`).join('')}</div>` : ''}
+      </div>
+    </label>
+    <label class="wide">Notiz<textarea id="kolFieldNotiz" placeholder="Warum als Referenz geeignet, besondere Hinweise">${escapeHtml(draft.notiz)}</textarea></label>
     <div class="report-actions wide"><button class="primary-button compact" data-action="kol-save">Speichern</button></div>
   </section>`;
 }
@@ -3418,24 +3445,64 @@ function bind() {
     state.kolProdukt = button.dataset.kolProdukt || null;
     render();
   }));
-  $('[data-action="kol-toggle-form"]')?.addEventListener('click', () => { state.kolFormOpen = !state.kolFormOpen; render(); });
+  $('[data-action="kol-toggle-form"]')?.addEventListener('click', () => {
+    state.kolFormOpen = !state.kolFormOpen;
+    if (state.kolFormOpen) {
+      state.kolDraft = kolEmptyDraft();
+      state.kolDraftProdukte = [];
+      state.kolProduktSuche = '';
+    }
+    render();
+  });
+  $('#kolFieldRubrik')?.addEventListener('change', e => { state.kolDraft.rubrik = e.target.value; });
+  $('#kolFieldName')?.addEventListener('input', e => { state.kolDraft.name = e.target.value; });
+  $('#kolFieldAnsprechpartner')?.addEventListener('input', e => { state.kolDraft.ansprechpartner = e.target.value; });
+  $('#kolFieldTelefon')?.addEventListener('input', e => { state.kolDraft.telefon = e.target.value; });
+  $('#kolFieldEmail')?.addEventListener('input', e => { state.kolDraft.email = e.target.value; });
+  $('#kolFieldNotiz')?.addEventListener('input', e => { state.kolDraft.notiz = e.target.value; });
+  $('#kolProduktSuche')?.addEventListener('input', e => { state.kolProduktSuche = e.target.value; debouncedRender(); });
+  $('#kolProduktSuche')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = state.kolProduktSuche.trim().replace(/,$/, '').trim();
+      if (val && !state.kolDraftProdukte.includes(val)) state.kolDraftProdukte.push(val);
+      state.kolProduktSuche = '';
+      render();
+    } else if (e.key === 'Backspace' && !state.kolProduktSuche && state.kolDraftProdukte.length) {
+      state.kolDraftProdukte.pop();
+      render();
+    }
+  });
+  document.querySelectorAll('[data-kol-suggestion]').forEach(button => button.addEventListener('click', () => {
+    const val = button.dataset.kolSuggestion;
+    if (val && !state.kolDraftProdukte.includes(val)) state.kolDraftProdukte.push(val);
+    state.kolProduktSuche = '';
+    render();
+    document.getElementById('kolProduktSuche')?.focus();
+  }));
+  document.querySelectorAll('[data-kol-draft-remove]').forEach(button => button.addEventListener('click', () => {
+    state.kolDraftProdukte.splice(parseInt(button.dataset.kolDraftRemove, 10), 1);
+    render();
+  }));
   $('[data-action="kol-save"]')?.addEventListener('click', () => {
-    const name = (($('#kolFieldName')||{}).value || '').trim();
+    const name = (state.kolDraft.name || '').trim();
     if (!name) { alert('Bitte mindestens den Namen der Institution/Einrichtung eintragen.'); return; }
-    const produkte = (($('#kolFieldProdukte')||{}).value || '').split(',').map(s => s.trim()).filter(Boolean);
     const entry = {
       id: 'kol' + Date.now().toString(36),
-      rubrik: ($('#kolFieldRubrik')||{}).value || KOL_RUBRIKEN[0],
+      rubrik: state.kolDraft.rubrik || KOL_RUBRIKEN[0],
       name,
-      ansprechpartner: (($('#kolFieldAnsprechpartner')||{}).value || '').trim(),
-      telefon: (($('#kolFieldTelefon')||{}).value || '').trim(),
-      email: (($('#kolFieldEmail')||{}).value || '').trim(),
-      produkte,
-      notiz: (($('#kolFieldNotiz')||{}).value || '').trim()
+      ansprechpartner: (state.kolDraft.ansprechpartner || '').trim(),
+      telefon: (state.kolDraft.telefon || '').trim(),
+      email: (state.kolDraft.email || '').trim(),
+      produkte: state.kolDraftProdukte.slice(),
+      notiz: (state.kolDraft.notiz || '').trim()
     };
     state.one.kol = [entry, ...state.one.kol];
     onePersistKol();
     state.kolFormOpen = false;
+    state.kolDraft = null;
+    state.kolDraftProdukte = [];
+    state.kolProduktSuche = '';
     render();
   });
   document.querySelectorAll('[data-kol-delete]').forEach(button => button.addEventListener('click', () => {
