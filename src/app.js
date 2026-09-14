@@ -451,6 +451,7 @@ const state = {
   kolDraftProdukte: [],
   kolProduktSuche: '',
   selectedKonzept: null,
+  selectedKonzeptBereich: null,
   summaryStep: null,
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
@@ -2725,15 +2726,33 @@ function konzeptPunkteHtml(punkte) {
     <div class="konzept-produkte">${p.produkte.map(konzeptProduktTag).join('')}</div>
   </div>`).join('');
 }
+function konzeptRaumListHtml(konzept) {
+  const sorted = konzept.bereiche.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  return `<div class="konzept-raum-list">${sorted.map(b => `<button type="button" class="konzept-raum-card" data-konzept-bereich="${escapeHtml(b.name)}">
+    <span class="konzept-raum-copy"><strong>${escapeHtml(b.name)}</strong><small>${b.ausbruch ? 'Routine & Ausbruchsfall' : 'Routine'}${b.hinweis ? ' · Hinweis' : ''}</small></span>
+    <b>›</b>
+  </button>`).join('')}</div>`;
+}
+function konzeptBereichDetailHtml(konzept, bereich) {
+  return `<section class="konzept-bereich">
+    ${bereich.hinweis ? `<p class="konzept-hinweis">${escapeHtml(bereich.hinweis)}</p>` : ''}
+    ${bereich.punkte ? konzeptPunkteHtml(bereich.punkte) : ''}
+    ${bereich.routine ? `<span class="notiz-baustein-label">Für die Routine</span>${konzeptPunkteHtml(bereich.routine)}` : ''}
+    ${bereich.ausbruch ? `<span class="notiz-baustein-label konzept-ausbruch-label">Für den Ausbruchsfall</span>${konzeptPunkteHtml(bereich.ausbruch)}` : ''}
+  </section>`;
+}
 function konzeptScreen() {
   const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
-  const bereich = b => `<section class="konzept-bereich">
-    <h2>${escapeHtml(b.name)}</h2>
-    ${b.hinweis ? `<p class="konzept-hinweis">${escapeHtml(b.hinweis)}</p>` : ''}
-    ${b.punkte ? konzeptPunkteHtml(b.punkte) : ''}
-    ${b.routine ? `<span class="notiz-baustein-label">Für die Routine</span>${konzeptPunkteHtml(b.routine)}` : ''}
-    ${b.ausbruch ? `<span class="notiz-baustein-label konzept-ausbruch-label">Für den Ausbruchsfall</span>${konzeptPunkteHtml(b.ausbruch)}` : ''}
-  </section>`;
+  const bereich = konzept.bereiche.find(b => b.name === state.selectedKonzeptBereich);
+  if (bereich) {
+    return `<main class="page report-page konzept-detail-page">
+      <div class="section-heading no-print">
+        <div><span class="eyebrow">${escapeHtml(konzept.branche)}</span><h1>${escapeHtml(bereich.name)}</h1></div>
+        <button class="secondary-button" data-action="konzept-raum-back">← Alle Bereiche</button>
+      </div>
+      ${konzeptBereichDetailHtml(konzept, bereich)}
+    </main>`;
+  }
   return `<main class="page report-page konzept-detail-page">
     <div class="section-heading no-print"><div><span class="eyebrow">${escapeHtml(konzept.kicker)}</span><h1>${escapeHtml(konzept.branche)}</h1><p>${escapeHtml(konzept.intro)}</p></div></div>
     <div class="konzept-actions no-print">
@@ -2743,7 +2762,8 @@ function konzeptScreen() {
       <label class="wide">An (Kunden-E-Mail)<input id="konzeptRecipientEmail" type="email" placeholder="kunde@beispiel.de"></label>
       <div class="report-actions wide"><button class="primary-button compact" data-action="konzept-send">${icon('talk')}<span>Konzept per E-Mail senden</span></button></div>
     </section>
-    ${konzept.bereiche.map(bereich).join('')}
+    <span class="notiz-baustein-label">Bereiche (A–Z)</span>
+    ${konzeptRaumListHtml(konzept)}
   </main>`;
 }
 function sendKonzeptEmail() {
@@ -3400,6 +3420,7 @@ function bind() {
   document.querySelectorAll('[data-action="price-list-inline"]').forEach(select => select.onchange = () => { state.priceList = select.value; localStorage.setItem('priceList', state.priceList); render(); });
   $('[data-action="back"]')?.addEventListener('click', () => {
     if (state.screen === 'detail') { state.screen = 'products'; render(); return; }
+    if (state.screen === 'konzept' && state.selectedKonzeptBereich) { state.selectedKonzeptBereich = null; render(); return; }
     if (state.screen === 'konzept') { state.screen = 'konzepte'; state.selectedKonzept = null; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'messe') { state.previousScreen = null; state.screen = 'messe'; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'kaltakquise-produkte') { state.previousScreen = null; if (state.newCustomer) newCustomerSave(); state.screen = 'summary'; state.summaryStep = 'produktbereiche'; render(); return; }
@@ -3752,9 +3773,15 @@ function bind() {
   }));
   document.querySelectorAll('[data-konzept-open]').forEach(button => button.addEventListener('click', () => {
     state.selectedKonzept = button.dataset.konzeptOpen;
+    state.selectedKonzeptBereich = null;
     state.screen = 'konzept';
     render();
   }));
+  document.querySelectorAll('[data-konzept-bereich]').forEach(button => button.addEventListener('click', () => {
+    state.selectedKonzeptBereich = button.dataset.konzeptBereich;
+    render();
+  }));
+  $('[data-action="konzept-raum-back"]')?.addEventListener('click', () => { state.selectedKonzeptBereich = null; render(); });
   $('[data-action="konzept-send"]')?.addEventListener('click', sendKonzeptEmail);
   $('[data-action="kol-toggle-form"]')?.addEventListener('click', () => {
     state.kolFormOpen = !state.kolFormOpen;
