@@ -450,6 +450,7 @@ const state = {
   kolDraft: null,
   kolDraftProdukte: [],
   kolProduktSuche: '',
+  selectedKonzept: null,
   summaryStep: null,
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
@@ -502,7 +503,8 @@ function icon(name) {
     kundenbesuch:'<svg viewBox="0 0 24 24"><path d="M6 3h4l1 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 1v4a2 2 0 0 1-2 2C10.5 20 4 13.5 4 5a2 2 0 0 1 2-2Z"/><path d="M14 3l3 3-3 3M17 6h-6"/></svg>',
     meinekontakte:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4M14 13h4"/></svg>',
     smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>',
-    kol:'<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c0-4 3.1-7 7-7s7 3 7 7"/><path d="m18.5 2 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z"/></svg>'
+    kol:'<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c0-4 3.1-7 7-7s7 3 7 7"/><path d="m18.5 2 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z"/></svg>',
+    konzept:'<svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6M4 12h16"/></svg>'
   };
   return icons[name] || '';
 }
@@ -588,6 +590,8 @@ function render() {
   if (state.screen === 'messe') html = header(true) + messeScreen() + bottomNav('home');
   if (state.screen === 'pm') html = header(true) + productManagementScreen() + bottomNav('home');
   if (state.screen === 'kol') html = header(true) + kolScreen() + bottomNav('home');
+  if (state.screen === 'konzepte') html = header(true) + konzepteScreen() + bottomNav('home');
+  if (state.screen === 'konzept') html = header(true) + konzeptScreen() + bottomNav('home');
   if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
   if (state.summaryStep) html += occasionPromptModal();
   app.innerHTML = html;
@@ -669,7 +673,7 @@ function coreCategoryGrid() {
 // "Anordnen"-Modus selbst zurechtlegen (lokal auf dem eigenen Gerät gespeichert). Diese Liste
 // ist nur der Ausgangszustand; neu hinzukommende Kacheln werden an bestehende Reihenfolgen
 // automatisch hinten angehängt.
-const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','downloads','all'];
+const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
 function orderedToolCards(toolCards) {
   const order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder : DASHBOARD_TOOL_KEYS_DEFAULT;
   const byKey = new Map(toolCards.map(c => [c[0], c]));
@@ -773,6 +777,7 @@ function menuScreen() {
     ['messe','Messe','Kontakt live erfassen und an den Innendienst senden'],
     ['pm','Produktmanagement','Zuständigkeiten und Kontakte der Produktmanager'],
     ['kol','KOL – Key Opinion Leader','Referenzkunden je Produkt finden – unabhängig vom eigenen Gebiet'],
+    ['konzepte','Konzepte','Branchenkonzepte mit den passenden Produkten je Bereich – z. B. Rettungsdienst oder Pflege'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
@@ -1588,7 +1593,248 @@ const PRODUKTBEREICHE = [
 // Rubriken für "KOL – Key Opinion Leader": Einrichtungstypen, in die sich Referenzkunden
 // einordnen lassen. Die eigentliche Suche läuft aber bewusst über das Produkt, nicht über
 // Gebiet/Rubrik — die Rubrik dient nur der groben Vorsortierung beim Durchblättern.
-const KOL_RUBRIKEN = ['Krankenhaus','Rettungsdienst','Pflegeheim','Dental','Veterinär','Arztpraxis'];
+// Branchenkonzepte: kuratiert aus den offiziellen Dr. Schumacher Kernprogramm-Broschüren
+// (Quelle jeweils in pdfUrl). Bewusst nach Branche/Bereich statt nach Produktkategorie
+// sortiert, damit Kolleginnen und Kollegen beim Kunden vor Ort nur die für diese Branche
+// relevanten Produkte sehen und sich nicht durch das restliche Sortiment ablenken lassen.
+// produkte-Einträge sind einzelne, eindeutige Produktnamen (Wipes-Varianten wie ".../WIPES/XL"
+// aus den Broschüren wurden auf die praxisübliche Basisvariante vereinheitlicht) und werden
+// über findProductByName() mit dem PRODUCTS-Katalog verknüpft, damit sie direkt anklickbar sind.
+const KONZEPTE = [
+  {
+    id: 'rettungsdienst',
+    branche: 'Rettungsdienst',
+    kicker: 'Rettungswachen & Rettungsdienste',
+    intro: 'Auf engstem Raum treffen Trage, Fahrzeuginnenraum und medizinische Geräte auf wechselnde, oft unbekannte Infektionsrisiken. Das Kernprogramm deckt Hände- und Hautdesinfektion sowie Flächenhygiene mit kurzen Einwirkzeiten und praxisgerechten Applikationshilfen für den hektischen Einsatzalltag ab.',
+    pdfUrl: 'https://www.schumacher-online.com/web/downloads/deutsch/printmedien/d-h/Kernprogramm_Rettungsdienst.pdf',
+    bereiche: [
+      { name: 'Hände und Haut', punkte: [
+        { ort: '', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® GEL','ASEPTOMAN® PLUS','ASEPTOMAN® FORTE','DESCODERM HAUTDESINFEKTION','DESCOLIND PURE WASH','DESCOLIND EXPERT PROTECT CREAM','DESCOLIND EXPERT INTENSIVE CREAM'] }
+      ] },
+      { name: 'Fläche', punkte: [
+        { ort: '', produkte: ['DESCOSEPT SENSITIVE WIPES','DESCOSEPT SENSITIVE WIPES XL','DESCODERM PADS','OPTISAL® PLUS','ULTRASOL® ACTIVE','ULTRASOL OXY®','ULTRASOL OXY® WIPES','ULTRASOL OXY® WIPES XL','ONE SYSTEM BASIC','ONE SYSTEM PLUS','ECO WIPES TÜCHER'] }
+      ] },
+      { name: 'Applikationshilfen', punkte: [
+        { ort: '', produkte: ['AK PLUS 500 WANDSPENDER','AK PLUS 1000 WANDSPENDER','WANDHALTER','DOSIERHILFEN'] }
+      ] }
+    ]
+  },
+  {
+    id: 'pflege',
+    branche: 'Pflegeeinrichtungen',
+    kicker: 'Pflegeheime & Pflegeeinrichtungen',
+    intro: 'Vom Bewohnerzimmer über Küche und Wäscherei bis zum Fahrdienst: Für jeden Bereich im Pflegeheim gibt es die passende Hygienelösung – abgestimmt auf die tägliche Routine und, wo nötig, verschärft für den Ausbruchsfall, etwa bei Noro- oder Grippeviren.',
+    pdfUrl: 'https://www.schumacher-online.com/web/downloads/deutsch/printmedien/d-h/Kernprogramm_Pflege.pdf',
+    bereiche: [
+      { name: 'Bewohnerzimmer',
+        routine: [
+          { ort: 'Oberflächen & bewohnernahe Flächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Toilette', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH','DESCOLIND EXPERT PROTECT CREAM'] },
+          { ort: 'Bewohnerin und Bewohner', produkte: ['DESCOMED BARRIERECREME','DESCO VITAL GEL','DESCOLIND CARE WIPES','DESODERM CARE WIPES'] }
+        ],
+        ausbruch: [
+          { ort: 'Fußboden', produkte: ['ULTRASOL® ACTIVE','ULTRASOL OXY®'] },
+          { ort: 'Oberflächen, bewohnernahe Flächen & Toilette', produkte: ['ULTRASOL OXY® WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Wohnbereichsküche',
+        routine: [
+          { ort: 'Oberflächen & Kühlschrank', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Gemeinschaftsraum und Speisesaal',
+        routine: [
+          { ort: 'Rollatoren, Rollstühle, Gehhilfen & Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Wandspender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      },
+      { name: 'Gymnastikraum',
+        routine: [
+          { ort: 'Oberflächen, Handläufe & Therapiegeräte', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Wandspender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] },
+          { ort: 'Massageplatz', produkte: ['DESCO VITAL GEL'] }
+        ]
+      },
+      { name: 'Fluren',
+        routine: [
+          { ort: 'Türgriffe & Handläufe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] }
+        ],
+        ausbruch: [
+          { ort: 'Fußboden', produkte: ['ULTRASOL® ACTIVE','ULTRASOL OXY®'] },
+          { ort: 'Türgriffe & Handläufe', produkte: ['ULTRASOL OXY® WIPES'] }
+        ]
+      },
+      { name: 'Pflegewagen',
+        routine: [
+          { ort: 'Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES','OPTISAL® PLUS'] },
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] },
+          { ort: 'Ausstattung – Desinfektion', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] },
+          { ort: 'Ausstattung – Hautpflege', produkte: ['DESCOMED BARRIERECREME','DESCO VITAL GEL'] },
+          { ort: 'Ausstattung – Hautreinigung', produkte: ['DECONTAMAN PRE WASH','DECONTAMAN PRE WIPES','DECONTAMAN PRE CAP','DESCOLIND CARE WIPES','DESODERM CARE WIPES'] }
+        ],
+        ausbruch: [
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES'] },
+          { ort: 'Händedesinfektion & Ausstattung', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Eingangsbereich',
+        routine: [
+          { ort: 'Oberflächen, Aufzugtüren & Handläufe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Spendersäulen', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      },
+      { name: 'Verwaltung',
+        routine: [
+          { ort: 'Oberflächen, Tastaturen & Telefone', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Spendersäule', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      },
+      { name: 'Sanitäreinrichtungen',
+        routine: [
+          { ort: 'Türgriffe, Oberflächen, Urinale & Toilette', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Dienstzimmer',
+        routine: [
+          { ort: 'Medikamentenschrank & -kühlschrank', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Oberflächen', produkte: ['ONE SYSTEM PLUS','DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH','DESCOLIND EXPERT PROTECT CREAM'] },
+          { ort: 'Aufbereitung Mehrweg-Vliestuchspendersystem', produkte: ['ECO WIPES TÜCHER','ULTRASOL OXY® WIPES'] }
+        ]
+      },
+      { name: 'Umkleideräume',
+        routine: [
+          { ort: 'Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH','DESCOLIND EXPERT PROTECT CREAM'] },
+          { ort: 'Körperreinigung', produkte: ['DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Abschiedsraum',
+        routine: [
+          { ort: 'Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Spendersäule', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      },
+      { name: 'Pflegebad',
+        routine: [
+          { ort: 'Oberflächen, Geräte- & Bedienoberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Toilette', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] },
+          { ort: 'Bewohnerin und Bewohner – Hautpflege', produkte: ['DESCOLIND EXPERT PROTECT CREAM','DESCOMED BARRIERECREME','DESCO VITAL GEL'] },
+          { ort: 'Bewohnerin und Bewohner – Hautreinigung', produkte: ['DESCOMED ÖLBAD','DESCOLIND CARE WIPES','DESODERM CARE WIPES'] },
+          { ort: 'Pflegebadewanne', produkte: ['ULTRASOL OXY® WIPES'] }
+        ],
+        ausbruch: [
+          { ort: 'Fußboden', produkte: ['ULTRASOL® ACTIVE','ULTRASOL OXY®'] },
+          { ort: 'Oberflächen & Toilette', produkte: ['ULTRASOL OXY® WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Reinigungswagen',
+        routine: [
+          { ort: 'Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] },
+          { ort: 'Fußboden-Reinigung', produkte: ['OPTISAL® PLUS'] }
+        ]
+      },
+      { name: 'Pflegearbeitsraum',
+        routine: [
+          { ort: 'Oberflächen & Steckbeckenautomat', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] },
+          { ort: 'Steckbeckenautomat im Betrieb', produkte: ['THERMO CLEAR','THERMO ALKA CLEAR'] },
+          { ort: 'Aufbereitung Instrumente', produkte: ['PLURAZYME EXTRA','PERFEKTAN® ACTIVE'] }
+        ]
+      },
+      { name: 'Müllraum',
+        routine: [
+          { ort: 'Oberflächen & Aufbewahrungscontainer', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Hauswirtschaftsraum',
+        routine: [
+          { ort: 'Oberflächen & Geräte-/Bedienoberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Wäscherei',
+        hinweis: 'Besondere Anweisungen der Wäscheordnung beachten.',
+        routine: [
+          { ort: 'Oberflächen, Waschmaschine & Geräteoberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ],
+        ausbruch: [
+          { ort: 'Fußboden', produkte: ['ULTRASOL® ACTIVE','ULTRASOL OXY®'] },
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Anlieferung und Lager',
+        routine: [
+          { ort: 'Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Wandspender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] }
+        ]
+      },
+      { name: 'Produktionsküche',
+        routine: [
+          { ort: 'Oberflächen, Geräteoberflächen & Schneidebretter', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ],
+        ausbruch: [
+          { ort: 'Fußboden', produkte: ['ULTRASOL® ACTIVE','ULTRASOL OXY®'] },
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Haustechnik',
+        routine: [
+          { ort: 'Bedienoberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] }
+        ]
+      },
+      { name: 'Fahrzeug und mobiler Einsatz',
+        routine: [
+          { ort: 'Bedienflächen & Lenkrad', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Für den mobilen Einsatz – Hautpflege', produkte: ['DESCOMED BARRIERECREME','DESCO VITAL GEL'] },
+          { ort: 'Für den mobilen Einsatz – Hautreinigung', produkte: ['DESCOLIND CARE WIPES','DESODERM CARE WIPES'] },
+          { ort: 'Für den mobilen Einsatz – Händedesinfektion', produkte: ['ASEPTOMAN® GEL'] }
+        ]
+      }
+    ]
+  }
+];
+function normalizeProductName(name) { return (name || '').toUpperCase().replace(/[®©]/g, '').replace(/\s+/g, ' ').trim(); }
+function findProductByName(name) { const norm = normalizeProductName(name); return PRODUCTS.find(p => normalizeProductName(p.name) === norm); }
+function konzeptAlleProdukte(konzept) {
+  const names = new Set();
+  konzept.bereiche.forEach(b => {
+    (b.punkte || []).concat(b.routine || [], b.ausbruch || []).forEach(p => p.produkte.forEach(n => names.add(n)));
+  });
+  return names.size;
+}
 const NOTIZ_BAUSTEINE = {
   surface: [
     'Setzt aktuell ein anderes Flächendesinfektionsmittel ein, ist aber offen für einen Vergleich.',
@@ -2456,6 +2702,64 @@ function kolScreen() {
     </div>
   </main>`;
 }
+function konzepteScreen() {
+  const card = k => `<button type="button" class="konzept-card" data-konzept-open="${k.id}">
+    <span class="konzept-card-icon">${icon('konzept')}</span>
+    <span class="konzept-card-copy"><strong>${escapeHtml(k.branche)}</strong><small>${escapeHtml(k.kicker)}</small><em>${konzeptAlleProdukte(k)} Produkte · ${k.bereiche.length} Bereiche</em></span>
+    <b>›</b>
+  </button>`;
+  return `<main class="page report-page konzepte-page">
+    <div class="section-heading no-print"><div><span class="eyebrow">Branchenkonzepte</span><h1>Konzepte</h1><p>Für jede Branche nur die Produkte, die dort wirklich gebraucht werden — inklusive der offiziellen Kernprogramm-Broschüre zum direkten Versand an den Kunden.</p></div></div>
+    <div class="konzept-list">${KONZEPTE.map(card).join('')}</div>
+  </main>`;
+}
+function konzeptProduktTag(name) {
+  const product = findProductByName(name);
+  return product
+    ? `<button type="button" class="konzept-produkt-tag" data-product="${product.id}">${escapeHtml(name)}</button>`
+    : `<span class="konzept-produkt-tag muted">${escapeHtml(name)}</span>`;
+}
+function konzeptPunkteHtml(punkte) {
+  return punkte.map(p => `<div class="konzept-punkt">
+    ${p.ort ? `<span class="konzept-ort">${escapeHtml(p.ort)}</span>` : ''}
+    <div class="konzept-produkte">${p.produkte.map(konzeptProduktTag).join('')}</div>
+  </div>`).join('');
+}
+function konzeptScreen() {
+  const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
+  const bereich = b => `<section class="konzept-bereich">
+    <h2>${escapeHtml(b.name)}</h2>
+    ${b.hinweis ? `<p class="konzept-hinweis">${escapeHtml(b.hinweis)}</p>` : ''}
+    ${b.punkte ? konzeptPunkteHtml(b.punkte) : ''}
+    ${b.routine ? `<span class="notiz-baustein-label">Für die Routine</span>${konzeptPunkteHtml(b.routine)}` : ''}
+    ${b.ausbruch ? `<span class="notiz-baustein-label konzept-ausbruch-label">Für den Ausbruchsfall</span>${konzeptPunkteHtml(b.ausbruch)}` : ''}
+  </section>`;
+  return `<main class="page report-page konzept-detail-page">
+    <div class="section-heading no-print"><div><span class="eyebrow">${escapeHtml(konzept.kicker)}</span><h1>${escapeHtml(konzept.branche)}</h1><p>${escapeHtml(konzept.intro)}</p></div></div>
+    <div class="konzept-actions no-print">
+      <a class="secondary-button" href="${escapeHtml(konzept.pdfUrl)}" target="_blank" rel="noopener">${icon('offer')}<span>PDF öffnen</span></a>
+    </div>
+    <section class="report-form no-print konzept-send-form">
+      <label class="wide">An (Kunden-E-Mail)<input id="konzeptRecipientEmail" type="email" placeholder="kunde@beispiel.de"></label>
+      <div class="report-actions wide"><button class="primary-button compact" data-action="konzept-send">${icon('talk')}<span>Konzept per E-Mail senden</span></button></div>
+    </section>
+    ${konzept.bereiche.map(bereich).join('')}
+  </main>`;
+}
+function sendKonzeptEmail() {
+  const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
+  const to = (($('#konzeptRecipientEmail')||{}).value || '').trim();
+  const lines = [
+    `Hygienekonzept ${konzept.branche} – Dr. Schumacher`, '',
+    konzept.intro, '',
+    'Das vollständige Kernprogramm mit allen Produktdetails finden Sie hier zum Download:',
+    konzept.pdfUrl, '',
+    'Bereiche im Überblick:',
+    ...konzept.bereiche.map(b => `- ${b.name}`),
+    '', 'Gerne bespreche ich das Konzept persönlich mit Ihnen.', '', 'Beste Grüße'
+  ];
+  openMailto(`Hygienekonzept ${konzept.branche} – Dr. Schumacher`, lines.join('\n'), to);
+}
 function messeScreen() {
   const chosen = favoriteEntries();
   const query = state.messeQuery || '';
@@ -3096,6 +3400,7 @@ function bind() {
   document.querySelectorAll('[data-action="price-list-inline"]').forEach(select => select.onchange = () => { state.priceList = select.value; localStorage.setItem('priceList', state.priceList); render(); });
   $('[data-action="back"]')?.addEventListener('click', () => {
     if (state.screen === 'detail') { state.screen = 'products'; render(); return; }
+    if (state.screen === 'konzept') { state.screen = 'konzepte'; state.selectedKonzept = null; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'messe') { state.previousScreen = null; state.screen = 'messe'; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'kaltakquise-produkte') { state.previousScreen = null; if (state.newCustomer) newCustomerSave(); state.screen = 'summary'; state.summaryStep = 'produktbereiche'; render(); return; }
     state.previousScreen = null;
@@ -3107,7 +3412,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
@@ -3445,6 +3750,12 @@ function bind() {
     state.kolProdukt = button.dataset.kolProdukt || null;
     render();
   }));
+  document.querySelectorAll('[data-konzept-open]').forEach(button => button.addEventListener('click', () => {
+    state.selectedKonzept = button.dataset.konzeptOpen;
+    state.screen = 'konzept';
+    render();
+  }));
+  $('[data-action="konzept-send"]')?.addEventListener('click', sendKonzeptEmail);
   $('[data-action="kol-toggle-form"]')?.addEventListener('click', () => {
     state.kolFormOpen = !state.kolFormOpen;
     if (state.kolFormOpen) {
