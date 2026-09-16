@@ -82,6 +82,7 @@
 .konzept-bereich{background:#fff;border:1px solid var(--border);border-radius:22px;padding:20px 22px;margin-bottom:14px}
 .konzept-bereich h2{margin:0 0 10px;color:#173d65;font-size:19px}
 .konzept-hinweis{background:#fff6db;color:#725d0c;border-radius:12px;padding:10px 14px;font-size:13.5px;margin:0 0 12px}
+.konzept-verkaufsargument{background:#eafaf0;color:#0d7a4c;border-radius:12px;padding:10px 14px;font-size:13.5px;line-height:1.5;margin:8px 0 0}
 .konzept-ausbruch-label{color:#a3282d;margin-top:14px}
 .konzept-punkt{margin-bottom:10px}
 .konzept-punkt:last-child{margin-bottom:0}
