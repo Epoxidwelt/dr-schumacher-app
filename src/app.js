@@ -3567,7 +3567,10 @@ function bind() {
   document.querySelectorAll('[data-action="region"]').forEach(button => button.onclick = () => { state.previousScreen = state.screen; state.screen='region'; render(); });
   document.querySelectorAll('[data-action="price-list-inline"]').forEach(select => select.onchange = () => { state.priceList = select.value; localStorage.setItem('priceList', state.priceList); render(); });
   $('[data-action="back"]')?.addEventListener('click', () => {
-    if (state.screen === 'detail') { state.screen = 'products'; render(); return; }
+    if (state.screen === 'detail') {
+      if (state.previousScreen === 'konzept') { state.previousScreen = null; state.screen = 'konzept'; render(); return; }
+      state.screen = 'products'; render(); return;
+    }
     if (state.screen === 'konzept' && state.selectedKonzeptBereich) { state.selectedKonzeptBereich = null; render(); return; }
     if (state.screen === 'konzept') { state.screen = 'konzepte'; state.selectedKonzept = null; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'messe') { state.previousScreen = null; state.screen = 'messe'; render(); return; }
@@ -3590,7 +3593,7 @@ function bind() {
   document.querySelectorAll('[data-aroundme-save]').forEach(button => button.onclick = () => { aroundMeSaveAsContact(Number(button.dataset.aroundmeSave)); });
   $('#aroundmeRadius')?.addEventListener('input', e => { state.aroundMe.radiusKm = Number(e.target.value); render(); });
   $('[data-action="aroundme-search"]')?.addEventListener('click', () => aroundMeRun());
-  document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
+  document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; if (state.screen === 'konzept') state.previousScreen = 'konzept'; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
   document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => {
     const size = button.dataset.size;
