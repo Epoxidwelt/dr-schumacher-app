@@ -88,7 +88,11 @@
 .konzept-punkt:last-child{margin-bottom:0}
 .konzept-ort{display:block;font-weight:800;color:#294c69;font-size:14px;margin-bottom:6px}
 .konzept-produkte{display:flex;flex-wrap:wrap;gap:7px}
-.konzept-produkt-tag{border:0;background:#eaf5ff;color:#0e3f66;font-weight:700;font-size:13px;border-radius:10px;padding:6px 11px;cursor:pointer}
+.konzept-produkt-tag{display:inline-flex;align-items:center;gap:5px;border:0;background:#eaf5ff;color:#0e3f66;font-weight:700;font-size:13px;border-radius:10px;padding:6px 8px 6px 11px;cursor:pointer}
+.konzept-produkt-tag .favorite-button{width:20px;height:20px;color:#8ca6bb}
+.konzept-produkt-tag .favorite-button svg{width:15px;height:15px}
+.konzept-produkt-tag .favorite-button.active{color:#1268b5}
+.konzept-produkt-tag .favorite-button.active svg{fill:currentColor}
 .konzept-produkt-tag:hover{background:#d9ecfb}
 .konzept-produkt-tag.muted{background:#f4f7fa;color:#7a8da0;cursor:default}
 .konzept-raum-list{background:#fff;border:1px solid var(--border);border-radius:22px;overflow:hidden}

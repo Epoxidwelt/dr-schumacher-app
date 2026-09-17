@@ -1615,15 +1615,58 @@ const KONZEPTE = [
     intro: 'Auf engstem Raum treffen Trage, Fahrzeuginnenraum und medizinische Geräte auf wechselnde, oft unbekannte Infektionsrisiken. Das Kernprogramm deckt Hände- und Hautdesinfektion sowie Flächenhygiene mit kurzen Einwirkzeiten und praxisgerechten Applikationshilfen für den hektischen Einsatzalltag ab.',
     pdfUrl: 'https://www.schumacher-online.com/web/downloads/deutsch/printmedien/d-h/Kernprogramm_Rettungsdienst.pdf',
     bereiche: [
-      { name: 'Hände und Haut', punkte: [
-        { ort: '', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® GEL','ASEPTOMAN® PLUS','ASEPTOMAN® FORTE','DESCODERM HAUTDESINFEKTION','DESCOLIND PURE WASH','DESCOLIND EXPERT PROTECT CREAM','DESCOLIND EXPERT INTENSIVE CREAM'] }
-      ] },
-      { name: 'Fläche', punkte: [
-        { ort: '', produkte: ['DESCOSEPT SENSITIVE WIPES','DESCOSEPT SENSITIVE WIPES XL','DESCODERM PADS','OPTISAL® PLUS','ULTRASOL® ACTIVE','ULTRASOL OXY®','ULTRASOL OXY® WIPES','ULTRASOL OXY® WIPES XL','ONE SYSTEM BASIC','ONE SYSTEM PLUS','ECO WIPES TÜCHER'] }
-      ] },
-      { name: 'Applikationshilfen', punkte: [
-        { ort: '', produkte: ['AK PLUS 500 WANDSPENDER','AK PLUS 1000 WANDSPENDER','WANDHALTER','DOSIERHILFEN'] }
-      ] }
+      { name: 'RTW – Patientenraum',
+        routine: [
+          { ort: 'Trage, Arbeitsflächen & Bedienoberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Medizinprodukte (z. B. Ventilmembran-Konnektoren)', produkte: ['DESCODERM PADS'] }
+        ],
+        ausbruch: [
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES','ULTRASOL OXY® WIPES XL'] },
+          { ort: 'Großflächen / starke Verschmutzung', produkte: ['ULTRASOL® ACTIVE'] }
+        ]
+      },
+      { name: 'RTW – Fahrerkabine',
+        routine: [
+          { ort: 'Lenkrad, Schalthebel & Bedienflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] }
+        ],
+        ausbruch: [
+          { ort: 'Bedienflächen', produkte: ['ULTRASOL OXY® WIPES'] }
+        ]
+      },
+      { name: 'Händedesinfektion & Hautschutz',
+        routine: [
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] },
+          { ort: 'Unterwegs / im Fahrzeug', produkte: ['ASEPTOMAN® GEL'] },
+          { ort: 'Hautantiseptik vor Injektionen/Punktionen', produkte: ['DESCODERM HAUTDESINFEKTION'] },
+          { ort: 'Hautreinigung', produkte: ['DESCOLIND PURE WASH'] },
+          { ort: 'Hautschutz & Pflege', produkte: ['DESCOLIND EXPERT PROTECT CREAM','DESCOLIND EXPERT INTENSIVE CREAM'] }
+        ],
+        ausbruch: [
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Rettungswache – Eingangs- und Sozialbereich',
+        routine: [
+          { ort: 'Oberflächen & Türgriffe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Spender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      },
+      { name: 'Rettungswache – Sanitär- und Umkleidebereich',
+        routine: [
+          { ort: 'Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Applikationshilfen & Spendersysteme',
+        routine: [
+          { ort: 'Wandspender', produkte: ['AK PLUS 500 WANDSPENDER','AK PLUS 1000 WANDSPENDER'] },
+          { ort: 'Wandhalter', produkte: ['WANDHALTER'] },
+          { ort: 'Dosierhilfen', produkte: ['DOSIERHILFEN'] },
+          { ort: 'Vliestuchspendersysteme', produkte: ['ONE SYSTEM BASIC','ONE SYSTEM PLUS','ECO WIPES TÜCHER'] }
+        ]
+      }
     ]
   },
   {
@@ -1879,6 +1922,30 @@ function konzeptAlleProdukte(konzept) {
   const names = new Set();
   konzept.bereiche.forEach(b => {
     (b.punkte || []).concat(b.routine || [], b.ausbruch || []).forEach(p => p.produkte.forEach(n => names.add(n)));
+  });
+  return names.size;
+}
+// Reduziert die Bereiche eines Konzepts auf genau die Produkte, die währenddessen mit ★
+// markiert wurden (dieselben globalen Favoriten wie bei Kundenzusammenfassung/Angebot) — so
+// wird aus der generischen Branchenübersicht eine auf das tatsächliche Gespräch zugeschnittene
+// Zusammenfassung je Bereich, inklusive Routine/Ausbruchsfall-Trennung.
+function konzeptFavoritedBereiche(konzept) {
+  const favIds = new Set(state.favorites.map(f => f.id));
+  const nurFavorisiert = (liste) => (liste || [])
+    .map(p => ({...p, produkte: p.produkte.filter(n => { const prod = findProductByName(n); return prod && favIds.has(prod.id); })}))
+    .filter(p => p.produkte.length);
+  return konzept.bereiche
+    .map(b => ({name: b.name, punkte: nurFavorisiert(b.punkte), routine: nurFavorisiert(b.routine), ausbruch: nurFavorisiert(b.ausbruch)}))
+    .filter(b => b.punkte.length || b.routine.length || b.ausbruch.length);
+}
+function konzeptFavoritenCount(konzept) {
+  const favIds = new Set(state.favorites.map(f => f.id));
+  const names = new Set();
+  konzept.bereiche.forEach(b => {
+    (b.punkte || []).concat(b.routine || [], b.ausbruch || []).forEach(p => p.produkte.forEach(n => {
+      const prod = findProductByName(n);
+      if (prod && favIds.has(prod.id)) names.add(prod.id);
+    }));
   });
   return names.size;
 }
@@ -2775,9 +2842,9 @@ function konzepteScreen() {
 }
 function konzeptProduktTag(name) {
   const product = findProductByName(name);
-  return product
-    ? `<button type="button" class="konzept-produkt-tag" data-product="${product.id}">${escapeHtml(name)}</button>`
-    : `<span class="konzept-produkt-tag muted">${escapeHtml(name)}</span>`;
+  if (!product) return `<span class="konzept-produkt-tag muted">${escapeHtml(name)}</span>`;
+  const favorite = state.favorites.some(f => f.id === product.id);
+  return `<span class="konzept-produkt-tag" data-product="${product.id}">${escapeHtml(name)}<button type="button" class="favorite-button ${favorite?'active':''}" data-favorite="${product.id}" aria-label="Als Favorit markieren">${icon('star')}</button></span>`;
 }
 function konzeptPunkteHtml(punkte) {
   return punkte.map(p => `<div class="konzept-punkt">
@@ -2819,6 +2886,7 @@ function konzeptScreen() {
       <a class="secondary-button" href="${escapeHtml(konzept.pdfUrl)}" target="_blank" rel="noopener">${icon('offer')}<span>PDF öffnen</span></a>
     </div>` : ''}
     <section class="report-form no-print konzept-send-form">
+      <p class="wide muster-ve-info ${konzeptFavoritenCount(konzept) ? '' : 'muted'}">${konzeptFavoritenCount(konzept) ? `${konzeptFavoritenCount(konzept)} Produkt(e) mit ★ markiert — werden je Bereich in die E-Mail übernommen.` : 'Noch nichts markiert — die E-Mail enthält dann die allgemeine Bereichsübersicht. Produkte in einem Bereich mit ★ markieren, um das Konzept auf das Gespräch zuzuschneiden.'}</p>
       <label class="wide">An (Kunden-E-Mail)<input id="konzeptRecipientEmail" type="email" placeholder="kunde@beispiel.de"></label>
       <div class="report-actions wide"><button class="primary-button compact" data-action="konzept-send">${icon('talk')}<span>Konzept per E-Mail senden</span></button></div>
     </section>
@@ -2829,14 +2897,33 @@ function konzeptScreen() {
 function sendKonzeptEmail() {
   const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
   const to = (($('#konzeptRecipientEmail')||{}).value || '').trim();
+  const favBereiche = konzeptFavoritedBereiche(konzept);
   const lines = [
     `Hygienekonzept ${konzept.branche} – Dr. Schumacher`, '',
-    konzept.intro, '',
-    ...(konzept.pdfUrl ? ['Das vollständige Kernprogramm mit allen Produktdetails finden Sie hier zum Download:', konzept.pdfUrl, ''] : []),
-    'Bereiche im Überblick:',
-    ...konzept.bereiche.map(b => `- ${b.name}`),
-    '', 'Gerne bespreche ich das Konzept persönlich mit Ihnen.', '', 'Beste Grüße'
+    konzept.intro, ''
   ];
+  const pushPunkte = (liste, label) => {
+    if (!liste.length) return;
+    if (label) lines.push(label);
+    liste.forEach(p => {
+      if (p.ort) lines.push(`${p.ort}:`);
+      p.produkte.forEach(n => lines.push(`✓ ${n}`));
+    });
+  };
+  if (favBereiche.length) {
+    lines.push('Basierend auf unserem Gespräch empfehlen wir für Ihre Einrichtung:', '');
+    favBereiche.forEach(b => {
+      lines.push(b.name.toUpperCase());
+      pushPunkte(b.punkte, null);
+      pushPunkte(b.routine, 'Für die Routine:');
+      pushPunkte(b.ausbruch, 'Für den Ausbruchsfall:');
+      lines.push('');
+    });
+  } else {
+    lines.push('Bereiche im Überblick:', ...konzept.bereiche.map(b => `- ${b.name}`), '');
+  }
+  if (konzept.pdfUrl) lines.push('Das vollständige Kernprogramm mit allen Produktdetails finden Sie hier zum Download:', konzept.pdfUrl, '');
+  lines.push('Gerne bespreche ich das Konzept persönlich mit Ihnen.', '', 'Beste Grüße');
   openMailto(`Hygienekonzept ${konzept.branche} – Dr. Schumacher`, lines.join('\n'), to);
 }
 function messeScreen() {
