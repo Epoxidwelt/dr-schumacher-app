@@ -2028,10 +2028,11 @@ function konzeptAllBereicheForList(konzept) {
     .map(e => ({...e, erledigt: konzeptIsErledigt(konzept.id, e.key)}))
     .sort((a, b) => a.name.localeCompare(b.name, 'de'));
 }
-// Reduziert die Bereiche eines Konzepts auf das, was tatsächlich mit dem Kunden besprochen
-// wurde: als "erledigt" markierte Bereiche gehen komplett hinein (die ganze Routine-/
-// Ausbruchsfall-Empfehlung), alle anderen nur mit den Produkten, die dabei zusätzlich mit ★
-// markiert wurden (dieselben globalen Favoriten wie bei Kundenzusammenfassung/Angebot).
+// Reduziert die Bereiche eines Konzepts ausschließlich auf die Produkte, die mit ★ markiert
+// wurden (dieselben globalen Favoriten wie bei Kundenzusammenfassung/Angebot) — unabhängig
+// davon, ob der Bereich als "erledigt" markiert ist. Ohne Stern kein Produkt in der E-Mail,
+// auch nicht bei einem bereits abgehakten Bereich. Die Erledigt-Markierung steuert weiterhin
+// nur den Fortschritt/geführten Ablauf in der App, nicht mehr den Mailinhalt.
 function konzeptSummaryBereiche(konzept) {
   const favIds = new Set(state.favorites.map(f => f.id));
   const nurFavorisiert = (liste) => (liste || [])
@@ -2039,15 +2040,11 @@ function konzeptSummaryBereiche(konzept) {
     .filter(p => p.produkte.length);
   const result = [];
   konzept.bereiche.forEach(b => {
-    if (konzeptIsErledigt(konzept.id, b.name)) {
-      result.push({name: b.name, punkte: b.punkte || [], routine: b.routine || [], ausbruch: b.ausbruch || []});
-    } else {
-      const punkte = nurFavorisiert(b.punkte), routine = nurFavorisiert(b.routine), ausbruch = nurFavorisiert(b.ausbruch);
-      if (punkte.length || routine.length || ausbruch.length) result.push({name: b.name, punkte, routine, ausbruch});
-    }
+    const punkte = nurFavorisiert(b.punkte), routine = nurFavorisiert(b.routine), ausbruch = nurFavorisiert(b.ausbruch);
+    if (punkte.length || routine.length || ausbruch.length) result.push({name: b.name, punkte, routine, ausbruch});
   });
   konzeptCustomList(konzept.id).forEach(c => {
-    if (konzeptIsErledigt(konzept.id, 'custom:' + c.id) || (c.notiz || '').trim()) {
+    if ((c.notiz || '').trim()) {
       result.push({name: c.name, custom: true, notiz: c.notiz || ''});
     }
   });
@@ -3021,7 +3018,7 @@ function konzeptScreen() {
       <a class="secondary-button" href="${escapeHtml(konzept.pdfUrl)}" target="_blank" rel="noopener">${icon('offer')}<span>PDF öffnen</span></a>
     </div>` : ''}
     <section class="report-form no-print konzept-send-form">
-      <p class="wide muster-ve-info">${done} von ${total} Bereichen besprochen${favCount ? ` · ${favCount} Produkt(e) zusätzlich mit ★ markiert` : ''} — fließt in die E-Mail ein.</p>
+      <p class="wide muster-ve-info">${done} von ${total} Bereichen besprochen. ${favCount ? `${favCount} Produkt(e) mit ★ markiert — nur diese werden in die E-Mail übernommen.` : 'Noch kein Produkt mit ★ markiert — die E-Mail enthält dann nur die allgemeine Bereichsübersicht.'}</p>
       <label class="wide">An (Kunden-E-Mail)<input id="konzeptRecipientEmail" type="email" placeholder="kunde@beispiel.de"></label>
       <div class="report-actions wide"><button class="primary-button compact" data-action="konzept-send">${icon('talk')}<span>Konzept per E-Mail senden</span></button></div>
     </section>
