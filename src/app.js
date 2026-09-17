@@ -3687,7 +3687,10 @@ function bind() {
     else if (mode === 've2' && veCount) state.musterMengen[key] = { status, mode:'ve', ve:2, stueck:0, gesamt:veCount*2 };
     else if (mode === 'stueck') {
       const prev = state.musterMengen[key];
-      const stueck = (prev && prev.mode === 'stueck') ? prev.stueck : 0;
+      // Standardmenge 1 Stück beim ersten Öffnen — deckt den häufigsten Fall (ein Muster
+      // dagelassen) ohne Tipparbeit ab und lässt "Weiter" sofort anklickbar werden; individuell
+      // anpassbar bleibt es über das Eingabefeld trotzdem.
+      const stueck = (prev && prev.mode === 'stueck') ? prev.stueck : 1;
       state.musterMengen[key] = { status, mode:'stueck', ve:0, stueck, gesamt:stueck };
     }
     render();
