@@ -2925,7 +2925,7 @@ function sendKonzeptEmail() {
     lines.push('Bereiche im Überblick:', ...konzept.bereiche.map(b => `- ${b.name}`), '');
   }
   if (konzept.pdfUrl) lines.push('Das vollständige Kernprogramm mit allen Produktdetails finden Sie hier zum Download:', konzept.pdfUrl, '');
-  lines.push('Gerne erstelle ich Ihnen dazu ein unverbindliches Angebot oder vereinbare einen Termin zur Umsetzung – melden Sie sich einfach bei mir, damit wir die nächsten Schritte festlegen können.', '', 'Beste Grüße');
+  lines.push('Prüfen Sie das Konzept gerne in Ruhe. Wenn Sie es durchgesehen haben oder weitere Informationen brauchen, arbeite ich sehr gerne gemeinsam mit Ihnen an der Umsetzung – und begleite Sie auf Wunsch auch persönlich bei einem Test der Produkte vor Ort. Mir ist wichtig, dass Sie sich bei jedem Schritt voll unterstützt fühlen.', '', 'Beste Grüße');
   openMailto(`Hygienekonzept ${konzept.branche} – Dr. Schumacher`, lines.join('\n'), to);
 }
 function messeScreen() {
