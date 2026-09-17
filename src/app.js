@@ -1133,6 +1133,7 @@ function detailScreen() {
       ${documentLink('Betriebsanweisung','Dokumente für den sicheren Umgang',productDocUrl(p,'ba'),'📋')}
       ${documentLink('Produktbild','Aktuelle Bilddaten herunterladen',OFFICIAL.images,'🖼️')}
     </div></section>
+    <button class="secondary-button konzept-jump-button" data-category="konzepte">${icon('konzept')}<span>Konzept erstellen</span></button>
   </main>`;
 }
 
@@ -2899,7 +2900,8 @@ function sendKonzeptEmail() {
   const to = (($('#konzeptRecipientEmail')||{}).value || '').trim();
   const favBereiche = konzeptFavoritedBereiche(konzept);
   const lines = [
-    `Hygienekonzept ${konzept.branche} – Dr. Schumacher`, '',
+    'Hallo,', '',
+    `vielen Dank für das Gespräch vor Ort. Wie besprochen fasse ich Ihnen unser Hygienekonzept für ${konzept.branche} nachfolgend zusammen:`, '',
     konzept.intro, ''
   ];
   const pushPunkte = (liste, label) => {
@@ -2923,7 +2925,7 @@ function sendKonzeptEmail() {
     lines.push('Bereiche im Überblick:', ...konzept.bereiche.map(b => `- ${b.name}`), '');
   }
   if (konzept.pdfUrl) lines.push('Das vollständige Kernprogramm mit allen Produktdetails finden Sie hier zum Download:', konzept.pdfUrl, '');
-  lines.push('Gerne bespreche ich das Konzept persönlich mit Ihnen.', '', 'Beste Grüße');
+  lines.push('Gerne erstelle ich Ihnen dazu ein unverbindliches Angebot oder vereinbare einen Termin zur Umsetzung – melden Sie sich einfach bei mir, damit wir die nächsten Schritte festlegen können.', '', 'Beste Grüße');
   openMailto(`Hygienekonzept ${konzept.branche} – Dr. Schumacher`, lines.join('\n'), to);
 }
 function messeScreen() {
@@ -3347,7 +3349,7 @@ function copyOfferEmail(button) {
 
 function favoritesScreen() {
   const entries = favoriteEntries();
-  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1><p>Mit dem Stern markierte Produkte landen automatisch auch in der Kundenzusammenfassung. Bei mehreren Gebindegrößen oder Tuchmengen können Sie jede Variante einzeln markieren – sie erscheint dann als eigener Eintrag.</p></div>${entries.length ? '<button class="secondary-button" data-action="clear-favorites">Favoriten leeren</button>' : ''}</div><div class="product-list">${entries.map(e=>productCard(e.product, e.size)).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
+  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1><p>Mit dem Stern markierte Produkte landen automatisch auch in der Kundenzusammenfassung. Bei mehreren Gebindegrößen oder Tuchmengen können Sie jede Variante einzeln markieren – sie erscheint dann als eigener Eintrag.</p></div><div class="report-actions">${entries.length ? '<button class="secondary-button" data-action="clear-favorites">Favoriten leeren</button>' : ''}<button class="secondary-button" data-category="konzepte">${icon('konzept')}<span>Konzept erstellen</span></button></div></div><div class="product-list">${entries.map(e=>productCard(e.product, e.size)).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
 }
 
 function settingsScreen() {
@@ -3593,7 +3595,7 @@ function bind() {
   document.querySelectorAll('[data-aroundme-save]').forEach(button => button.onclick = () => { aroundMeSaveAsContact(Number(button.dataset.aroundmeSave)); });
   $('#aroundmeRadius')?.addEventListener('input', e => { state.aroundMe.radiusKm = Number(e.target.value); render(); });
   $('[data-action="aroundme-search"]')?.addEventListener('click', () => aroundMeRun());
-  document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; if (state.screen === 'konzept') state.previousScreen = 'konzept'; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
+  document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; if (state.screen === 'konzept') state.previousScreen = 'konzept'; else if (state.previousScreen === 'konzept') state.previousScreen = null; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
   document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => {
     const size = button.dataset.size;
