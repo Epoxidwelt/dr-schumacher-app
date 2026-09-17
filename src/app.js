@@ -2427,13 +2427,11 @@ function buildCustomerSummaryEmail(){
   ];
   const showPrices = state.summaryIncludePrices && !state.customerMode;
   entries.forEach(({product: p, size})=>{
-    lines.push(`▸ ${p.name.toUpperCase()}${size ? ' – ' + size : ''}`, p.kind, '');
-    if (p.summary) lines.push(p.summary, '');
+    lines.push(`▸ ${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
     if (showPrices) {
       const price = resolvePrice(p, size);
-      if (price !== undefined && price !== null && price !== '') lines.push(`Ihr Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`, '');
+      if (price !== undefined && price !== null && price !== '') lines.push(`Ihr Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
     }
-    lines.push('Ihre Vorteile auf einen Blick:');
     productFacts(p).forEach(f=>lines.push(`✓ ${f}`));
     if (sizeBonusFacts(size).length) sizeBonusFacts(size).forEach(f=>lines.push(`✓ ${f}`));
     lines.push('');
