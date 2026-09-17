@@ -401,6 +401,12 @@ const state = {
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
   summaryNotiz: localStorage.getItem('summaryNotiz') || '',
+  // Weitere Ansprechpartner beim Bestandskunden (z. B. zweiter Kontakt in derselben
+  // Einrichtung) — werden sowohl im CRM-Eintrag aufgeführt als auch als CC in die
+  // Kundenzusammenfassung aufgenommen, sofern eine E-Mail-Adresse hinterlegt ist.
+  summaryAdditionalContacts: JSON.parse(localStorage.getItem('summaryAdditionalContacts') || '[]'),
+  summaryContactFormOpen: false,
+  summaryContactDraft: {anrede: 'Herr', name: '', email: ''},
   // Muster-Abfrage: für Bestandskunde genauso wie für Neukunde/Kaltakquise, deshalb hier auf
   // dem Top-Level-State statt in state.newCustomer (das es für Bestandskunde nicht gibt).
   musterWanted: null, musterCycleIndex: 0, musterMengen: {},
@@ -1177,9 +1183,9 @@ function buildStarredProductsEmail() {
   return { subject, body: lines.join('\n') };
 }
 
-function openMailto(subject, body, to='') {
+function openMailto(subject, body, to='', cc='') {
   const a = document.createElement('a');
-  a.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  a.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc ? '&cc=' + encodeURIComponent(cc) : ''}`;
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
@@ -2151,6 +2157,18 @@ function occasionPromptModal() {
         <p>${isCrmFirst ? 'Für den CRM-Eintrag als Ansprechpartner.' : `Für die spätere Anrede „Hallo ${state.summarySalutation} ${state.summaryCustomer.trim() || 'Name'}" in der E-Mail an den Kunden.`}</p>
         <label class="modal-field"><input id="occasionContact" type="text" value="${escapeHtml(state.summaryCustomer)}" placeholder="Nachname, z. B. Müller" autofocus></label>
         <label class="modal-field"><input id="occasionKundenNr" type="text" value="${escapeHtml(state.summaryKundenNr)}" placeholder="KD-Nr. (optional)"></label>
+        <div class="additional-contacts-block">
+          ${state.summaryAdditionalContacts.length ? `<div class="kol-produkte">${state.summaryAdditionalContacts.map((c,i) => `<span class="kol-produkt-tag">${escapeHtml(c.anrede)} ${escapeHtml(c.name)}${c.email ? ' · ' + escapeHtml(c.email) : ''}<button type="button" class="kol-tag-remove" data-additional-contact-remove="${i}" aria-label="${escapeHtml(c.name)} entfernen">×</button></span>`).join('')}</div>` : ''}
+          ${state.summaryContactFormOpen ? `<div class="additional-contact-form">
+            <div class="notiz-baustein-chips">${['Herr','Frau'].map(s => `<button type="button" class="notiz-chip ${state.summaryContactDraft.anrede===s?'active':''}" data-additional-contact-anrede="${s}">${s}</button>`).join('')}</div>
+            <label class="modal-field"><input id="additionalContactName" type="text" value="${escapeHtml(state.summaryContactDraft.name)}" placeholder="Name, z. B. Meier"></label>
+            <label class="modal-field"><input id="additionalContactEmail" type="email" value="${escapeHtml(state.summaryContactDraft.email)}" placeholder="E-Mail-Adresse"></label>
+            <div class="modal-actions">
+              <button class="secondary-button compact" data-action="additional-contact-cancel">Abbrechen</button>
+              <button class="primary-button compact" data-action="additional-contact-save">Hinzufügen</button>
+            </div>
+          </div>` : `<button type="button" class="secondary-button compact" data-action="additional-contact-open">+ Weiteren Ansprechpartner hinzufügen</button>`}
+        </div>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-name">Zurück</button>
           <button class="primary-button compact" data-action="name-to-produktbereiche">Weiter</button>
@@ -2399,11 +2417,13 @@ function buildCustomerSummaryEmail(){
   const contactName=state.summaryCustomer.trim();
   const salutation=contactName?`Hallo ${state.summarySalutation} ${contactName}`:'Hallo';
   const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
+  const ccContacts = state.summaryAdditionalContacts || [];
   const lines=[
     `${salutation},`,
     ``,
     `vielen Dank für ${occasion}. Wie besprochen fasse ich Ihnen nachfolgend die für Sie passenden Produkte von Dr. Schumacher zusammen – mit den Vorteilen, die für Sie den größten Mehrwert bieten:`,
-    ``
+    ``,
+    ...(ccContacts.length ? [`In Kopie: ${ccContacts.map(c => `${c.anrede} ${c.name}`).join(', ')}`, ``] : [])
   ];
   const showPrices = state.summaryIncludePrices && !state.customerMode;
   entries.forEach(({product: p, size})=>{
@@ -2444,7 +2464,8 @@ function sendCustomerSummaryEmail(){
     if (match && match.email) to = match.email;
   }
   state.summaryPendingRecipient = null;
-  openMailto(subject, body, to || '');
+  const cc = (state.summaryAdditionalContacts || []).map(c => c.email).filter(Boolean).join(',');
+  openMailto(subject, body, to || '', cc);
 }
 
 function competitionScreen(){
@@ -3082,6 +3103,7 @@ function buildCrmSummary(report = state.visitReport) {
     `Kunde/Einrichtung: ${report.customer || '-'}`,
     `KD-Nr.: ${report.kundenNr || '-'}`,
     `Ansprechpartner: ${report.contacts || '-'}`,
+    ...((report.additionalContacts && report.additionalContacts.length) ? [`Weitere Ansprechpartner: ${report.additionalContacts.map(c => `${c.anrede} ${c.name}${c.email ? ' (' + c.email + ')' : ''}`).join('; ')}`] : []),
     `Terminart: ${report.type || 'Produktvorstellung'}`,
     `Ausgangssituation / aktuelle Produkte: ${report.current || '-'}`,
     `Besprochene Produkte: ${report.products || '-'}`,
@@ -3130,6 +3152,7 @@ function buildQuickCrmEntry(){
     musterWanted: !!state.musterWanted, musterListe: computeMusterListe(entries),
     date: oneToday(),
     contacts: state.summaryCustomer.trim() || '-',
+    additionalContacts: state.summaryAdditionalContacts.slice(),
     type: state.summaryOccasion.trim() || 'Produktvorstellung',
     products,
     wettbewerber: [...(state.crmWettbewerber || []), (state.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
@@ -3606,6 +3629,31 @@ function bind() {
   $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { if (state.newCustomer) newCustomerSave(); state.summaryStep = 'musterfrage'; render(); });
   $('[data-action="produktbereiche-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'name'; render(); });
   $('[data-action="name-to-produktbereiche"]')?.addEventListener('click', () => { state.summaryStep = 'produktbereiche'; render(); });
+  $('[data-action="additional-contact-open"]')?.addEventListener('click', () => {
+    state.summaryContactFormOpen = true;
+    state.summaryContactDraft = {anrede: 'Herr', name: '', email: ''};
+    render();
+  });
+  $('[data-action="additional-contact-cancel"]')?.addEventListener('click', () => { state.summaryContactFormOpen = false; render(); });
+  document.querySelectorAll('[data-additional-contact-anrede]').forEach(button => button.addEventListener('click', () => {
+    state.summaryContactDraft.anrede = button.dataset.additionalContactAnrede;
+    render();
+  }));
+  $('#additionalContactName')?.addEventListener('input', e => { state.summaryContactDraft.name = e.target.value; });
+  $('#additionalContactEmail')?.addEventListener('input', e => { state.summaryContactDraft.email = e.target.value; });
+  $('[data-action="additional-contact-save"]')?.addEventListener('click', () => {
+    const name = (state.summaryContactDraft.name || '').trim();
+    if (!name) { alert('Bitte einen Namen für den weiteren Ansprechpartner eintragen.'); return; }
+    state.summaryAdditionalContacts = [...state.summaryAdditionalContacts, {anrede: state.summaryContactDraft.anrede, name, email: (state.summaryContactDraft.email || '').trim()}];
+    localStorage.setItem('summaryAdditionalContacts', JSON.stringify(state.summaryAdditionalContacts));
+    state.summaryContactFormOpen = false;
+    render();
+  });
+  document.querySelectorAll('[data-additional-contact-remove]').forEach(button => button.addEventListener('click', () => {
+    state.summaryAdditionalContacts = state.summaryAdditionalContacts.filter((c, i) => i !== parseInt(button.dataset.additionalContactRemove, 10));
+    localStorage.setItem('summaryAdditionalContacts', JSON.stringify(state.summaryAdditionalContacts));
+    render();
+  }));
   $('[data-action="occasion-back-musterfrage"]')?.addEventListener('click', () => { state.summaryStep = 'musterfrage'; render(); });
   document.querySelectorAll('[data-muster-wanted]').forEach(button => button.addEventListener('click', () => {
     const ja = button.dataset.musterWanted === 'ja';
@@ -4138,6 +4186,7 @@ function snapshotCustomerData() {
     // mit diesem Neukunden nichts zu tun hat.
     kundenNr: draft ? '' : state.summaryKundenNr.trim(),
     salutation: state.summarySalutation || '',
+    additionalContacts: draft ? [] : state.summaryAdditionalContacts,
     occasion: state.summaryOccasion.trim(),
     products: entries,
     // Bei einem noch nicht abgeschlossenen Neukunden/Kaltakquise-Formular den Entwurf sichern,
@@ -4213,6 +4262,8 @@ function restoreHistorySnapshotIdentity(snap) {
     state.summaryCustomer = plainName || d.nachname || '';
     localStorage.setItem('summaryCustomer', state.summaryCustomer);
     state.summaryPendingRecipient = d.email.trim() || null;
+    state.summaryAdditionalContacts = [];
+    localStorage.setItem('summaryAdditionalContacts', '[]');
   } else {
     state.newCustomer = null;
     state.summaryIsNewCustomer = false;
@@ -4223,6 +4274,8 @@ function restoreHistorySnapshotIdentity(snap) {
     state.summarySalutation = snap.salutation || 'Herr';
     localStorage.setItem('summarySalutation', state.summarySalutation);
     state.summaryPendingRecipient = null;
+    state.summaryAdditionalContacts = snap.additionalContacts || [];
+    localStorage.setItem('summaryAdditionalContacts', JSON.stringify(state.summaryAdditionalContacts));
   }
 }
 
@@ -4261,12 +4314,15 @@ function customerHistoryScreen() {
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf und Messe-Erfassung werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryAdditionalContacts','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
   state.summaryKundenNr = '';
   state.summaryNotiz = '';
   state.summarySalutation = 'Herr';
+  state.summaryAdditionalContacts = [];
+  state.summaryContactFormOpen = false;
+  state.summaryContactDraft = {anrede: 'Herr', name: '', email: ''};
   state.summaryOccasion = SUMMARY_OCCASIONS[0].value;
   state.summaryIncludePrices = false;
   state.musterWanted = null; state.musterCycleIndex = 0; state.musterMengen = {};

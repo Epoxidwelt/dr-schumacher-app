@@ -358,3 +358,5 @@
   .one-mailrow{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){.one-app *{animation:none!important; transition:none!important}}
+.additional-contacts-block{text-align:left;margin:14px 0 0}
+.additional-contact-form{display:flex;flex-direction:column;gap:10px;margin-top:10px}
