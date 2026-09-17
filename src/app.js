@@ -468,6 +468,13 @@ const state = {
   konzeptHideErledigt: false,
   konzeptBereichFormOpen: false,
   konzeptBereichDraftName: '',
+  // Aktueller Hersteller/Wettbewerber je Konzept (Mehrfachauswahl) — fließt in die
+  // Konzept-E-Mail ein. Freitext-Ergänzungen ("Sonstiger") werden dauerhaft gelernt, damit sie
+  // beim nächsten Mal als Vorschlag erscheinen (branchenspezifisch, z. B. Dental ≠ Pflege).
+  konzeptWettbewerberSelected: JSON.parse(localStorage.getItem('konzeptWettbewerberSelected') || '{}'),
+  konzeptWettbewerberLearned: JSON.parse(localStorage.getItem('konzeptWettbewerberLearned') || '{}'),
+  konzeptWettbewerberCustomOpen: false,
+  konzeptWettbewerberCustomText: '',
   summaryStep: null,
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
@@ -1625,6 +1632,7 @@ const KONZEPTE = [
     kicker: 'Rettungswachen & Rettungsdienste',
     intro: 'Auf engstem Raum treffen Trage, Fahrzeuginnenraum und medizinische Geräte auf wechselnde, oft unbekannte Infektionsrisiken. Das Kernprogramm deckt Hände- und Hautdesinfektion sowie Flächenhygiene mit kurzen Einwirkzeiten und praxisgerechten Applikationshilfen für den hektischen Einsatzalltag ab.',
     pdfUrl: 'https://www.schumacher-online.com/web/downloads/deutsch/printmedien/d-h/Kernprogramm_Rettungsdienst.pdf',
+    wettbewerber: ['Schülke', 'Bode/Hartmann', 'B. Braun'],
     bereiche: [
       { name: 'RTW – Patientenraum',
         routine: [
@@ -1686,6 +1694,7 @@ const KONZEPTE = [
     kicker: 'Pflegeheime & Pflegeeinrichtungen',
     intro: 'Vom Bewohnerzimmer über Küche und Wäscherei bis zum Fahrdienst: Für jeden Bereich im Pflegeheim gibt es die passende Hygienelösung – abgestimmt auf die tägliche Routine und, wo nötig, verschärft für den Ausbruchsfall, etwa bei Noro- oder Grippeviren.',
     pdfUrl: 'https://www.schumacher-online.com/web/downloads/deutsch/printmedien/d-h/Kernprogramm_Pflege.pdf',
+    wettbewerber: ['Schülke', 'Bode/Hartmann', 'Dr. Weigert'],
     bereiche: [
       { name: 'Bewohnerzimmer',
         routine: [
@@ -1891,6 +1900,7 @@ const KONZEPTE = [
     branche: 'Veterinär',
     kicker: 'Tierarztpraxen & Tierkliniken',
     intro: 'Ob Kleintierpraxis, Tierklinik oder Pensionstierheim: Behandlungsraum, OP und vor allem Käfige/Boxen sind Schnittstellen für die Übertragung von Tier zu Tier. Das Konzept deckt Hände-, Haut- und Flächenhygiene sowie die Instrumentenaufbereitung ab – mit einem starken Zusatznutzen bei der Käfig- und Quarantänehygiene.',
+    wettbewerber: ['Schülke', 'Bode/Hartmann', 'Ecolab'],
     bereiche: [
       { name: 'Behandlungsraum & Untersuchung',
         routine: [
@@ -1931,6 +1941,10 @@ const KONZEPTE = [
     branche: 'Dental',
     kicker: 'Zahnarztpraxen & Dentalkliniken',
     intro: 'Vom Behandlungszimmer über die Steri bis zum Empfang: Die Praxis lebt von kurzen Wechselzeiten zwischen den Patientinnen und Patienten. Das Konzept deckt Flächen- und Händehygiene sowie die Instrumentenaufbereitung ab – abgestimmt auf die tägliche Routine und, wo nötig, verschärft für den Ausbruchsfall.',
+    // Dental hat ein eigenes, von Klinik/Pflege abweichendes Wettbewerbsumfeld — deshalb hier
+    // dentalspezifische Hersteller statt der allgemeinen Klinik-Wettbewerber (Schülke, Bode
+    // etc.), die in COMPETITOR_BY_KIND für den Wettbewerbsvergleich hinterlegt sind.
+    wettbewerber: ['Alpro Medical', 'Dürr Dental', 'Kaniedenta', 'Peppler'],
     bereiche: [
       { name: 'Behandlungszimmer',
         routine: [
@@ -2065,6 +2079,25 @@ function konzeptErledigtCount(konzept) {
   const total = konzept.bereiche.length + konzeptCustomList(konzept.id).length;
   const done = konzeptAllBereicheForList(konzept).filter(b => b.erledigt).length;
   return {done, total};
+}
+// Hersteller-Vorschläge für "Aktueller Hersteller/Wettbewerber": die branchentypischen aus
+// KONZEPTE plus alle bereits einmal per Freitext eingetragenen ("gelernte") Namen — beides
+// gemischt und dedupliziert, damit ein einmal eingetippter Hersteller ab sofort als Chip
+// erscheint, ohne ihn erneut eintippen zu müssen.
+function konzeptWettbewerberOptions(konzeptId) {
+  const konzept = KONZEPTE.find(k => k.id === konzeptId);
+  const basis = (konzept && konzept.wettbewerber) || [];
+  const gelernt = state.konzeptWettbewerberLearned[konzeptId] || [];
+  return Array.from(new Set([...basis, ...gelernt]));
+}
+function konzeptLearnWettbewerber(konzeptId, name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return;
+  const basis = (KONZEPTE.find(k => k.id === konzeptId) || {}).wettbewerber || [];
+  const gelernt = state.konzeptWettbewerberLearned[konzeptId] || [];
+  if (basis.includes(trimmed) || gelernt.includes(trimmed)) return;
+  state.konzeptWettbewerberLearned = {...state.konzeptWettbewerberLearned, [konzeptId]: [...gelernt, trimmed]};
+  localStorage.setItem('konzeptWettbewerberLearned', JSON.stringify(state.konzeptWettbewerberLearned));
 }
 const NOTIZ_BAUSTEINE = {
   surface: [
@@ -3019,6 +3052,14 @@ function konzeptScreen() {
     </div>` : ''}
     <section class="report-form no-print konzept-send-form">
       <p class="wide muster-ve-info">${done} von ${total} Bereichen besprochen. ${favCount ? `${favCount} Produkt(e) mit ★ markiert — nur diese werden in die E-Mail übernommen.` : 'Noch kein Produkt mit ★ markiert — die E-Mail enthält dann nur die allgemeine Bereichsübersicht.'}</p>
+      <div class="wide">
+        <span class="notiz-baustein-label">Aktueller Hersteller / Wettbewerber (optional, Mehrfachauswahl)</span>
+        <div class="notiz-baustein-chips">
+          ${konzeptWettbewerberOptions(konzept.id).map(o => `<button type="button" class="notiz-chip ${(state.konzeptWettbewerberSelected[konzept.id]||[]).includes(o)?'active':''}" data-konzept-wettbewerber-toggle="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
+          <button type="button" class="notiz-chip ${state.konzeptWettbewerberCustomOpen?'active':''}" data-action="konzept-wettbewerber-custom-toggle">Sonstiger</button>
+        </div>
+        ${state.konzeptWettbewerberCustomOpen ? `<label class="modal-field"><input id="konzeptWettbewerberCustom" type="text" placeholder="Weiterer Hersteller / Produktname" value="${escapeHtml(state.konzeptWettbewerberCustomText || '')}"></label>` : ''}
+      </div>
       <label class="wide">An (Kunden-E-Mail)<input id="konzeptRecipientEmail" type="email" placeholder="kunde@beispiel.de"></label>
       <div class="report-actions wide"><button class="primary-button compact" data-action="konzept-send">${icon('talk')}<span>Konzept per E-Mail senden</span></button></div>
     </section>
@@ -3036,12 +3077,27 @@ function konzeptScreen() {
 function sendKonzeptEmail() {
   const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
   const to = (($('#konzeptRecipientEmail')||{}).value || '').trim();
+  // Freitext-Hersteller aus "Sonstiger" beim Absenden übernehmen und dauerhaft lernen, damit er
+  // beim nächsten Konzept dieser Branche direkt als Chip vorgeschlagen wird.
+  const customText = (state.konzeptWettbewerberCustomText || '').trim();
+  let wettbewerberSelected = state.konzeptWettbewerberSelected[konzept.id] || [];
+  if (customText) {
+    konzeptLearnWettbewerber(konzept.id, customText);
+    if (!wettbewerberSelected.includes(customText)) wettbewerberSelected = [...wettbewerberSelected, customText];
+    state.konzeptWettbewerberSelected = {...state.konzeptWettbewerberSelected, [konzept.id]: wettbewerberSelected};
+    localStorage.setItem('konzeptWettbewerberSelected', JSON.stringify(state.konzeptWettbewerberSelected));
+    state.konzeptWettbewerberCustomText = '';
+    state.konzeptWettbewerberCustomOpen = false;
+  }
   const besprochen = konzeptSummaryBereiche(konzept);
   const lines = [
     'Hallo,', '',
     `vielen Dank für das Gespräch vor Ort. Wie besprochen fasse ich Ihnen unser Hygienekonzept für ${konzept.branche} nachfolgend zusammen:`, '',
     konzept.intro, ''
   ];
+  if (wettbewerberSelected.length) {
+    lines.push(`Aktuell setzen Sie auf Produkte von ${wettbewerberSelected.join(', ')}. Gerne zeigen wir Ihnen im direkten Vergleich, welche zusätzlichen Vorteile Ihnen die vorgestellten Dr. Schumacher Produkte bieten.`, '');
+  }
   const pushPunkte = (liste, label) => {
     if (!liste.length) return;
     if (label) lines.push(label);
@@ -3069,6 +3125,7 @@ function sendKonzeptEmail() {
   if (konzept.pdfUrl) lines.push('Das vollständige Kernprogramm mit allen Produktdetails finden Sie hier zum Download:', konzept.pdfUrl, '');
   lines.push('Prüfen Sie das Konzept gerne in Ruhe. Wenn Sie es durchgesehen haben oder weitere Informationen brauchen, arbeite ich sehr gerne gemeinsam mit Ihnen an der Umsetzung – und begleite Sie auf Wunsch auch persönlich bei einem Test der Produkte vor Ort. Mir ist wichtig, dass Sie sich bei jedem Schritt voll unterstützt fühlen.', '', 'Beste Grüße');
   openMailto(`Hygienekonzept ${konzept.branche} – Dr. Schumacher`, lines.join('\n'), to);
+  if (customText) render();
 }
 function messeScreen() {
   const chosen = favoriteEntries();
@@ -4128,6 +4185,20 @@ function bind() {
     render();
   }));
   $('[data-action="konzept-hide-erledigt-toggle"]')?.addEventListener('click', () => { state.konzeptHideErledigt = !state.konzeptHideErledigt; render(); });
+  document.querySelectorAll('[data-konzept-wettbewerber-toggle]').forEach(button => button.addEventListener('click', () => {
+    const konzeptId = state.selectedKonzept;
+    const name = button.dataset.konzeptWettbewerberToggle;
+    const current = state.konzeptWettbewerberSelected[konzeptId] || [];
+    const next = current.includes(name) ? current.filter(x => x !== name) : [...current, name];
+    state.konzeptWettbewerberSelected = {...state.konzeptWettbewerberSelected, [konzeptId]: next};
+    localStorage.setItem('konzeptWettbewerberSelected', JSON.stringify(state.konzeptWettbewerberSelected));
+    render();
+  }));
+  $('[data-action="konzept-wettbewerber-custom-toggle"]')?.addEventListener('click', () => {
+    state.konzeptWettbewerberCustomOpen = !state.konzeptWettbewerberCustomOpen;
+    render();
+  });
+  $('#konzeptWettbewerberCustom')?.addEventListener('input', e => { state.konzeptWettbewerberCustomText = e.target.value; });
   $('[data-action="konzept-bereich-add-open"]')?.addEventListener('click', () => {
     state.konzeptBereichFormOpen = true;
     state.konzeptBereichDraftName = '';
