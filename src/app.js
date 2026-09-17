@@ -458,6 +458,16 @@ const state = {
   kolProduktSuche: '',
   selectedKonzept: null,
   selectedKonzeptBereich: null,
+  // Checkliste je Konzept: welche Bereiche wurden mit dem Kunden bereits besprochen
+  // ("erledigt")? Schlüssel ist bei festen Bereichen der Name, bei selbst angelegten
+  // Bereichen "custom:<id>". Fließt direkt in die Konzept-Zusammenfassungs-E-Mail ein.
+  konzeptErledigt: JSON.parse(localStorage.getItem('konzeptErledigt') || '{}'),
+  // Selbst hinzugefügte Bereiche je Konzept, für Einrichtungen mit Räumen/Themen, die im
+  // Katalog nicht vorgesehen sind.
+  konzeptCustomBereiche: JSON.parse(localStorage.getItem('konzeptCustomBereiche') || '{}'),
+  konzeptHideErledigt: false,
+  konzeptBereichFormOpen: false,
+  konzeptBereichDraftName: '',
   summaryStep: null,
   summaryPendingRecipient: null,
   summaryIsNewCustomer: null,
@@ -1915,6 +1925,57 @@ const KONZEPTE = [
         ]
       }
     ]
+  },
+  {
+    id: 'dental',
+    branche: 'Dental',
+    kicker: 'Zahnarztpraxen & Dentalkliniken',
+    intro: 'Vom Behandlungszimmer über die Steri bis zum Empfang: Die Praxis lebt von kurzen Wechselzeiten zwischen den Patientinnen und Patienten. Das Konzept deckt Flächen- und Händehygiene sowie die Instrumentenaufbereitung ab – abgestimmt auf die tägliche Routine und, wo nötig, verschärft für den Ausbruchsfall.',
+    bereiche: [
+      { name: 'Behandlungszimmer',
+        routine: [
+          { ort: 'Behandlungsstuhl, Ablagen & Lichtgriffe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Absaugschläuche & Sauganlage', produkte: ['DESCOSUC','DESCOSUC CLEANER'] },
+          { ort: 'Hautantiseptik vor Injektion/Anästhesie', produkte: ['DESCODERM HAUTDESINFEKTION'] }
+        ],
+        ausbruch: [
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES'] }
+        ]
+      },
+      { name: 'Steri / Instrumentenaufbereitung',
+        routine: [
+          { ort: 'Vorreinigung (enzymatisch)', produkte: ['PLURAZYME EXTRA'] },
+          { ort: 'Manuelle Instrumentendesinfektion', produkte: ['PERFEKTAN® ACTIVE','DESCOTON EXTRA'] },
+          { ort: 'Bohrerbad', produkte: ['DESCO BOHRERBAD'] },
+          { ort: 'Instrumententablett-Reinigung', produkte: ['DESCO TRAY CLEANER'] },
+          { ort: 'Prothetik-Desinfektion', produkte: ['DESCOPRENT'] }
+        ]
+      },
+      { name: 'Händedesinfektion & Hautschutz',
+        routine: [
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] },
+          { ort: 'Hautreinigung', produkte: ['DESCOLIND PURE WASH'] },
+          { ort: 'Hautschutz & Pflege', produkte: ['DESCOLIND EXPERT PROTECT CREAM'] }
+        ],
+        ausbruch: [
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Umkleideraum & Sozialraum',
+        routine: [
+          { ort: 'Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Empfang und Wartebereich',
+        routine: [
+          { ort: 'Oberflächen & Türgriffe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Spender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      }
+    ]
   }
 ];
 function normalizeProductName(name) { return (name || '').toUpperCase().replace(/[®©]/g, '').replace(/\s+/g, ' ').trim(); }
@@ -1926,18 +1987,71 @@ function konzeptAlleProdukte(konzept) {
   });
   return names.size;
 }
-// Reduziert die Bereiche eines Konzepts auf genau die Produkte, die währenddessen mit ★
-// markiert wurden (dieselben globalen Favoriten wie bei Kundenzusammenfassung/Angebot) — so
-// wird aus der generischen Branchenübersicht eine auf das tatsächliche Gespräch zugeschnittene
-// Zusammenfassung je Bereich, inklusive Routine/Ausbruchsfall-Trennung.
-function konzeptFavoritedBereiche(konzept) {
+// Checkliste je Konzept: welche Bereiche wurden mit dem Kunden vor Ort schon besprochen?
+// Feste Bereiche werden über ihren Namen referenziert, selbst angelegte Bereiche über
+// "custom:<id>" — beides zusammen bildet den Fortschritt, der in der Raumliste als grüner
+// Haken erscheint und darüber entscheidet, was in die Zusammenfassungs-E-Mail übernommen wird.
+function konzeptIsErledigt(konzeptId, key) {
+  return !!(state.konzeptErledigt[konzeptId] && state.konzeptErledigt[konzeptId][key]);
+}
+function konzeptToggleErledigt(konzeptId, key) {
+  const forKonzept = {...(state.konzeptErledigt[konzeptId] || {})};
+  if (forKonzept[key]) delete forKonzept[key]; else forKonzept[key] = true;
+  state.konzeptErledigt = {...state.konzeptErledigt, [konzeptId]: forKonzept};
+  localStorage.setItem('konzeptErledigt', JSON.stringify(state.konzeptErledigt));
+}
+function konzeptCustomList(konzeptId) {
+  return state.konzeptCustomBereiche[konzeptId] || [];
+}
+function konzeptAddCustomBereich(konzeptId, name) {
+  const entry = {id: 'cb' + Date.now().toString(36), name, notiz: ''};
+  state.konzeptCustomBereiche = {...state.konzeptCustomBereiche, [konzeptId]: [...konzeptCustomList(konzeptId), entry]};
+  localStorage.setItem('konzeptCustomBereiche', JSON.stringify(state.konzeptCustomBereiche));
+  return entry;
+}
+function konzeptRemoveCustomBereich(konzeptId, id) {
+  state.konzeptCustomBereiche = {...state.konzeptCustomBereiche, [konzeptId]: konzeptCustomList(konzeptId).filter(c => c.id !== id)};
+  localStorage.setItem('konzeptCustomBereiche', JSON.stringify(state.konzeptCustomBereiche));
+  const key = 'custom:' + id;
+  if (state.konzeptErledigt[konzeptId] && state.konzeptErledigt[konzeptId][key]) konzeptToggleErledigt(konzeptId, key);
+}
+function konzeptUpdateCustomNotiz(konzeptId, id, notiz) {
+  state.konzeptCustomBereiche = {...state.konzeptCustomBereiche, [konzeptId]: konzeptCustomList(konzeptId).map(c => c.id === id ? {...c, notiz} : c)};
+  localStorage.setItem('konzeptCustomBereiche', JSON.stringify(state.konzeptCustomBereiche));
+}
+// Liste für die Raumübersicht: feste Bereiche + selbst angelegte, in einer einheitlichen Form
+// (mit stabilem "key" fürs Anklicken/Erledigt-Markieren), alphabetisch gemischt sortiert.
+function konzeptAllBereicheForList(konzept) {
+  const feste = konzept.bereiche.map(b => ({key: b.name, name: b.name, isCustom: false, bereich: b}));
+  const eigene = konzeptCustomList(konzept.id).map(c => ({key: 'custom:' + c.id, name: c.name, isCustom: true, bereich: c}));
+  return feste.concat(eigene)
+    .map(e => ({...e, erledigt: konzeptIsErledigt(konzept.id, e.key)}))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+// Reduziert die Bereiche eines Konzepts auf das, was tatsächlich mit dem Kunden besprochen
+// wurde: als "erledigt" markierte Bereiche gehen komplett hinein (die ganze Routine-/
+// Ausbruchsfall-Empfehlung), alle anderen nur mit den Produkten, die dabei zusätzlich mit ★
+// markiert wurden (dieselben globalen Favoriten wie bei Kundenzusammenfassung/Angebot).
+function konzeptSummaryBereiche(konzept) {
   const favIds = new Set(state.favorites.map(f => f.id));
   const nurFavorisiert = (liste) => (liste || [])
     .map(p => ({...p, produkte: p.produkte.filter(n => { const prod = findProductByName(n); return prod && favIds.has(prod.id); })}))
     .filter(p => p.produkte.length);
-  return konzept.bereiche
-    .map(b => ({name: b.name, punkte: nurFavorisiert(b.punkte), routine: nurFavorisiert(b.routine), ausbruch: nurFavorisiert(b.ausbruch)}))
-    .filter(b => b.punkte.length || b.routine.length || b.ausbruch.length);
+  const result = [];
+  konzept.bereiche.forEach(b => {
+    if (konzeptIsErledigt(konzept.id, b.name)) {
+      result.push({name: b.name, punkte: b.punkte || [], routine: b.routine || [], ausbruch: b.ausbruch || []});
+    } else {
+      const punkte = nurFavorisiert(b.punkte), routine = nurFavorisiert(b.routine), ausbruch = nurFavorisiert(b.ausbruch);
+      if (punkte.length || routine.length || ausbruch.length) result.push({name: b.name, punkte, routine, ausbruch});
+    }
+  });
+  konzeptCustomList(konzept.id).forEach(c => {
+    if (konzeptIsErledigt(konzept.id, 'custom:' + c.id) || (c.notiz || '').trim()) {
+      result.push({name: c.name, custom: true, notiz: c.notiz || ''});
+    }
+  });
+  return result;
 }
 function konzeptFavoritenCount(konzept) {
   const favIds = new Set(state.favorites.map(f => f.id));
@@ -1949,6 +2063,11 @@ function konzeptFavoritenCount(konzept) {
     }));
   });
   return names.size;
+}
+function konzeptErledigtCount(konzept) {
+  const total = konzept.bereiche.length + konzeptCustomList(konzept.id).length;
+  const done = konzeptAllBereicheForList(konzept).filter(b => b.erledigt).length;
+  return {done, total};
 }
 const NOTIZ_BAUSTEINE = {
   surface: [
@@ -2831,11 +2950,14 @@ function kolScreen() {
   </main>`;
 }
 function konzepteScreen() {
-  const card = k => `<button type="button" class="konzept-card" data-konzept-open="${k.id}">
+  const card = k => {
+    const {done, total} = konzeptErledigtCount(k);
+    return `<button type="button" class="konzept-card" data-konzept-open="${k.id}">
     <span class="konzept-card-icon">${icon('konzept')}</span>
-    <span class="konzept-card-copy"><strong>${escapeHtml(k.branche)}</strong><small>${escapeHtml(k.kicker)}</small><em>${konzeptAlleProdukte(k)} Produkte · ${k.bereiche.length} Bereiche</em></span>
+    <span class="konzept-card-copy"><strong>${escapeHtml(k.branche)}</strong><small>${escapeHtml(k.kicker)}</small><em>${konzeptAlleProdukte(k)} Produkte · ${total} Bereiche${done ? ` · ${done} besprochen` : ''}</em></span>
     <b>›</b>
   </button>`;
+  };
   return `<main class="page report-page konzepte-page">
     <div class="section-heading no-print"><div><span class="eyebrow">Branchenkonzepte</span><h1>Konzepte</h1><p>Für jede Branche nur die Produkte, die dort wirklich gebraucht werden — inklusive der offiziellen Kernprogramm-Broschüre zum direkten Versand an den Kunden.</p></div></div>
     <div class="konzept-list">${KONZEPTE.map(card).join('')}</div>
@@ -2855,9 +2977,12 @@ function konzeptPunkteHtml(punkte) {
   </div>`).join('');
 }
 function konzeptRaumListHtml(konzept) {
-  const sorted = konzept.bereiche.slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  return `<div class="konzept-raum-list">${sorted.map(b => `<button type="button" class="konzept-raum-card" data-konzept-bereich="${escapeHtml(b.name)}">
-    <span class="konzept-raum-copy"><strong>${escapeHtml(b.name)}</strong><small>${b.ausbruch ? 'Routine & Ausbruchsfall' : 'Routine'}${b.hinweis ? ' · Hinweis' : ''}</small></span>
+  let list = konzeptAllBereicheForList(konzept);
+  if (state.konzeptHideErledigt) list = list.filter(b => !b.erledigt);
+  if (!list.length) return `<div class="empty-state"><h2>Alles besprochen</h2><p>Alle Bereiche sind als erledigt markiert — "Erledigte ausblenden" wieder deaktivieren, um sie erneut zu sehen.</p></div>`;
+  return `<div class="konzept-raum-list">${list.map(b => `<button type="button" class="konzept-raum-card ${b.erledigt?'erledigt':''}" data-konzept-bereich="${escapeHtml(b.key)}">
+    <span class="konzept-raum-check">${b.erledigt ? '✓' : ''}</span>
+    <span class="konzept-raum-copy"><strong>${escapeHtml(b.name)}</strong><small>${b.isCustom ? 'Eigener Bereich' : `${b.bereich.ausbruch ? 'Routine & Ausbruchsfall' : 'Routine'}${b.bereich.hinweis ? ' · Hinweis' : ''}`}</small></span>
     <b>›</b>
   </button>`).join('')}</div>`;
 }
@@ -2871,34 +2996,50 @@ function konzeptBereichDetailHtml(konzept, bereich) {
 }
 function konzeptScreen() {
   const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
-  const bereich = konzept.bereiche.find(b => b.name === state.selectedKonzeptBereich);
-  if (bereich) {
+  const bereichEntry = konzeptAllBereicheForList(konzept).find(b => b.key === state.selectedKonzeptBereich);
+  if (bereichEntry) {
+    const erledigt = bereichEntry.erledigt;
     return `<main class="page report-page konzept-detail-page">
       <div class="section-heading no-print">
-        <div><span class="eyebrow">${escapeHtml(konzept.branche)}</span><h1>${escapeHtml(bereich.name)}</h1></div>
+        <div><span class="eyebrow">${escapeHtml(konzept.branche)}</span><h1>${escapeHtml(bereichEntry.name)}</h1></div>
         <button class="secondary-button" data-action="konzept-raum-back">← Alle Bereiche</button>
       </div>
-      ${konzeptBereichDetailHtml(konzept, bereich)}
+      <div class="konzept-actions no-print">
+        <button type="button" class="secondary-button ${erledigt?'active':''}" data-konzept-erledigt-toggle="${escapeHtml(bereichEntry.key)}">${erledigt ? '✓ Als besprochen markiert' : 'Als besprochen markieren'}</button>
+        ${bereichEntry.isCustom ? `<button type="button" class="secondary-button danger-link" data-konzept-bereich-remove="${escapeHtml(bereichEntry.bereich.id)}">Bereich entfernen</button>` : ''}
+      </div>
+      ${bereichEntry.isCustom
+        ? `<section class="konzept-bereich"><label class="modal-field wide"><textarea id="konzeptCustomNotiz" rows="4" placeholder="Was wurde hier besprochen? Welche Produkte kommen zum Einsatz?">${escapeHtml(bereichEntry.bereich.notiz || '')}</textarea></label></section>`
+        : konzeptBereichDetailHtml(konzept, bereichEntry.bereich)}
     </main>`;
   }
+  const {done, total} = konzeptErledigtCount(konzept);
+  const favCount = konzeptFavoritenCount(konzept);
   return `<main class="page report-page konzept-detail-page">
     <div class="section-heading no-print"><div><span class="eyebrow">${escapeHtml(konzept.kicker)}</span><h1>${escapeHtml(konzept.branche)}</h1><p>${escapeHtml(konzept.intro)}</p></div></div>
     ${konzept.pdfUrl ? `<div class="konzept-actions no-print">
       <a class="secondary-button" href="${escapeHtml(konzept.pdfUrl)}" target="_blank" rel="noopener">${icon('offer')}<span>PDF öffnen</span></a>
     </div>` : ''}
     <section class="report-form no-print konzept-send-form">
-      <p class="wide muster-ve-info ${konzeptFavoritenCount(konzept) ? '' : 'muted'}">${konzeptFavoritenCount(konzept) ? `${konzeptFavoritenCount(konzept)} Produkt(e) mit ★ markiert — werden je Bereich in die E-Mail übernommen.` : 'Noch nichts markiert — die E-Mail enthält dann die allgemeine Bereichsübersicht. Produkte in einem Bereich mit ★ markieren, um das Konzept auf das Gespräch zuzuschneiden.'}</p>
+      <p class="wide muster-ve-info">${done} von ${total} Bereichen besprochen${favCount ? ` · ${favCount} Produkt(e) zusätzlich mit ★ markiert` : ''} — fließt in die E-Mail ein.</p>
       <label class="wide">An (Kunden-E-Mail)<input id="konzeptRecipientEmail" type="email" placeholder="kunde@beispiel.de"></label>
       <div class="report-actions wide"><button class="primary-button compact" data-action="konzept-send">${icon('talk')}<span>Konzept per E-Mail senden</span></button></div>
     </section>
-    <span class="notiz-baustein-label">Bereiche (A–Z)</span>
+    <div class="konzept-raum-toolbar no-print">
+      <span class="notiz-baustein-label">Bereiche (A–Z)</span>
+      <button type="button" class="filter-chip ${state.konzeptHideErledigt?'active':''}" data-action="konzept-hide-erledigt-toggle">Erledigte ausblenden</button>
+    </div>
     ${konzeptRaumListHtml(konzept)}
+    ${state.konzeptBereichFormOpen ? `<section class="report-form no-print konzept-bereich-add-form">
+      <label class="wide">Neuer Bereich<input id="konzeptBereichName" value="${escapeHtml(state.konzeptBereichDraftName)}" placeholder="z. B. Röntgenraum"></label>
+      <div class="report-actions wide"><button class="secondary-button compact" data-action="konzept-bereich-add-cancel">Abbrechen</button><button class="primary-button compact" data-action="konzept-bereich-add-save">Hinzufügen</button></div>
+    </section>` : `<button type="button" class="secondary-button konzept-bereich-add-open" data-action="konzept-bereich-add-open">+ Bereich hinzufügen</button>`}
   </main>`;
 }
 function sendKonzeptEmail() {
   const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
   const to = (($('#konzeptRecipientEmail')||{}).value || '').trim();
-  const favBereiche = konzeptFavoritedBereiche(konzept);
+  const besprochen = konzeptSummaryBereiche(konzept);
   const lines = [
     'Hallo,', '',
     `vielen Dank für das Gespräch vor Ort. Wie besprochen fasse ich Ihnen unser Hygienekonzept für ${konzept.branche} nachfolgend zusammen:`, '',
@@ -2912,13 +3053,17 @@ function sendKonzeptEmail() {
       p.produkte.forEach(n => lines.push(`✓ ${n}`));
     });
   };
-  if (favBereiche.length) {
-    lines.push('Basierend auf unserem Gespräch empfehlen wir für Ihre Einrichtung:', '');
-    favBereiche.forEach(b => {
+  if (besprochen.length) {
+    lines.push('Besprochene Bereiche:', '');
+    besprochen.forEach(b => {
       lines.push(b.name.toUpperCase());
-      pushPunkte(b.punkte, null);
-      pushPunkte(b.routine, 'Für die Routine:');
-      pushPunkte(b.ausbruch, 'Für den Ausbruchsfall:');
+      if (b.custom) {
+        lines.push(b.notiz.trim() || 'Individuell vor Ort besprochen.');
+      } else {
+        pushPunkte(b.punkte, null);
+        pushPunkte(b.routine, 'Für die Routine:');
+        pushPunkte(b.ausbruch, 'Für den Ausbruchsfall:');
+      }
       lines.push('');
     });
   } else {
@@ -3964,6 +4109,54 @@ function bind() {
   }));
   $('[data-action="konzept-raum-back"]')?.addEventListener('click', () => { state.selectedKonzeptBereich = null; render(); });
   $('[data-action="konzept-send"]')?.addEventListener('click', sendKonzeptEmail);
+  document.querySelectorAll('[data-konzept-erledigt-toggle]').forEach(button => button.addEventListener('click', () => {
+    const key = button.dataset.konzeptErledigtToggle;
+    const wasErledigt = konzeptIsErledigt(state.selectedKonzept, key);
+    konzeptToggleErledigt(state.selectedKonzept, key);
+    // Nur beim Markieren (nicht beim Entfernen der Markierung) automatisch zum nächsten noch
+    // offenen Bereich weiterspringen — führt so durch alle Räume, ohne jedes Mal manuell über
+    // "← Alle Bereiche" zurückgehen zu müssen. Bleibt optional: über die Raumliste kann jeder
+    // Bereich weiterhin frei und in beliebiger Reihenfolge angesteuert werden.
+    if (!wasErledigt) {
+      const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
+      const list = konzeptAllBereicheForList(konzept);
+      const currentIdx = list.findIndex(b => b.key === key);
+      let next = null;
+      for (let i = 1; i <= list.length; i++) {
+        const candidate = list[(currentIdx + i) % list.length];
+        if (candidate && !candidate.erledigt && candidate.key !== key) { next = candidate; break; }
+      }
+      state.selectedKonzeptBereich = next ? next.key : null;
+    }
+    render();
+  }));
+  $('[data-action="konzept-hide-erledigt-toggle"]')?.addEventListener('click', () => { state.konzeptHideErledigt = !state.konzeptHideErledigt; render(); });
+  $('[data-action="konzept-bereich-add-open"]')?.addEventListener('click', () => {
+    state.konzeptBereichFormOpen = true;
+    state.konzeptBereichDraftName = '';
+    render();
+  });
+  $('[data-action="konzept-bereich-add-cancel"]')?.addEventListener('click', () => { state.konzeptBereichFormOpen = false; render(); });
+  $('#konzeptBereichName')?.addEventListener('input', e => { state.konzeptBereichDraftName = e.target.value; });
+  $('[data-action="konzept-bereich-add-save"]')?.addEventListener('click', () => {
+    const name = (state.konzeptBereichDraftName || '').trim();
+    if (!name) { alert('Bitte einen Namen für den Bereich eintragen.'); return; }
+    const entry = konzeptAddCustomBereich(state.selectedKonzept, name);
+    state.konzeptBereichFormOpen = false;
+    state.selectedKonzeptBereich = 'custom:' + entry.id;
+    render();
+  });
+  document.querySelectorAll('[data-konzept-bereich-remove]').forEach(button => button.addEventListener('click', () => {
+    if (!confirm('Diesen Bereich wirklich entfernen?')) return;
+    konzeptRemoveCustomBereich(state.selectedKonzept, button.dataset.konzeptBereichRemove);
+    state.selectedKonzeptBereich = null;
+    render();
+  }));
+  $('#konzeptCustomNotiz')?.addEventListener('input', e => {
+    const konzept = KONZEPTE.find(k => k.id === state.selectedKonzept) || KONZEPTE[0];
+    const entry = konzeptAllBereicheForList(konzept).find(b => b.key === state.selectedKonzeptBereich);
+    if (entry && entry.isCustom) konzeptUpdateCustomNotiz(konzept.id, entry.bereich.id, e.target.value);
+  });
   $('[data-action="kol-toggle-form"]')?.addEventListener('click', () => {
     state.kolFormOpen = !state.kolFormOpen;
     if (state.kolFormOpen) {
