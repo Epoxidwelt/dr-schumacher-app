@@ -4637,13 +4637,14 @@ function restoreHistorySnapshotIdentity(snap) {
   }
 }
 
+// "Favoriten leeren" räumt bewusst den kompletten Kundengesprächs-Stand ab (nicht nur die
+// ★-Liste) — sonst blieben Ansprechpartner, Notizen, Muster- und CRM-Angaben vom vorherigen
+// Kunden stehen, obwohl man optisch schon bei "keine Favoriten" ist. Nutzt dieselbe,
+// bereits geprüfte Reset-Logik wie "Speicher löschen – neuer Kunde" in den Einstellungen
+// (inkl. Sicherung des bisherigen Stands im Kundenverlauf).
 function clearFavoritesOnly() {
   if (!state.favorites.length) return;
-  if (!confirm('Alle markierten Favoriten löschen?')) return;
-  snapshotCustomerData();
-  state.favorites = [];
-  localStorage.removeItem('favorites');
-  render();
+  resetCustomerData();
 }
 
 function customerHistoryScreen() {
@@ -4670,9 +4671,9 @@ function customerHistoryScreen() {
 }
 
 function resetCustomerData() {
-  if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf und Messe-Erfassung werden zurückgesetzt. Preise und bereits gespeicherte Besuchsberichte bleiben erhalten.')) return;
+  if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf, Messe-Erfassung und der Konzept-Gesprächsstand (besprochene Bereiche, eigene Bereiche, Hersteller-Auswahl) werden zurückgesetzt. Preise, bereits gespeicherte Besuchsberichte und branchentypische Hersteller-Vorschläge bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryAdditionalContacts','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter'].forEach(key => localStorage.removeItem(key));
+  ['favorites','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryAdditionalContacts','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter','konzeptErledigt','konzeptCustomBereiche','konzeptWettbewerberSelected'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
   state.summaryCustomer = '';
   state.summaryKundenNr = '';
@@ -4683,6 +4684,18 @@ function resetCustomerData() {
   state.summaryContactDraft = {anrede: 'Herr', name: '', email: ''};
   state.summaryOccasion = SUMMARY_OCCASIONS[0].value;
   state.summaryIncludePrices = false;
+  // Konzept-Gesprächsstand ist an DIESES Kundengespräch gebunden (welche Bereiche wurden mit
+  // diesem Kunden besprochen?) — im Unterschied zu konzeptWettbewerberLearned, das bewusst
+  // dauerhaft bleibt (branchentypische Hersteller, kundenunabhängig gelernt).
+  state.konzeptErledigt = {};
+  state.konzeptCustomBereiche = {};
+  state.konzeptWettbewerberSelected = {};
+  state.konzeptWettbewerberCustomOpen = false;
+  state.konzeptWettbewerberCustomText = '';
+  state.konzeptHideErledigt = false;
+  state.konzeptBereichFormOpen = false;
+  state.konzeptBereichDraftName = '';
+  state.selectedKonzeptBereich = null;
   state.musterWanted = null; state.musterCycleIndex = 0; state.musterMengen = {};
   state.crmWettbewerber = []; state.crmWettbewerberCustomOpen = false; state.crmWettbewerberCustomText = '';
   state.crmFeedback = ''; state.crmFeedbackSelected = []; state.crmSamples = 'Keine'; state.crmResult = 'Offen';
