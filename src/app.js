@@ -1994,6 +1994,72 @@ const KONZEPTE = [
         ]
       }
     ]
+  },
+  {
+    id: 'reha',
+    branche: 'Reha-Klinik',
+    kicker: 'Rehabilitationskliniken & Reha-Zentren',
+    intro: 'Von der Patiententherapie bis zum Bewegungsbad: Reha-Kliniken verbinden pflegerische mit therapeutischen Bereichen unter einem Dach. Das Konzept deckt Flächen- und Händehygiene für Patientenzimmer, Therapie- und Wasseranwendungen ab – abgestimmt auf die tägliche Routine und, wo nötig, verschärft für den Ausbruchsfall.',
+    wettbewerber: ['Schülke', 'Bode/Hartmann', 'B. Braun'],
+    bereiche: [
+      { name: 'Patientenzimmer',
+        routine: [
+          { ort: 'Oberflächen & bettnahe Flächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] },
+          { ort: 'Hautschutz & Pflege', produkte: ['DESCOLIND EXPERT PROTECT CREAM'] }
+        ],
+        ausbruch: [
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Therapieraum / Physiotherapie',
+        routine: [
+          { ort: 'Trainingsgeräte, Matten & Griffe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Wandspender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] },
+          { ort: 'Hautpflege nach der Behandlung', produkte: ['DESCO VITAL GEL'] }
+        ]
+      },
+      { name: 'Bewegungsbad / Hydrotherapie',
+        routine: [
+          { ort: 'Beckenrand, Haltegriffe & Liegen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Umkleide- & Duschbereich (Fußboden)', produkte: ['OPTISAL® PLUS'] }
+        ],
+        ausbruch: [
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES'] }
+        ]
+      },
+      { name: 'Stationszimmer / Pflegearbeitsraum',
+        routine: [
+          { ort: 'Medikamentenschrank & -kühlschrank', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Arbeitsflächen', produkte: ['ONE SYSTEM PLUS','DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Sanitär- und Waschräume',
+        routine: [
+          { ort: 'Oberflächen, Urinale & Toilette', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Speisesaal und Cafeteria',
+        routine: [
+          { ort: 'Tische, Stühle & Tabletts', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Wandspender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      },
+      { name: 'Empfang und Wartebereich',
+        routine: [
+          { ort: 'Oberflächen & Türgriffe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Spender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      }
+    ]
   }
 ];
 function normalizeProductName(name) { return (name || '').toUpperCase().replace(/[®©]/g, '').replace(/\s+/g, ' ').trim(); }
