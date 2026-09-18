@@ -147,7 +147,11 @@ function sendToHint(email) {
 
 const SUMMARY_OCCASIONS = [
   {value:'das freundliche Telefonat', label:'Telefonat – „vielen Dank für das freundliche Telefonat"', short:'Telefonat', icon:'phone'},
-  {value:'den Termin', label:'Vor Ort – „vielen Dank für den Termin"', short:'Vor Ort / Termin', icon:'pin'}
+  {value:'den Termin', label:'Vor Ort – „vielen Dank für den Termin"', short:'Vor Ort / Termin', icon:'pin'},
+  // Für Kontakte ohne konkretes Gesprächsthema (z. B. kurzer Austausch, Messe- oder
+  // Flurgespräch) — damit der CRM-Eintrag nicht künstlich als "Telefonat" oder "Termin"
+  // erfasst werden muss, obwohl inhaltlich nichts zu besprechen war.
+  {value:'das Netzwerken', label:'Netzwerken – „vielen Dank für das Netzwerken", kein konkretes Thema', short:'Netzwerken', icon:'meinekontakte'}
 ];
 
 const PRODUCT_DOCS = {
@@ -2520,8 +2524,8 @@ function occasionPromptModal() {
     <div class="modal-card">
       ${modalCloseBtn()}
       <span class="eyebrow">Schritt ${stepNum.occasion} von ${total}</span>
-      <h2>Telefonat oder Termin vor Ort?</h2>
-      <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt.</p>
+      <h2>Wie kam der Kontakt zustande?</h2>
+      <p>Damit die E-Mail an den Kunden mit der passenden Formulierung beginnt — bei "Netzwerken" ohne konkretes Thema reicht das für den CRM-Eintrag.</p>
       <div class="modal-choices">${SUMMARY_OCCASIONS.map(o => `<button class="modal-choice" data-occasion-choice="${escapeHtml(o.value)}">${icon(o.icon)}<span>${escapeHtml(o.short)}</span></button>`).join('')}</div>
       <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-ergebnis">Zurück</button></div>
     </div>
