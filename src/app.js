@@ -5043,7 +5043,7 @@ function oneSeed() {
       {id:'k9', externeNr:'EX-10029', kundenNr:'K-4479', name:'Praxis Grenzfall',        plz:'99999', ort:'',          strasse:'',                 hausnummer:'',   bezirk:'',          preisliste:'UVP',  email:'',                            telefon:'',             comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kunde', anrede:'', ansprechpartnerVorname:'', ansprechpartnerNachname:''}
     ],
     users:[
-      {id:'admin', name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'1234', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlzRanges:[], active:true, telefon:'0221 8890-100'},
+      {id:'admin', name:'Admin Demo',      email:'admin@example.com',                  password:'demo', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlzRanges:[], active:true, telefon:'0000 000000'},
       {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical'],               team:'nord', territories:['nord'], individualPlzRanges:[], active:true, telefon:'0170 1234501'},
       {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['nonmedical'],            team:'ost',  territories:['ost'],  individualPlzRanges:[], active:true, telefon:'0170 1234502'},
       {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlzRanges:[], active:true, telefon:'0170 1234503'},
@@ -6658,7 +6658,7 @@ function oneViewLogin(){
     ${O.authError ? `<div class="one-note stop" style="margin-top:10px">${escapeHtml(O.authError)}</div>` : ''}
     <div class="one-note warn" style="margin-top:16px; text-align:left">
       <strong>Simulation für die Präsentation.</strong> Die Prüfung läuft im Browser und ist kein Sicherheitsmerkmal. Produktiv gehört hierhin eine echte Anmeldung — Single Sign-On über das Firmenkonto plus Zwei-Faktor, serverseitig geprüft.
-      Demo-Zugänge: Name aus der Mitarbeiterliste (z. B. „Gerald Gampp" oder „Mitarbeiter A"), Passwort <span class="mono">1234</span>.
+      Demo-Zugänge: Name aus der Mitarbeiterliste (z. B. „Admin Demo" oder „Mitarbeiter A"), Passwort siehe Mitarbeiterliste.
     </div>
   </div></div>`;
 }
