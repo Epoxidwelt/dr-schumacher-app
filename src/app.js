@@ -241,6 +241,12 @@ const PRODUCT_DOCS = {
   'thermo-alka-clear': {pif:'https://www.schumacher-online.com/products/pif/PF_100215_PIF_00137-THERMO%20ALKA%20CLEAR_DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/THERMO%20ALKA%20CLEAR_GB-GHS.pdf',ba:'https://www.schumacher-online.com/products/ba/137_THERMO%20ALKA%20CLEAR_BA.pdf'},
   'wandhalter': {pif:'https://www.schumacher-online.com/products/pif/2602_FLY_Mobilhalter_Wandhalter_05_Abstimmung.pdf',sdb:null,ba:null},
   'baby-wipes-sensitive': {pif:'https://www.schumacher-online.com/products/pif/P_243000_PIF_01639NK-Care%20Zone%20BABY-WIPES-SENSITIVE-DE.pdf',sdb:null,ba:null},
+  'descoderm-hautdesinfektion': {pif:'https://www.schumacher-online.com/products/pif/PF_100112_PIF_00401-Descoderm-Hautdesinfektion-DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/descoderm_hautdesinfektion-de-sds_de.pdf',ba:'https://www.schumacher-online.com/products/ba/descoderm-hautdesinfektion-de-ba-public.pdf'},
+  'descolind-expert-protect-cream': {pif:'https://www.schumacher-online.com/products/pif/P_239000_PIF_00623-02-Descolind-Expert-Protect-Cream-DE.pdf',sdb:null,ba:null},
+  'descolind-expert-intensive-cream': {pif:'https://www.schumacher-online.com/products/pif/PF_100143_PIF_00622OP-DESCOLIND%20EXPERT%20INTENSIVE%20CREAM_DE.pdf',sdb:null,ba:null},
+  'descolind-pure-intensive-cream': {pif:'https://www.schumacher-online.com/products/pif/P_232000_PIF_00622IS-Descolind-Pure-Intensive-Cream-DE.pdf',sdb:null,ba:null},
+  'spezial-ölspray': {pif:'https://www.schumacher-online.com/_default_upload_bucket/P_359000_PIF_00108-SPEZIAL-OELSPRAY-DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/spezial_oelspray-de-sds_de.pdf',ba:'https://www.schumacher-online.com/products/ba/special-oelspray-de-ba-public.pdf'},
+  'thermoshield-xtreme': {pif:'https://www.schumacher-online.com/products/pif/PF_352000_PIF_00170-THERMOSHIELD%20XTREME_DE.pdf',sdb:'https://www.schumacher-online.com/products/sdb/thermoshield_xtreme-de-sds_de.pdf',ba:'https://www.schumacher-online.com/products/ba/thermoshield-xtreme-de-ba-public.pdf'},
 };
 
 const PRODUCTS = [
@@ -1149,11 +1155,11 @@ function detailScreen() {
       </div>
     </section>
     <section class="document-section"><h2>Aktuelle Unterlagen</h2><div class="document-grid">
-      ${documentLink('Produktinformation','Aktuelle Produktinformationen und Einwirkzeiten',productDocUrl(p,'pif'),'📄')}
-      ${documentLink('Sicherheitsdatenblatt','Aktuelle Sicherheitsinformationen',productDocUrl(p,'sdb'),'🛡️')}
-      ${documentLink('Betriebsanweisung','Dokumente für den sicheren Umgang',productDocUrl(p,'ba'),'📋')}
+      ${productDocUrl(p,'pif') ? documentLink('Produktinformation','Aktuelle Produktinformationen und Einwirkzeiten',productDocUrl(p,'pif'),'📄') : ''}
+      ${productDocUrl(p,'sdb') ? documentLink('Sicherheitsdatenblatt','Aktuelle Sicherheitsinformationen',productDocUrl(p,'sdb'),'🛡️') : ''}
+      ${productDocUrl(p,'ba') ? documentLink('Betriebsanweisung','Dokumente für den sicheren Umgang',productDocUrl(p,'ba'),'📋') : ''}
       ${documentLink('Produktbild','Aktuelle Bilddaten herunterladen',OFFICIAL.images,'🖼️')}
-    </div></section>
+    </div>${(!productDocUrl(p,'pif')||!productDocUrl(p,'sdb')||!productDocUrl(p,'ba')) ? `<small class="muted-copy">Für dieses Produkt liegen nicht alle Dokumente vor (z. B. kein Sicherheitsdatenblatt bei kosmetischen Pflegeprodukten). Fehlende Unterlagen bitte beim Innendienst erfragen.</small>` : ''}</section>
     <button class="secondary-button konzept-jump-button" data-category="konzepte">${icon('konzept')}<span>Konzept erstellen</span></button>
   </main>`;
 }
@@ -1195,9 +1201,9 @@ function buildStarredProductsEmail() {
       if (per) lines.push(`Umgerechnet: ${per}`);
     }
     if (inc.muster) lines.push(`MUSTER: bitte ein Muster (${size}) an den Kunden senden`);
-    if (inc.sheet) lines.push(`PRODUKTDATENBLATT (PIF): ${productDocUrl(p,'pif')}`);
-    if (inc.safety) lines.push(`SICHERHEITSDATENBLATT: ${productDocUrl(p,'sdb')}`);
-    if (inc.ba) lines.push(`BETRIEBSANWEISUNG (BA): ${productDocUrl(p,'ba')}`);
+    if (inc.sheet) lines.push(productDocUrl(p,'pif') ? `PRODUKTDATENBLATT (PIF): ${productDocUrl(p,'pif')}` : `PRODUKTDATENBLATT (PIF): liegt für dieses Produkt nicht vor`);
+    if (inc.safety) lines.push(productDocUrl(p,'sdb') ? `SICHERHEITSDATENBLATT: ${productDocUrl(p,'sdb')}` : `SICHERHEITSDATENBLATT: liegt für dieses Produkt nicht vor (z. B. kosmetisches Pflegeprodukt)`);
+    if (inc.ba) lines.push(productDocUrl(p,'ba') ? `BETRIEBSANWEISUNG (BA): ${productDocUrl(p,'ba')}` : `BETRIEBSANWEISUNG (BA): liegt für dieses Produkt nicht vor`);
     lines.push('');
   });
   lines.push('Danke und Grüße');
@@ -3670,7 +3676,7 @@ function documentLink(title, sub, url, emoji) {
 }
 function productDocUrl(product, kind) {
   const docs = PRODUCT_DOCS[product.id];
-  return (docs && docs[kind]) || OFFICIAL.sheets;
+  return (docs && docs[kind]) || null;
 }
 function productFacts(product) {
   const live = state.liveFacts[product.id];
