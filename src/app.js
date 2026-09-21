@@ -493,6 +493,7 @@ const state = {
   summaryKundenbesuch: false,
   summarySent: false,
   angebotOptionen: {pif:false, sdb:false, ba:false},
+  angebotPdfBusy: false, angebotPdfHint: null,
   newCustomer: null,
   inviteWelcome: null
 };
@@ -1489,7 +1490,7 @@ function closeAnyModal(){
   state.summaryKaltakquise = false;
   state.summaryKundenbesuch = false;
   state.newCustomer = null;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false};
+  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
   render();
 }
 function startSummaryFlow(){
@@ -1503,7 +1504,7 @@ function startSummaryFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false};
+  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
 }
 // Einstieg über die Kachel "Kundenbesuch": fragt zuerst, ob es sich um einen Bestandskunden
 // oder eine Kaltakquise handelt (state.summaryKundenbesuch markiert diesen Einstiegsweg für den
@@ -1520,7 +1521,7 @@ function startKundenbesuchFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false};
+  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
 }
 // Einstieg über die Kachel "Angebot anfragen": nutzt die im Gespräch bereits mit ★ markierten
 // Produkte und führt direkt in die Angebotsanfrage an den Innendienst — ohne die übrigen
@@ -1539,7 +1540,7 @@ function startAngebotFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false};
+  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
 }
 function newCustomerDraftDefault(){
   return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
@@ -2573,6 +2574,12 @@ function occasionPromptModal() {
             <button type="button" class="notiz-chip ${opts.ba?'active':''}" data-angebot-toggle="ba">Betriebsanweisung</button>
           </div>
         </div>
+        <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Oder direkt als PDF an den Kunden</span>
+          <p class="muted-copy" style="margin:2px 0 10px">Erstellt ein Angebots-PDF mit den markierten Produkten und Preisen (${state.priceList}) und öffnet den Teilen-Dialog des Geräts – ohne Umweg über den Innendienst.</p>
+          <button type="button" class="primary-button compact" data-action="angebot-pdf-senden" ${entries.length && !state.angebotPdfBusy ? '' : 'disabled'}>${icon('talk')}<span>${state.angebotPdfBusy ? 'PDF wird erstellt…' : 'Angebot als PDF an Kunden senden'}</span></button>
+          ${state.angebotPdfHint ? `<p class="muster-ve-info muted" style="margin-top:10px">${escapeHtml(state.angebotPdfHint)}</p>` : ''}
+        </div>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="${angebotBackAction}">Zurück</button>
           <button class="primary-button compact" data-action="angebot-senden" ${entries.length?'':'disabled'}>${icon('talk')}<span>An Innendienst senden</span></button>
@@ -2669,6 +2676,154 @@ function buildAngebotInnendienstEmail(){
 function sendAngebotInnendienstEmail(){
   const {subject, body} = buildAngebotInnendienstEmail();
   openMailto(subject, body, innendienstEmail());
+}
+
+// Muster-Layout für das direkt an den Kunden versendete PDF-Angebot. Farben/Typografie
+// orientieren sich an der bestehenden App (--blue/--blue2 aus styles.css). Sobald die
+// offizielle Dr.-Schumacher-Angebotsvorlage vorliegt, hier nur generateAngebotPdf() ersetzen —
+// der Rest (Web-Share-Versand, Datenermittlung) bleibt unverändert.
+let _logoDataUrlPromise = null;
+function logoDataUrl() {
+  if (_logoDataUrlPromise) return _logoDataUrlPromise;
+  _logoDataUrlPromise = fetch('public/assets/dr-schumacher-logo.png')
+    .then(r => r.blob())
+    .then(b => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(b);
+    }))
+    .catch(() => null);
+  return _logoDataUrlPromise;
+}
+function angebotKundeInfo() {
+  const contact = newCustomerContact();
+  const draft = state.newCustomer ? state.newCustomer.draft : null;
+  if (contact) {
+    return {
+      name: contact.name || '',
+      zeile2: [contact.strasse, contact.hausnummer].filter(Boolean).join(' '),
+      zeile3: [contact.plz, contact.ort].filter(Boolean).join(' '),
+      email: contact.email || '',
+      telefon: contact.telefon || ''
+    };
+  }
+  if (draft && (draft.firma || draft.nachname)) {
+    const ansprechpartner = newCustomerAnsprechpartner(draft);
+    return {
+      name: draft.firma || ansprechpartner,
+      zeile2: [draft.strasse, draft.hausnummer].filter(Boolean).join(' '),
+      zeile3: [draft.plz, draft.ort].filter(Boolean).join(' '),
+      email: draft.email || '',
+      telefon: draft.telefon || ''
+    };
+  }
+  return { name: state.summaryCustomer.trim() || 'Kunde', zeile2: '', zeile3: '', email: '', telefon: '' };
+}
+async function generateAngebotPdf() {
+  const entries = favoriteEntries();
+  const kunde = angebotKundeInfo();
+  const nr = 'AN-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+  const heute = new Date();
+  const gueltigBis = new Date(heute.getTime() + 30*24*60*60*1000);
+  const fmtDate = d => d.toLocaleDateString('de-DE');
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const blue = [7,95,183], dark = [16,36,67], muted = [92,112,132];
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 18;
+
+  const logo = await logoDataUrl();
+  if (logo) doc.addImage(logo, 'PNG', marginX, 16, 42, 15.1);
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...muted);
+  doc.text(['Dr. Schumacher GmbH', '[Straße Hausnummer]', '[PLZ Ort]', 'www.schumacher-online.com'], pageWidth - marginX, 18, { align: 'right' });
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(...blue);
+  doc.text('ANGEBOT', marginX, 46);
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...dark);
+  doc.text(`Angebots-Nr.: ${nr}`, marginX, 53);
+  doc.text(`Datum: ${fmtDate(heute)}`, marginX, 58);
+  doc.text(`Gültig bis: ${fmtDate(gueltigBis)}`, marginX, 63);
+  if (state.repName) doc.text(`Ihr Ansprechpartner: ${state.repName}${state.region ? ' · ' + regionLabel(state.region) : ''}`, marginX, 68);
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...dark);
+  doc.text('Angebot für', marginX, 80);
+  doc.setFont('helvetica','normal');
+  const kundeLines = [kunde.name, kunde.zeile2, kunde.zeile3].filter(Boolean);
+  doc.text(kundeLines, marginX, 86);
+
+  const rows = entries.map(({product, size}) => {
+    const price = resolvePrice(product, size);
+    const priceNum = (typeof price === 'number') ? price : parseFloat(price);
+    return [product.name, resolveArtNr(product, size), size, '1', isNaN(priceNum) ? '–' : money(priceNum), isNaN(priceNum) ? '–' : money(priceNum)];
+  });
+  const total = entries.reduce((sum, {product, size}) => {
+    const price = resolvePrice(product, size);
+    const priceNum = (typeof price === 'number') ? price : parseFloat(price);
+    return sum + (isNaN(priceNum) ? 0 : priceNum);
+  }, 0);
+
+  doc.autoTable({
+    startY: 96,
+    margin: { left: marginX, right: marginX },
+    head: [['Produkt', 'Art.-Nr.', 'Gebinde', 'Menge', 'Einzelpreis', 'Gesamt']],
+    body: rows,
+    styles: { font: 'helvetica', fontSize: 9, textColor: dark, cellPadding: 2.5 },
+    headStyles: { fillColor: blue, textColor: [255,255,255], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [240,246,251] },
+    columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+  });
+
+  let y = doc.lastAutoTable.finalY + 8;
+  const mwst = total * 0.19;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...dark);
+  doc.text('Zwischensumme:', pageWidth - marginX - 45, y);
+  doc.text(money(total), pageWidth - marginX, y, { align: 'right' });
+  y += 6;
+  doc.text('zzgl. 19% MwSt.:', pageWidth - marginX - 45, y);
+  doc.text(money(mwst), pageWidth - marginX, y, { align: 'right' });
+  y += 7;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('Gesamtsumme:', pageWidth - marginX - 45, y);
+  doc.text(money(total + mwst), pageWidth - marginX, y, { align: 'right' });
+
+  y += 16;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...muted);
+  doc.text(
+    'Dieses Angebot ist freibleibend und gilt bis zum genannten Datum. Preise zzgl. gesetzlicher Mehrwertsteuer.\nLieferung gemäß unseren Allgemeinen Geschäftsbedingungen. Bei Fragen sprechen Sie uns gerne an.',
+    marginX, y
+  );
+
+  const filename = `Angebot_${(kunde.name||'Kunde').replace(/[^\w-]+/g,'_')}_${heute.toISOString().slice(0,10)}.pdf`;
+  return { doc, filename, kunde, nr };
+}
+async function sendAngebotPdfToCustomer() {
+  if (!favoriteEntries().length) return;
+  state.angebotPdfBusy = true; render();
+  try {
+    const { doc, filename, kunde } = await generateAngebotPdf();
+    const blob = doc.output('blob');
+    const file = new File([blob], filename, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Angebot', text: `Angebot für ${kunde.name}` });
+      state.angebotPdfHint = null;
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      state.angebotPdfHint = kunde.email
+        ? `PDF „${filename}" wurde heruntergeladen. Bitte manuell an ${kunde.email} anhängen und versenden.`
+        : `PDF „${filename}" wurde heruntergeladen. Bitte manuell an den Kunden anhängen und versenden.`;
+    }
+  } catch (err) {
+    if (err && err.name !== 'AbortError') state.angebotPdfHint = 'PDF konnte nicht erstellt werden. Bitte erneut versuchen.';
+  } finally {
+    state.angebotPdfBusy = false; render();
+  }
 }
 
 function summaryScreen(){
@@ -4212,6 +4367,7 @@ function bind() {
     render();
   }));
   $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; render(); });
+  $('[data-action="angebot-pdf-senden"]')?.addEventListener('click', () => { sendAngebotPdfToCustomer(); });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
   document.querySelectorAll('[data-messe-field]').forEach(input => { const isChangeType = input.type === 'date' || input.tagName === 'SELECT'; const handler = () => { state[input.dataset.messeField] = input.value; localStorage.setItem(input.dataset.messeField, input.value); if (isChangeType) render(); }; input.addEventListener(isChangeType ? 'change' : 'input', handler); });
@@ -4458,7 +4614,7 @@ function bind() {
     } else if (action === 'kunde') {
       sendCustomerSummaryEmail();
     } else if (action === 'angebot') {
-      state.angebotOptionen = {pif:false, sdb:false, ba:false};
+      state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
       state.summaryPurpose = 'angebot';
       state.screen = 'summary';
       state.summaryStep = 'angebotOptionen';
