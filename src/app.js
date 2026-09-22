@@ -1543,8 +1543,13 @@ function startAngebotFlow(){
   state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
 }
 function newCustomerDraftDefault(){
-  return { firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
+  return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
 }
+const NEUKUNDE_BRANCHEN = [
+  'Rettungswache / Rettungsdienst', 'Pflegedienst / Pflegeeinrichtung', 'Krankenhaus / Klinik',
+  'Arztpraxis', 'Zahnarztpraxis', 'Augenklinik / Augenarztpraxis', 'Tierarztpraxis / Tierklinik',
+  'Reha-Klinik', 'Sonstige'
+];
 function isValidEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||'').trim()); }
 // Aktuell bewusst kein Pflichtfeld bei der Neukunden-/Kaltakquise-Erfassung — vor Ort sind
 // oft noch nicht alle Angaben bekannt, und der Kontakt soll trotzdem gespeichert werden
@@ -1560,7 +1565,7 @@ function newCustomerSave(){
   const existing = nc.contactId ? state.one.contacts.find(c => c.id === nc.contactId) : null;
   const entries = favoriteEntries();
   const fields = {
-    name:d.firma.trim(), anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
+    name:d.firma.trim(), branche:d.branche, anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
     plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(),
     email:d.email.trim(), telefon:d.telefon.trim(), notiz:state.summaryNotiz.trim(),
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
@@ -1614,10 +1619,15 @@ function newCustomerFormFieldsHtml(d){
       <button type="button" class="filter-chip ${d.anrede==='Herr'?'active':''}" data-nc-anrede="Herr">Herr</button>
       <button type="button" class="filter-chip ${d.anrede==='Frau'?'active':''}" data-nc-anrede="Frau">Frau</button>
     </div></div>
-    ${fields.map(([k,label,fieldRequired,type]) => {
-      const numeric = k==='plz' || k==='hausnummer';
-      return `<div class="${k==='firma'||k==='email'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${numeric?'inputmode="numeric" pattern="[0-9]*"':''} ${k==='plz'?'maxlength="5"':''} ${fieldRequired?'required':''} value="${escapeHtml(d[k])}"></div>`;
-    }).join('')}
+    ${(() => {
+      const rows = fields.map(([k,label,fieldRequired,type]) => {
+        const numeric = k==='plz' || k==='hausnummer';
+        return `<div class="${k==='firma'||k==='email'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${numeric?'inputmode="numeric" pattern="[0-9]*"':''} ${k==='plz'?'maxlength="5"':''} ${fieldRequired?'required':''} value="${escapeHtml(d[k])}"></div>`;
+      });
+      const brancheField = `<div class="wide"><label for="nc-branche">Branche</label><select id="nc-branche" data-nc-field="branche"><option value="">Bitte wählen…</option>${NEUKUNDE_BRANCHEN.map(b => `<option value="${escapeHtml(b)}" ${d.branche===b?'selected':''}>${escapeHtml(b)}</option>`).join('')}</select></div>`;
+      rows.splice(1, 0, brancheField);
+      return rows.join('');
+    })()}
   </div>`;
 }
 const PRODUKTBEREICHE = [
@@ -2366,10 +2376,10 @@ function occasionPromptModal() {
         <h2>Welche Produkte wurden besprochen?</h2>
         <p>Kachel antippen und dort die passenden Produkte markieren — genau wie im Hauptmenü.</p>
         <div class="category-grid">${PRODUKTBEREICHE.map(([key,title,sub]) => { const count = countByCat[key] || 0; return `<button type="button" class="category-card ${key} ${count?'on':''}" data-produktbereich-open="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${count ? count + ' ausgewählt' : sub}</small></span><b>${count ? '✓' : '›'}</b></button>`; }).join('')}</div>
-        ${entries.length ? `<div class="produkte-picked">${entries.map(({product,size}) => `<span>${escapeHtml(product.name)}${size?` · ${escapeHtml(size)}`:''}</span>`).join('')}</div>` : `<p class="muted-copy">Noch keine Produkte ausgewählt.</p>`}
+        ${entries.length ? `<div class="produkte-picked">${entries.map(({product,size}) => `<span>${escapeHtml(product.name)}${size?` · ${escapeHtml(size)}`:''}</span>`).join('')}</div>` : `<p class="muted-copy">${state.summaryKaltakquise ? 'Noch keine Produkte ausgewählt — bei einer Kaltakquise auch ohne möglich, z. B. wenn der Ansprechpartner nicht angetroffen wurde.' : 'Noch keine Produkte ausgewählt.'}</p>`}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="${state.newCustomer ? 'occasion-back-neukunde' : 'produktbereiche-back-name'}">Zurück</button>
-          <button class="primary-button compact" data-action="produktbereiche-weiter" ${entries.length?'':'disabled'}>Weiter</button>
+          <button class="primary-button compact" data-action="produktbereiche-weiter" ${entries.length || state.summaryKaltakquise ?'':'disabled'}>Weiter</button>
         </div>
       </div>
     </div>`;
@@ -2556,6 +2566,24 @@ function occasionPromptModal() {
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="kunde-entry-no">Nein, fertig</button>
           <button class="primary-button compact" data-action="kunde-entry-yes">${icon('talk')}<span>Ja, senden</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'kaltakquiseEmailAsk') {
+    const entries = favoriteEntries();
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">${newCustomerContact() ? 'Vorletzter Schritt' : 'Letzter Schritt'}</span>
+        <h2>Kaltakquise-Nachfass-E-Mail senden?</h2>
+        <p>${entries.length
+          ? 'Dokumentiert den Kontaktversuch und fasst die bereits markierten Produkte kurz zusammen — mit Aufforderung, einen Termin zu vereinbaren.'
+          : 'Auch ohne markierte Produkte sinnvoll: dokumentiert den Kontaktversuch und bittet aktiv um einen Termin — z. B. wenn der Ansprechpartner nicht persönlich angetroffen wurde.'}</p>
+        ${sendToHint(kaltakquiseNachfassRecipient())}
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="kaltakquise-email-no">Nein, fertig</button>
+          <button class="primary-button compact" data-action="kaltakquise-email-yes">${icon('talk')}<span>Ja, senden</span></button>
         </div>
       </div>
     </div>`;
@@ -2973,6 +3001,68 @@ function sendCustomerSummaryEmail(){
   state.summaryPendingRecipient = null;
   const cc = (state.summaryAdditionalContacts || []).map(c => c.email).filter(Boolean).join(',');
   openMailto(subject, body, to || '', cc);
+}
+
+// Kaltakquise-Nachfass-E-Mail: anders als buildCustomerSummaryEmail() setzt diese Mail
+// NICHT voraus, dass bereits Produkte mit ★ markiert wurden — bei einer klassischen
+// Kaltakquise (vor Ort oder telefonisch versucht, Ansprechpartner aber nicht persönlich
+// angetroffen) gibt es oft schlicht noch nichts Konkretes zu besprechen. Die Mail dient dann
+// nur dazu, den Kontaktversuch zu dokumentieren und aktiv einen Termin anzustoßen. Wurden
+// doch schon Produkte markiert, werden sie ergänzend aufgeführt.
+function buildKaltakquiseNachfassEmail(){
+  const entries = favoriteEntries();
+  const contact = newCustomerContact();
+  const ansprechpartner = contact
+    ? [contact.anrede, contact.ansprechpartnerVorname, contact.ansprechpartnerNachname].filter(Boolean).join(' ').trim()
+    : '';
+  const salutationName = ansprechpartner || state.summaryCustomer.trim();
+  const salutation = salutationName ? `Hallo ${state.summarySalutation} ${salutationName}` : 'Hallo';
+  const wasVorOrt = state.summaryOccasion === 'den Termin';
+  const versuchSatz = wasVorOrt
+    ? 'ich war soeben bei Ihnen vor Ort, konnte Sie dabei aber leider nicht persönlich antreffen.'
+    : 'ich habe eben versucht, Sie telefonisch zu erreichen, Sie dabei aber leider nicht persönlich erreicht.';
+  const rep = currentRepUser();
+  const kontaktLines = [state.repName, rep && rep.telefon ? `Telefon: ${rep.telefon}` : '', myOwnEmail() ? `E-Mail: ${myOwnEmail()}` : ''].filter(Boolean);
+
+  const lines = [`${salutation},`, '', versuchSatz, ''];
+  if (entries.length) {
+    lines.push('Da Sie sich bereits für folgende Produkte von Dr. Schumacher interessiert haben, fasse ich sie Ihnen gerne kurz zusammen:', '');
+    entries.forEach(({product: p, size}) => {
+      lines.push(`▸ ${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
+      const facts = productFacts(p);
+      if (facts.length) lines.push(`✓ ${facts[0]}`);
+      lines.push('');
+    });
+  }
+  lines.push(
+    'Gerne würde ich mit Ihnen einen Termin vereinbaren, um Ihren Bedarf in Ruhe zu besprechen und die passenden Lösungen für Sie vorzustellen.',
+    '',
+    'Über eine kurze Rückmeldung per E-Mail oder telefonisch würde ich mich sehr freuen – lassen Sie uns gerne zeitnah einen Termin finden!',
+    ''
+  );
+  if (kontaktLines.length) lines.push('Meine Kontaktdaten:', ...kontaktLines, '');
+  lines.push('Mit freundlichen Grüßen' + (state.repName ? ', ' + state.repName : ''));
+
+  const subject = wasVorOrt
+    ? 'Kurz bei Ihnen vorbeigeschaut – lassen Sie uns einen Termin vereinbaren (Dr. Schumacher)'
+    : 'Eben versucht Sie zu erreichen – lassen Sie uns einen Termin vereinbaren (Dr. Schumacher)';
+  return {subject, body: lines.join('\n')};
+}
+function kaltakquiseNachfassRecipient(){
+  let to = state.summaryPendingRecipient;
+  if (!to && state.summaryKundenNr.trim()) {
+    const kundenNr = state.summaryKundenNr.trim().toLowerCase();
+    const match = state.one.contacts.find(c => (c.kundenNr || '').trim().toLowerCase() === kundenNr);
+    if (match && match.email) to = match.email;
+  }
+  const contact = newCustomerContact();
+  return to || (contact && contact.email) || '';
+}
+function sendKaltakquiseNachfassEmail(){
+  const {subject, body} = buildKaltakquiseNachfassEmail();
+  const to = kaltakquiseNachfassRecipient();
+  state.summaryPendingRecipient = null;
+  openMailto(subject, body, to);
 }
 
 function competitionScreen(){
@@ -4382,7 +4472,8 @@ function bind() {
     // lösen dieselbe Aktion aus.
     if (state.summaryPurpose === 'crm') {
       sendQuickCrmEntry();
-      state.summaryStep = 'kundeask';
+      const isKaltakquiseKontakt = state.summaryKaltakquise && (value === 'den Termin' || value === 'das freundliche Telefonat');
+      state.summaryStep = isKaltakquiseKontakt ? 'kaltakquiseEmailAsk' : 'kundeask';
     } else {
       state.summarySent = true;
       sendCustomerSummaryEmail();
@@ -4406,6 +4497,12 @@ function bind() {
   $('[data-action="kunde-entry-yes"]')?.addEventListener('click', () => {
     state.summarySent = true;
     sendCustomerSummaryEmail();
+    state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask';
+    render();
+  });
+  $('[data-action="kaltakquise-email-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
+  $('[data-action="kaltakquise-email-yes"]')?.addEventListener('click', () => {
+    sendKaltakquiseNachfassEmail();
     state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask';
     render();
   });

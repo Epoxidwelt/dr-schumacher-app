@@ -26,7 +26,7 @@
 .location-actions .secondary-button{flex:1;justify-content:center;min-width:160px}
 .new-customer-form .wide{grid-column:1/-1}
 .new-customer-form label{display:block;font-weight:800;color:#294c69;font-size:13px}
-.new-customer-form input{display:block;width:100%;margin-top:6px;border:1px solid var(--border);border-radius:12px;padding:11px 13px;background:#f8fbfd;color:#264c6d;font:inherit}
+.new-customer-form input,.new-customer-form select{display:block;width:100%;margin-top:6px;border:1px solid var(--border);border-radius:12px;padding:11px 13px;background:#f8fbfd;color:#264c6d;font:inherit}
 .new-customer-form input:required:invalid{border-color:#e0a5a5}
 .new-customer-summary{text-align:left;background:#f7fafc;border-radius:15px;padding:16px 18px;margin:10px 0 4px;font-size:14px;color:#294c69;line-height:1.6}
 @media(max-width:760px){.new-customer-form{grid-template-columns:1fr}.new-customer-form .wide{grid-column:auto}}
