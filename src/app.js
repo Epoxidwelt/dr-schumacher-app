@@ -2067,6 +2067,67 @@ const KONZEPTE = [
         ]
       }
     ]
+  },
+  {
+    id: 'augenklinik',
+    branche: 'Augenklinik',
+    kicker: 'Augenärzte, Augenkliniken & Ambulantes Operieren',
+    intro: 'Von der Sprechstunde mit Spaltlampe und Tonometer über die Injektionssprechstunde bis zum OP für die Kataraktchirurgie: Augenkliniken und -praxen brauchen material- und schleimhautverträgliche Produkte, die schnell wirken und dabei empfindliche Diagnostik- und OP-Geräte schonen. Das Konzept deckt Flächen- und Händehygiene, die periokuläre Hautantiseptik vor Injektionen/Eingriffen sowie die Aufbereitung der mikrochirurgischen Instrumente ab – abgestimmt auf die tägliche Routine und, wo nötig, verschärft für den Ausbruchsfall.',
+    wettbewerber: ['Schülke', 'Bode/Hartmann', 'B. Braun'],
+    bereiche: [
+      { name: 'Sprechstunde / Untersuchungsraum',
+        routine: [
+          { ort: 'Spaltlampe, Kinn- & Stirnstütze', produkte: ['CLEANISEPT® WIPES'] },
+          { ort: 'Tonometer-Kontaktflächen & empfindliche Diagnostikgeräte', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Hautantiseptik vor Injektionen (z. B. IVOM)', produkte: ['DESCODERM HAUTDESINFEKTION'] },
+          { ort: 'Händedesinfektion zwischen Patienten', produkte: ['ASEPTOMAN® MED'] }
+        ],
+        ausbruch: [
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES'] }
+        ]
+      },
+      { name: 'OP-Bereich (z. B. Kataraktchirurgie)',
+        routine: [
+          { ort: 'OP-Flächen & Gerätewagen', produkte: ['DESCOSEPT SPEZIAL'] },
+          { ort: 'Periokuläre Hautantiseptik präoperativ', produkte: ['DESCODERM HAUTDESINFEKTION'] },
+          { ort: 'Chirurgische Händedesinfektion', produkte: ['ASEPTOMAN® DUO'] }
+        ],
+        ausbruch: [
+          { ort: 'OP-Flächen', produkte: ['ULTRASOL OXY®'] }
+        ]
+      },
+      { name: 'Instrumentenaufbereitung (Mikrochirurgie)',
+        routine: [
+          { ort: 'Vorreinigung (enzymatisch)', produkte: ['PLURAZYME EXTRA'] },
+          { ort: 'Manuelle Instrumentendesinfektion', produkte: ['PERFEKTAN® ACTIVE'] },
+          { ort: 'Schonende Aufbereitung empfindlicher Mikroinstrumente', produkte: ['PERFEKTAN® ENDO'] }
+        ]
+      },
+      { name: 'Händedesinfektion & Hautschutz (Personal)',
+        routine: [
+          { ort: 'Hygienische Händedesinfektion', produkte: ['ASEPTOMAN® MED'] },
+          { ort: 'Hautreinigung', produkte: ['DESCOLIND PURE WASH'] },
+          { ort: 'Hautschutz & Pflege', produkte: ['DESCOLIND EXPERT PROTECT CREAM'] }
+        ],
+        ausbruch: [
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® FORTE'] }
+        ]
+      },
+      { name: 'Umkleide- und Sozialraum',
+        routine: [
+          { ort: 'Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Empfang und Wartebereich',
+        routine: [
+          { ort: 'Oberflächen & Türgriffe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Spender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      }
+    ]
   }
 ];
 function normalizeProductName(name) { return (name || '').toUpperCase().replace(/[®©]/g, '').replace(/\s+/g, ' ').trim(); }
