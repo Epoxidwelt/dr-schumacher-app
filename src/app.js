@@ -3168,14 +3168,24 @@ function buildCustomerSummaryEmail(){
   const showPrices = state.summaryIncludePrices && !state.customerMode;
   entries.forEach(({product: p, size})=>{
     lines.push(`▸ ${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
+    lines.push('─'.repeat(`${p.name}${size ? ' – ' + size : ''}`.length + 2));
     if (showPrices) {
       const price = resolvePrice(p, size);
       if (price !== undefined && price !== null && price !== '') lines.push(`Ihr Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
     }
-    productFacts(p).forEach(f=>lines.push(`✓ ${f}`));
-    if (sizeBonusFacts(size).length) sizeBonusFacts(size).forEach(f=>lines.push(`✓ ${f}`));
+    // Standzeit direkt unter Produkt/Preis, noch vor den Vorteilen — das ist die praktisch
+    // wichtigste Zusatzinfo bei ONE SYSTEM PLUS/BASIC und soll nicht in der Vorteile-Liste
+    // untergehen. Die Vorteile bekommen danach eine eigene, klar beschriftete Gruppe.
     const standzeitLines = oneSystemStandzeitLines(p.id);
-    if (standzeitLines.length) { lines.push(''); standzeitLines.forEach(l=>lines.push(l)); }
+    if (standzeitLines.length) {
+      lines.push('', standzeitLines[0]);
+      standzeitLines.slice(1).forEach(l => lines.push('  ' + l));
+    }
+    const facts = [...productFacts(p), ...sizeBonusFacts(size)];
+    if (facts.length) {
+      lines.push('', 'Vorteile:');
+      facts.forEach(f => lines.push(`  ✓ ${f}`));
+    }
     lines.push('');
   });
   lines.push(
