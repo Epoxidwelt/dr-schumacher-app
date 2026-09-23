@@ -439,7 +439,8 @@ const state = {
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
   vsCompare: {productId:'', size:'', competitorName:'', competitorCustom:false, competitorPrice:'', competitorUnits:'', annualUnits:'', ...(JSON.parse(localStorage.getItem('vsCompare') || 'null') || {})},
   advisor: {category:'', subtype:'', need:''},
-  idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false},
+  idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
+  savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
@@ -1445,7 +1446,7 @@ function advisorEdit(key) {
 // und an den Innendienst weiterleiten können. Bewusst ohne Pflichtfelder bei der Kategorie
 // ("Sonstiges" deckt alles ab, was nicht in die 6-7 typischen Felder passt).
 function ideaReset() {
-  state.idea = {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false};
+  state.idea = {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null};
 }
 function ideaBack() {
   const idea = state.idea;
@@ -1472,19 +1473,65 @@ function buildIdeaEmail() {
   ];
   return {subject: `Ideenschmiede: ${kategorieLabel} (Dr. Schumacher)`, body: lines.join('\n')};
 }
+// Speichert die aktuelle Idee dauerhaft im localStorage (nicht nur als E-Mail verschickt) —
+// damit Mitarbeiter eigene Ideen jederzeit wieder aufrufen, nachschlagen und bearbeiten können,
+// statt sie nach dem Versand aus den Augen zu verlieren. Beim erneuten Senden einer bereits
+// gespeicherten Idee wird der bestehende Eintrag aktualisiert statt dupliziert.
+function ideaSaveToHistory() {
+  const idea = state.idea;
+  const now = new Date().toISOString();
+  const entry = {
+    bereich: idea.bereich, kategorie: idea.kategorie, kategorieSonstiges: idea.kategorieSonstiges,
+    text: idea.text, repName: state.repName || '', updatedAt: now
+  };
+  const existingIdx = idea.editingId ? state.savedIdeas.findIndex(i => i.id === idea.editingId) : -1;
+  if (existingIdx > -1) {
+    state.savedIdeas[existingIdx] = {...state.savedIdeas[existingIdx], ...entry};
+  } else {
+    const id = 'idea' + Date.now().toString(36);
+    idea.editingId = id;
+    state.savedIdeas = [{id, ...entry, createdAt: now}, ...state.savedIdeas].slice(0, 50);
+  }
+  localStorage.setItem('savedIdeas', JSON.stringify(state.savedIdeas));
+}
 function sendIdeaEmail() {
   const {subject, body} = buildIdeaEmail();
   openMailto(subject, body, innendienstEmail());
+  ideaSaveToHistory();
   state.idea.sentOk = true;
+}
+function ideaLoadForEdit(id) {
+  const saved = state.savedIdeas.find(i => i.id === id);
+  if (!saved) return;
+  state.idea = {
+    bereich: saved.bereich, kategorie: saved.kategorie, kategorieSonstiges: saved.kategorieSonstiges,
+    text: saved.text, sentOk: false, editingId: saved.id
+  };
+}
+function ideaDelete(id) {
+  state.savedIdeas = state.savedIdeas.filter(i => i.id !== id);
+  localStorage.setItem('savedIdeas', JSON.stringify(state.savedIdeas));
+}
+function ideaKategorieLabel(entry) {
+  return entry.kategorie === '__sonstiges__' ? (entry.kategorieSonstiges.trim() || 'Sonstiges') : entry.kategorie;
+}
+function ideaHistoryListHtml() {
+  if (!state.savedIdeas.length) return '';
+  return `<section class="saved-reports no-print"><h2>Meine gespeicherten Ideen</h2>${state.savedIdeas.slice(0,10).map(entry => `
+    <div class="saved-idea-row">
+      <button data-idea-edit="${entry.id}"><strong>${escapeHtml(ideaKategorieLabel(entry))}</strong><small>${escapeHtml(entry.bereich === 'produkt' ? 'Neue Produktidee' : 'Prozessoptimierung')} · ${escapeHtml((entry.text || '').slice(0,60))}${entry.text && entry.text.length>60 ? '…' : ''}</small></button>
+      <button type="button" class="danger-link" data-idea-delete="${entry.id}" aria-label="Idee löschen">✕</button>
+    </div>`).join('')}</section>`;
 }
 function ideenschmiedeScreen() {
   const idea = state.idea;
   if (idea.sentOk) {
     return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Ideenschmiede</span><h1>Danke für Ihre Idee!</h1><p>Sie wurde per E-Mail an den Innendienst übermittelt.</p></div></div>
+      <div class="section-heading"><div><span class="eyebrow">Ideenschmiede</span><h1>Danke für Ihre Idee!</h1><p>Sie wurde per E-Mail an den Innendienst übermittelt und dauerhaft gespeichert — Sie finden sie jederzeit unten wieder und können sie bearbeiten.</p></div></div>
       <section class="advisor-card">
         <button type="button" class="primary-button compact" data-action="idea-restart">${icon('ideenschmiede')}<span>Weitere Idee einreichen</span></button>
       </section>
+      ${ideaHistoryListHtml()}
     </main>`;
   }
   const totalSteps = 3;
@@ -1501,6 +1548,7 @@ function ideenschmiedeScreen() {
           <button class="category-card idea-produkt" data-idea-bereich="produkt"><span class="category-icon">${icon('star')}</span><span><strong>Neue Produktidee</strong><small>Idee für ein neues Produkt/Zubehör</small></span><b>›</b></button>
         </div>
       </section>
+      ${ideaHistoryListHtml()}
     </main>`;
   }
   if (!idea.kategorie) {
@@ -1520,11 +1568,11 @@ function ideenschmiedeScreen() {
   }
   const kategorieLabel = idea.kategorie === '__sonstiges__' ? (idea.kategorieSonstiges || 'Sonstiges') : idea.kategorie;
   return `<main class="page advisor-page">
-    <div class="section-heading"><div><span class="eyebrow">Frage 3 von 3</span><h1>Beschreiben Sie kurz Ihre Idee</h1><p>${escapeHtml(idea.bereich === 'produkt' ? 'Neue Produktidee' : 'Prozessoptimierung')} · ${escapeHtml(kategorieLabel)}</p></div><button class="secondary-button" data-action="idea-back">Zurück</button></div>
+    <div class="section-heading"><div><span class="eyebrow">Frage 3 von 3${idea.editingId ? ' · Bearbeiten' : ''}</span><h1>Beschreiben Sie kurz Ihre Idee</h1><p>${escapeHtml(idea.bereich === 'produkt' ? 'Neue Produktidee' : 'Prozessoptimierung')} · ${escapeHtml(kategorieLabel)}</p></div><button class="secondary-button" data-action="idea-back">Zurück</button></div>
     <section class="advisor-card">
       ${idea.kategorie === '__sonstiges__' ? `<label class="modal-field wide" style="display:block;margin-bottom:14px"><span class="notiz-baustein-label">Eigene Kategorie</span><input id="ideaKategorieSonstiges" type="text" placeholder="z. B. Fuhrpark, Tourenplanung …" value="${escapeHtml(idea.kategorieSonstiges)}"></label>` : ''}
       <label class="modal-field wide"><textarea id="ideaText" rows="6" placeholder="Was ist die Idee? Was würde sich dadurch verbessern?">${escapeHtml(idea.text)}</textarea></label>
-      <button type="button" class="primary-button compact" data-action="idea-senden" ${idea.text.trim() && (idea.kategorie !== '__sonstiges__' || idea.kategorieSonstiges.trim()) ? '' : 'disabled'}>${icon('talk')}<span>Idee an Innendienst senden</span></button>
+      <button type="button" class="primary-button compact" data-action="idea-senden" ${idea.text.trim() && (idea.kategorie !== '__sonstiges__' || idea.kategorieSonstiges.trim()) ? '' : 'disabled'}>${icon('talk')}<span>${idea.editingId ? 'Aktualisierte Idee senden' : 'Idee an Innendienst senden'}</span></button>
     </section>
   </main>`;
 }
@@ -4375,6 +4423,8 @@ function bind() {
   $('[data-action="idea-back"]')?.addEventListener('click', () => { ideaBack(); render(); });
   $('[data-action="idea-senden"]')?.addEventListener('click', () => { sendIdeaEmail(); render(); });
   $('[data-action="idea-restart"]')?.addEventListener('click', () => { ideaReset(); render(); });
+  document.querySelectorAll('[data-idea-edit]').forEach(button => button.addEventListener('click', () => { ideaLoadForEdit(button.dataset.ideaEdit); render(); }));
+  document.querySelectorAll('[data-idea-delete]').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('Diese Idee wirklich löschen?')) { ideaDelete(button.dataset.ideaDelete); render(); } }));
   $('#ideaText')?.addEventListener('input', e => { state.idea.text = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && (state.idea.kategorie !== '__sonstiges__' || state.idea.kategorieSonstiges.trim())); });
   $('#ideaKategorieSonstiges')?.addEventListener('input', e => { state.idea.kategorieSonstiges = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && state.idea.kategorieSonstiges.trim()); });
   document.querySelectorAll('[data-compare]').forEach(button => button.onclick = () => toggleCompare(button.dataset.compare));
