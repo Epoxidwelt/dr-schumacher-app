@@ -407,6 +407,7 @@ const state = {
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
   vsCompare: {productId:'', size:'', competitorName:'', competitorCustom:false, competitorPrice:'', competitorUnits:'', annualUnits:'', ...(JSON.parse(localStorage.getItem('vsCompare') || 'null') || {})},
   advisor: {category:'', subtype:'', need:''},
+  idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false},
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
@@ -539,7 +540,8 @@ function icon(name) {
     meinekontakte:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4M14 13h4"/></svg>',
     smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>',
     kol:'<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c0-4 3.1-7 7-7s7 3 7 7"/><path d="m18.5 2 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z"/></svg>',
-    konzept:'<svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6M4 12h16"/></svg>'
+    konzept:'<svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6M4 12h16"/></svg>',
+    ideenschmiede:'<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.3V17h6v-1.2c0-.9.4-1.7 1-2.3A6 6 0 0 0 12 3Z"/></svg>'
   };
   return icons[name] || '';
 }
@@ -626,6 +628,7 @@ function render() {
   if (state.screen === 'pm') html = header(true) + productManagementScreen() + bottomNav('home');
   if (state.screen === 'kol') html = header(true) + kolScreen() + bottomNav('home');
   if (state.screen === 'konzepte') html = header(true) + konzepteScreen() + bottomNav('home');
+  if (state.screen === 'ideenschmiede') html = header(true) + ideenschmiedeScreen() + bottomNav('home');
   if (state.screen === 'konzept') html = header(true) + konzeptScreen() + bottomNav('home');
   if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
   if (state.summaryStep) html += occasionPromptModal();
@@ -813,6 +816,7 @@ function menuScreen() {
     ['pm','Produktmanagement','Zuständigkeiten und Kontakte der Produktmanager'],
     ['kol','KOL – Key Opinion Leader','Referenzkunden je Produkt finden – unabhängig vom eigenen Gebiet'],
     ['konzepte','Konzepte','Branchenkonzepte mit den passenden Produkten je Bereich – z. B. Rettungsdienst oder Pflege'],
+    ['ideenschmiede','Ideenschmiede','Verbesserungsvorschläge und neue Produktideen direkt an den Innendienst'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
@@ -1403,6 +1407,95 @@ function advisorEdit(key) {
   render();
 }
 
+// Ideenschmiede: kurzer, dreistufiger Ablauf (Bereich → Kategorie → Beschreibung), damit
+// Mitarbeiter Verbesserungsvorschläge/Produktideen aus dem Alltag heraus schnell festhalten
+// und an den Innendienst weiterleiten können. Bewusst ohne Pflichtfelder bei der Kategorie
+// ("Sonstiges" deckt alles ab, was nicht in die 6-7 typischen Felder passt).
+function ideaReset() {
+  state.idea = {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false};
+}
+function ideaBack() {
+  const idea = state.idea;
+  if (idea.text) { idea.text = ''; return; }
+  if (idea.kategorie) { idea.kategorie = ''; idea.kategorieSonstiges = ''; return; }
+  idea.bereich = '';
+}
+function buildIdeaEmail() {
+  const idea = state.idea;
+  const bereichLabel = idea.bereich === 'produkt' ? 'Neue Produktidee' : 'Prozessoptimierung / Verbesserungsvorschlag';
+  const kategorieLabel = idea.kategorie === '__sonstiges__' ? (idea.kategorieSonstiges.trim() || 'Sonstiges') : idea.kategorie;
+  const lines = [
+    'Hallo Team,',
+    '',
+    'aus dem Außendienst kommt folgende Idee:',
+    '',
+    `Bereich: ${bereichLabel}`,
+    `Kategorie: ${kategorieLabel}`,
+    '',
+    'Beschreibung:',
+    idea.text.trim(),
+    '',
+    'Danke und Grüße' + (state.repName ? ', ' + state.repName : '')
+  ];
+  return {subject: `Ideenschmiede: ${kategorieLabel} (Dr. Schumacher)`, body: lines.join('\n')};
+}
+function sendIdeaEmail() {
+  const {subject, body} = buildIdeaEmail();
+  openMailto(subject, body, innendienstEmail());
+  state.idea.sentOk = true;
+}
+function ideenschmiedeScreen() {
+  const idea = state.idea;
+  if (idea.sentOk) {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Ideenschmiede</span><h1>Danke für Ihre Idee!</h1><p>Sie wurde per E-Mail an den Innendienst übermittelt.</p></div></div>
+      <section class="advisor-card">
+        <button type="button" class="primary-button compact" data-action="idea-restart">${icon('ideenschmiede')}<span>Weitere Idee einreichen</span></button>
+      </section>
+    </main>`;
+  }
+  const totalSteps = 3;
+  const answeredCount = (idea.bereich?1:0) + (idea.kategorie?1:0);
+  const progressDots = Array.from({length: totalSteps}).map((_,i) => `<span class="advisor-dot ${i < answeredCount ? 'done' : ''}"></span>`).join('');
+
+  if (!idea.bereich) {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Frage 1 von 3</span><h1>Worum geht es bei Ihrer Idee?</h1><p>Verbesserungsvorschläge, Prozessoptimierung oder eine neue Produktidee — direkt an den Innendienst.</p></div></div>
+      <div class="advisor-progress">${progressDots}</div>
+      <section class="advisor-card">
+        <div class="category-grid">
+          <button class="category-card idea-prozess" data-idea-bereich="prozess"><span class="category-icon">${icon('settings')}</span><span><strong>Prozesse</strong><small>Verbesserungsvorschlag zu Abläufen</small></span><b>›</b></button>
+          <button class="category-card idea-produkt" data-idea-bereich="produkt"><span class="category-icon">${icon('star')}</span><span><strong>Neue Produktidee</strong><small>Idee für ein neues Produkt/Zubehör</small></span><b>›</b></button>
+        </div>
+      </section>
+    </main>`;
+  }
+  if (!idea.kategorie) {
+    const options = idea.bereich === 'produkt'
+      ? PRODUKTBEREICHE.map(([key,title,sub]) => [key, title, sub])
+      : IDEA_KATEGORIEN_PROZESS.map(k => [k, k, '']);
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Frage 2 von 3</span><h1>Welcher Bereich passt am besten?</h1></div><button class="secondary-button" data-action="idea-back">Zurück</button></div>
+      <div class="advisor-progress">${progressDots}</div>
+      <section class="advisor-card">
+        <div class="answer-grid wizard">
+          ${options.map(([value,label,sub]) => `<button class="answer-button" data-idea-kategorie="${escapeHtml(value)}">${escapeHtml(label)}${sub?`<small style="display:block;font-weight:600;opacity:.7">${escapeHtml(sub)}</small>`:''}</button>`).join('')}
+          <button class="answer-button" data-idea-kategorie="__sonstiges__">Sonstiges<small style="display:block;font-weight:600;opacity:.7">Eigene Kategorie eintragen</small></button>
+        </div>
+      </section>
+    </main>`;
+  }
+  const kategorieLabel = idea.kategorie === '__sonstiges__' ? (idea.kategorieSonstiges || 'Sonstiges') : idea.kategorie;
+  return `<main class="page advisor-page">
+    <div class="section-heading"><div><span class="eyebrow">Frage 3 von 3</span><h1>Beschreiben Sie kurz Ihre Idee</h1><p>${escapeHtml(idea.bereich === 'produkt' ? 'Neue Produktidee' : 'Prozessoptimierung')} · ${escapeHtml(kategorieLabel)}</p></div><button class="secondary-button" data-action="idea-back">Zurück</button></div>
+    <section class="advisor-card">
+      ${idea.kategorie === '__sonstiges__' ? `<label class="modal-field wide" style="display:block;margin-bottom:14px"><span class="notiz-baustein-label">Eigene Kategorie</span><input id="ideaKategorieSonstiges" type="text" placeholder="z. B. Fuhrpark, Tourenplanung …" value="${escapeHtml(idea.kategorieSonstiges)}"></label>` : ''}
+      <label class="modal-field wide"><textarea id="ideaText" rows="6" placeholder="Was ist die Idee? Was würde sich dadurch verbessern?">${escapeHtml(idea.text)}</textarea></label>
+      <button type="button" class="primary-button compact" data-action="idea-senden" ${idea.text.trim() && (idea.kategorie !== '__sonstiges__' || idea.kategorieSonstiges.trim()) ? '' : 'disabled'}>${icon('talk')}<span>Idee an Innendienst senden</span></button>
+    </section>
+  </main>`;
+}
+
 function advisorResults() {
   const a = state.advisor;
   if (!a.category || !a.subtype) return [];
@@ -1635,6 +1728,20 @@ const PRODUKTBEREICHE = [
   ['hands','Hände & Haut','Händedesinfektion & Pflege'],
   ['instruments','Instrumente','Aufbereitung & Desinfektion'],
   ['application','Applikation','Spendersysteme & Zubehör']
+];
+// "Ideenschmiede": Themenfelder für Verbesserungsvorschläge/Prozessoptimierung, die Mitarbeiter
+// aus dem Alltag heraus einreichen können. Bewusst getrennt von PRODUKTBEREICHE (die Kachel
+// "Neue Produktidee" nutzt PRODUKTBEREICHE weiter, da eine Produktidee ohnehin einem der vier
+// bestehenden Sortimentsbereiche zugeordnet werden kann) — Prozessthemen brauchen eigene,
+// arbeitsalltagsnahe Kategorien.
+const IDEA_KATEGORIEN_PROZESS = [
+  'Bestell- & Lieferprozess',
+  'Muster & Musterversand',
+  'Preise & Konditionen',
+  'Vertriebsunterlagen & Schulung',
+  'App / digitale Werkzeuge',
+  'Kundenservice & Innendienst',
+  'Verpackung & Nachhaltigkeit'
 ];
 // Rubriken für "KOL – Key Opinion Leader": Einrichtungstypen, in die sich Referenzkunden
 // einordnen lassen. Die eigentliche Suche läuft aber bewusst über das Produkt, nicht über
@@ -2376,10 +2483,10 @@ function occasionPromptModal() {
         <h2>Welche Produkte wurden besprochen?</h2>
         <p>Kachel antippen und dort die passenden Produkte markieren — genau wie im Hauptmenü.</p>
         <div class="category-grid">${PRODUKTBEREICHE.map(([key,title,sub]) => { const count = countByCat[key] || 0; return `<button type="button" class="category-card ${key} ${count?'on':''}" data-produktbereich-open="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${count ? count + ' ausgewählt' : sub}</small></span><b>${count ? '✓' : '›'}</b></button>`; }).join('')}</div>
-        ${entries.length ? `<div class="produkte-picked">${entries.map(({product,size}) => `<span>${escapeHtml(product.name)}${size?` · ${escapeHtml(size)}`:''}</span>`).join('')}</div>` : `<p class="muted-copy">${state.summaryKaltakquise ? 'Noch keine Produkte ausgewählt — bei einer Kaltakquise auch ohne möglich, z. B. wenn der Ansprechpartner nicht angetroffen wurde.' : 'Noch keine Produkte ausgewählt.'}</p>`}
+        ${entries.length ? `<div class="produkte-picked">${entries.map(({product,size}) => `<span>${escapeHtml(product.name)}${size?` · ${escapeHtml(size)}`:''}</span>`).join('')}</div>` : `<p class="muted-copy">${state.newCustomer ? 'Noch keine Produkte ausgewählt — bei einem Neukunden auch ohne möglich, z. B. wenn der Ansprechpartner nicht angetroffen wurde.' : 'Noch keine Produkte ausgewählt.'}</p>`}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="${state.newCustomer ? 'occasion-back-neukunde' : 'produktbereiche-back-name'}">Zurück</button>
-          <button class="primary-button compact" data-action="produktbereiche-weiter" ${entries.length || state.summaryKaltakquise ?'':'disabled'}>Weiter</button>
+          <button class="primary-button compact" data-action="produktbereiche-weiter" ${entries.length || state.newCustomer ?'':'disabled'}>Weiter</button>
         </div>
       </div>
     </div>`;
@@ -4167,7 +4274,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
@@ -4202,6 +4309,13 @@ function bind() {
   $('[data-action="reset-advisor"]')?.addEventListener('click', () => { state.advisor={category:'',subtype:'',need:''}; render(); });
   $('[data-action="advisor-back"]')?.addEventListener('click', advisorBack);
   document.querySelectorAll('[data-advisor-edit]').forEach(button => button.onclick = () => advisorEdit(button.dataset.advisorEdit));
+  document.querySelectorAll('[data-idea-bereich]').forEach(button => button.onclick = () => { state.idea.bereich = button.dataset.ideaBereich; render(); });
+  document.querySelectorAll('[data-idea-kategorie]').forEach(button => button.onclick = () => { state.idea.kategorie = button.dataset.ideaKategorie; render(); });
+  $('[data-action="idea-back"]')?.addEventListener('click', () => { ideaBack(); render(); });
+  $('[data-action="idea-senden"]')?.addEventListener('click', () => { sendIdeaEmail(); render(); });
+  $('[data-action="idea-restart"]')?.addEventListener('click', () => { ideaReset(); render(); });
+  $('#ideaText')?.addEventListener('input', e => { state.idea.text = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && (state.idea.kategorie !== '__sonstiges__' || state.idea.kategorieSonstiges.trim())); });
+  $('#ideaKategorieSonstiges')?.addEventListener('input', e => { state.idea.kategorieSonstiges = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && state.idea.kategorieSonstiges.trim()); });
   document.querySelectorAll('[data-compare]').forEach(button => button.onclick = () => toggleCompare(button.dataset.compare));
   $('[data-action="copy-pitch"]')?.addEventListener('click', async () => { const text=comparisonPitch(state.compareIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean)); try { await navigator.clipboard.writeText(text); alert('Text wurde kopiert.'); } catch { alert(text); } });
   $('#summaryOccasion')?.addEventListener('change', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
@@ -4470,10 +4584,19 @@ function bind() {
     // Ansprechpartner (und bei Neukunde die ganze Adresse) sind zu diesem Zeitpunkt bereits
     // erfasst — Bestandskunde und Neukunde/Kaltakquise landen hier über denselben Weg und
     // lösen dieselbe Aktion aus.
+    // Die Kaltakquise-Nachfass-Frage gilt für JEDEN Neukunden mit Anlass "vor Ort"/"telefonisch"
+    // — unabhängig davon, über welche Kachel (Kundenbesuch, Kundenzusammenfassung, Angebot) der
+    // Ablauf gestartet wurde. state.summaryKaltakquise wird nämlich nur beim Einstieg über die
+    // Kachel "Kundenbesuch" gesetzt, state.newCustomer dagegen bei jedem "Neukunde"-Wahl.
+    const isNeukundeKontakt = !!state.newCustomer && (value === 'den Termin' || value === 'das freundliche Telefonat');
     if (state.summaryPurpose === 'crm') {
       sendQuickCrmEntry();
-      const isKaltakquiseKontakt = state.summaryKaltakquise && (value === 'den Termin' || value === 'das freundliche Telefonat');
-      state.summaryStep = isKaltakquiseKontakt ? 'kaltakquiseEmailAsk' : 'kundeask';
+      state.summaryStep = isNeukundeKontakt ? 'kaltakquiseEmailAsk' : 'kundeask';
+    } else if (isNeukundeKontakt) {
+      // Die Kaltakquise-Mail deckt bei markierten Produkten deren Zusammenfassung bereits mit
+      // ab (siehe buildKaltakquiseNachfassEmail) — kein zusätzlicher, separater Versand der
+      // normalen Kundenzusammenfassung nötig.
+      state.summaryStep = 'kaltakquiseEmailAsk';
     } else {
       state.summarySent = true;
       sendCustomerSummaryEmail();
