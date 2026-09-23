@@ -429,6 +429,7 @@ const state = {
   crmFollowUpWanted: null, crmFollowUpDate: '',
   summarySalutation: localStorage.getItem('summarySalutation') || 'Herr',
   summaryOccasion: localStorage.getItem('summaryOccasion') || SUMMARY_OCCASIONS[0].value,
+  summaryKontaktHatte: null,
   summaryIncludePrices: localStorage.getItem('summaryIncludePrices') === 'true',
   summaryQuery: '',
   talkProduct: '', talkSituation: 'Kurzvorstellung',
@@ -1583,7 +1584,7 @@ function closeAnyModal(){
   state.summaryKaltakquise = false;
   state.summaryKundenbesuch = false;
   state.newCustomer = null;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null;
   render();
 }
 function startSummaryFlow(){
@@ -1597,7 +1598,7 @@ function startSummaryFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null;
 }
 // Einstieg über die Kachel "Kundenbesuch": fragt zuerst, ob es sich um einen Bestandskunden
 // oder eine Kaltakquise handelt (state.summaryKundenbesuch markiert diesen Einstiegsweg für den
@@ -1614,7 +1615,7 @@ function startKundenbesuchFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null;
 }
 // Einstieg über die Kachel "Angebot anfragen": nutzt die im Gespräch bereits mit ★ markierten
 // Produkte und führt direkt in die Angebotsanfrage an den Innendienst — ohne die übrigen
@@ -1633,7 +1634,7 @@ function startAngebotFlow(){
   state.newCustomer = null;
   state.summaryPendingRecipient = null;
   state.summarySent = false;
-  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
+  state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null;
 }
 function newCustomerDraftDefault(){
   return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
@@ -2677,6 +2678,21 @@ function occasionPromptModal() {
       </div>
     </div>`;
   }
+  if (state.summaryStep === 'kaltakquiseKontaktAsk') {
+    const wasVorOrt = state.summaryOccasion === 'den Termin';
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Kaltakquise</span>
+        <h2>Hatten Sie persönlichen Kontakt mit dem Ansprechpartner?</h2>
+        <p>Davon hängt ab, wie die Nachfass-E-Mail formuliert wird — je nachdem, ob ${wasVorOrt ? 'das Gespräch vor Ort stattgefunden hat' : 'Sie ihn/sie am Telefon erreicht haben'} oder nicht.</p>
+        <div class="modal-choices">
+          <button class="modal-choice" data-kaltakquise-kontakt="ja">${icon('talk')}<span>Ja, ${wasVorOrt ? 'Gespräch fand statt' : 'ich habe ihn/sie erreicht'}</span></button>
+          <button class="modal-choice" data-kaltakquise-kontakt="nein">${icon('pm')}<span>Nein, nicht persönlich erreicht</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
   if (state.summaryStep === 'kaltakquiseEmailAsk') {
     const entries = favoriteEntries();
     return `<div class="modal-overlay">
@@ -2684,9 +2700,9 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">${newCustomerContact() ? 'Vorletzter Schritt' : 'Letzter Schritt'}</span>
         <h2>Kaltakquise-Nachfass-E-Mail senden?</h2>
-        <p>${entries.length
-          ? 'Dokumentiert den Kontaktversuch und fasst die bereits markierten Produkte kurz zusammen — mit Aufforderung, einen Termin zu vereinbaren.'
-          : 'Auch ohne markierte Produkte sinnvoll: dokumentiert den Kontaktversuch und bittet aktiv um einen Termin — z. B. wenn der Ansprechpartner nicht persönlich angetroffen wurde.'}</p>
+        <p>${state.summaryKontaktHatte === 'ja'
+          ? 'Knüpft an das Gespräch an und lädt zwanglos zu einem Termin in den kommenden Tagen/Wochen ein.'
+          : 'Dokumentiert freundlich den Kontaktversuch und weckt Interesse an einem Austausch über Neuheiten — mit sanfter Einladung zu einem Termin.'}${entries.length ? ' Bereits markierte Produkte werden kurz ergänzt.' : ''}</p>
         ${sendToHint(kaltakquiseNachfassRecipient())}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="kaltakquise-email-no">Nein, fertig</button>
@@ -3125,15 +3141,26 @@ function buildKaltakquiseNachfassEmail(){
   const salutationName = ansprechpartner || state.summaryCustomer.trim();
   const salutation = salutationName ? `Hallo ${state.summarySalutation} ${salutationName}` : 'Hallo';
   const wasVorOrt = state.summaryOccasion === 'den Termin';
-  const versuchSatz = wasVorOrt
-    ? 'ich war soeben bei Ihnen vor Ort, konnte Sie dabei aber leider nicht persönlich antreffen.'
-    : 'ich habe eben versucht, Sie telefonisch zu erreichen, Sie dabei aber leider nicht persönlich erreicht.';
+  const kontaktHatte = state.summaryKontaktHatte === 'ja';
   const rep = currentRepUser();
   const kontaktLines = [state.repName, rep && rep.telefon ? `Telefon: ${rep.telefon}` : '', myOwnEmail() ? `E-Mail: ${myOwnEmail()}` : ''].filter(Boolean);
 
-  const lines = [`${salutation},`, '', versuchSatz, ''];
+  // Bewusst zurückhaltend statt verkaufsfördernd formuliert — Ziel ist ein Termin in den
+  // kommenden Tagen/Wochen, nicht ein sofortiger Abschluss. Beide Varianten (Kontakt bestand
+  // / nicht bestand) laufen daher auf dieselbe weiche Einladung hinaus, unterscheiden sich
+  // nur im einleitenden Satz.
+  const einleitung = kontaktHatte
+    ? (wasVorOrt ? 'vielen Dank für das nette Gespräch eben vor Ort.' : 'vielen Dank für das freundliche Telefonat eben.')
+    : (wasVorOrt
+        ? 'ich war eben bei Ihnen vor Ort, konnte Sie dabei aber leider nicht persönlich antreffen.'
+        : 'ich habe eben versucht, Sie telefonisch zu erreichen, konnte Sie dabei aber leider nicht persönlich erreichen.');
+  const austauschSatz = kontaktHatte
+    ? 'Gerne bleibe ich mit Ihnen im Austausch und würde mich freuen, in den kommenden Tagen oder Wochen einmal in Ruhe über aktuelle Neuheiten aus unserem Sortiment zu sprechen, die für Ihren Alltag interessant sein könnten.'
+    : 'Gerne würde ich mich zu einem späteren Zeitpunkt mit Ihnen über aktuelle Neuheiten austauschen, die für Ihren Alltag interessant sein könnten.';
+
+  const lines = [`${salutation},`, '', einleitung, '', austauschSatz, ''];
   if (entries.length) {
-    lines.push('Da Sie sich bereits für folgende Produkte von Dr. Schumacher interessiert haben, fasse ich sie Ihnen gerne kurz zusammen:', '');
+    lines.push('Konkret hatten Sie bereits Interesse an folgenden Produkten von Dr. Schumacher gezeigt:', '');
     entries.forEach(({product: p, size}) => {
       lines.push(`▸ ${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
       const facts = productFacts(p);
@@ -3142,17 +3169,17 @@ function buildKaltakquiseNachfassEmail(){
     });
   }
   lines.push(
-    'Gerne würde ich mit Ihnen einen Termin vereinbaren, um Ihren Bedarf in Ruhe zu besprechen und die passenden Lösungen für Sie vorzustellen.',
-    '',
-    'Über eine kurze Rückmeldung per E-Mail oder telefonisch würde ich mich sehr freuen – lassen Sie uns gerne zeitnah einen Termin finden!',
+    'Vielleicht ergibt sich in den kommenden Tagen oder Wochen ein passender Moment für einen kurzen Termin. Über eine Rückmeldung per E-Mail oder telefonisch, wann es Ihnen am besten passt, würde ich mich freuen.',
     ''
   );
   if (kontaktLines.length) lines.push('Meine Kontaktdaten:', ...kontaktLines, '');
   lines.push('Mit freundlichen Grüßen' + (state.repName ? ', ' + state.repName : ''));
 
-  const subject = wasVorOrt
-    ? 'Kurz bei Ihnen vorbeigeschaut – lassen Sie uns einen Termin vereinbaren (Dr. Schumacher)'
-    : 'Eben versucht Sie zu erreichen – lassen Sie uns einen Termin vereinbaren (Dr. Schumacher)';
+  const subject = kontaktHatte
+    ? 'Vielen Dank für das Gespräch – gerne im Austausch bleiben (Dr. Schumacher)'
+    : (wasVorOrt
+        ? 'Kurz bei Ihnen vorbeigeschaut (Dr. Schumacher)'
+        : 'Eben versucht Sie zu erreichen (Dr. Schumacher)');
   return {subject, body: lines.join('\n')};
 }
 function kaltakquiseNachfassRecipient(){
@@ -4591,12 +4618,12 @@ function bind() {
     const isNeukundeKontakt = !!state.newCustomer && (value === 'den Termin' || value === 'das freundliche Telefonat');
     if (state.summaryPurpose === 'crm') {
       sendQuickCrmEntry();
-      state.summaryStep = isNeukundeKontakt ? 'kaltakquiseEmailAsk' : 'kundeask';
+      state.summaryStep = isNeukundeKontakt ? 'kaltakquiseKontaktAsk' : 'kundeask';
     } else if (isNeukundeKontakt) {
       // Die Kaltakquise-Mail deckt bei markierten Produkten deren Zusammenfassung bereits mit
       // ab (siehe buildKaltakquiseNachfassEmail) — kein zusätzlicher, separater Versand der
       // normalen Kundenzusammenfassung nötig.
-      state.summaryStep = 'kaltakquiseEmailAsk';
+      state.summaryStep = 'kaltakquiseKontaktAsk';
     } else {
       state.summarySent = true;
       sendCustomerSummaryEmail();
@@ -4623,6 +4650,11 @@ function bind() {
     state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask';
     render();
   });
+  document.querySelectorAll('[data-kaltakquise-kontakt]').forEach(button => button.addEventListener('click', () => {
+    state.summaryKontaktHatte = button.dataset.kaltakquiseKontakt;
+    state.summaryStep = 'kaltakquiseEmailAsk';
+    render();
+  }));
   $('[data-action="kaltakquise-email-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
   $('[data-action="kaltakquise-email-yes"]')?.addEventListener('click', () => {
     sendKaltakquiseNachfassEmail();
@@ -4895,7 +4927,7 @@ function bind() {
     } else if (action === 'kunde') {
       sendCustomerSummaryEmail();
     } else if (action === 'angebot') {
-      state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null;
+      state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null;
       state.summaryPurpose = 'angebot';
       state.screen = 'summary';
       state.summaryStep = 'angebotOptionen';
