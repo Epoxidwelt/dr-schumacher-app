@@ -460,6 +460,7 @@ const state = {
   crmWettbewerber: [], crmWettbewerberCustomOpen: false, crmWettbewerberCustomText: '',
   crmFeedback: '', crmFeedbackSelected: [], crmSamples: 'Keine', crmResult: 'Offen',
   crmFollowUpWanted: null, crmFollowUpDate: '',
+  crmVertragBisWanted: null, crmVertragBisDate: '',
   summarySalutation: localStorage.getItem('summarySalutation') || 'Herr',
   summaryOccasion: localStorage.getItem('summaryOccasion') || SUMMARY_OCCASIONS[0].value,
   summaryKontaktHatte: null,
@@ -1748,7 +1749,8 @@ function newCustomerSave(){
     musterWanted: !!state.musterWanted, musterListe: computeMusterListe(entries),
     wettbewerber: [...(state.crmWettbewerber || []), (state.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
     feedback: (state.crmFeedback || '').trim(), samples: state.crmSamples || 'Keine', result: state.crmResult || 'Offen',
-    nextFollowUp: (state.crmFollowUpWanted && state.crmFollowUpDate) ? state.crmFollowUpDate : null
+    nextFollowUp: (state.crmFollowUpWanted && state.crmFollowUpDate) ? state.crmFollowUpDate : null,
+    vertragBis: (state.crmVertragBisWanted && state.crmVertragBisDate) ? state.crmVertragBisDate : null
   };
   if (existing){
     Object.assign(existing, fields);
@@ -2728,6 +2730,14 @@ function occasionPromptModal() {
           ${state.crmWettbewerberCustomOpen ? `<label class="modal-field"><input id="ergebnisWettbewerberCustom" type="text" placeholder="Weiterer Hersteller / Produktname" value="${escapeHtml(state.crmWettbewerberCustomText || '')}"></label>` : ''}
         </div>
         <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Vertragslaufzeit beim aktuellen Anbieter bekannt? (optional)</span>
+          <div class="notiz-baustein-chips">
+            <button type="button" class="notiz-chip ${state.crmVertragBisWanted===false?'active':''}" data-vertragbis-wanted="nein">Nein / unbekannt</button>
+            <button type="button" class="notiz-chip ${state.crmVertragBisWanted===true?'active':''}" data-vertragbis-wanted="ja">Ja</button>
+          </div>
+          ${state.crmVertragBisWanted ? `<label class="modal-field"><span class="ergebnis-sublabel">Vertrag läuft bis</span><input id="ergebnisVertragBisDate" type="date" value="${escapeHtml(state.crmVertragBisDate || '')}"></label>` : ''}
+        </div>
+        <div class="ergebnis-block">
           <span class="notiz-baustein-label">Feedback / Bedarf</span>
           <div class="notiz-baustein-chips">${ERGEBNIS_FEEDBACK_BAUSTEINE.map((text,i) => `<button type="button" class="notiz-chip ${(state.crmFeedbackSelected||[]).includes(i)?'active':''}" data-feedback-idx="${i}">${escapeHtml(text)}</button>`).join('')}</div>
           <label class="modal-field"><textarea id="ergebnisFeedback" rows="2" placeholder="Eigener Text (optional)">${escapeHtml(state.crmFeedback || '')}</textarea></label>
@@ -2753,7 +2763,7 @@ function occasionPromptModal() {
         </div>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-notiz">Zurück</button>
-          <button class="primary-button compact" data-action="ergebnis-weiter" ${followUpWanted && !state.crmFollowUpDate ? 'disabled':''}>Weiter</button>
+          <button class="primary-button compact" data-action="ergebnis-weiter" ${(followUpWanted && !state.crmFollowUpDate) || (state.crmVertragBisWanted && !state.crmVertragBisDate) ? 'disabled':''}>Weiter</button>
         </div>
       </div>
     </div>`;
@@ -4065,6 +4075,7 @@ function buildCrmSummary(report = state.visitReport) {
       `Besprochene Produkte: ${report.produkteText || '-'}`,
       `Gesprächsnotiz: ${report.notiz || '-'}`,
       `Aktueller Wettbewerber: ${report.wettbewerber || '-'}`,
+      `Vertragslaufzeit beim aktuellen Anbieter: ${report.vertragBis ? new Date(report.vertragBis+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
       `Feedback / Bedarf: ${report.feedback || '-'}`,
       `Muster / Unterlagen: ${report.samples || 'Keine'}`,
       `Ergebnis: ${report.result || 'Offen'}`,
@@ -4087,6 +4098,7 @@ function buildCrmSummary(report = state.visitReport) {
     `Besprochene Produkte: ${report.products || '-'}`,
     `Gesprächsnotiz: ${report.notiz || '-'}`,
     `Aktueller Wettbewerber: ${report.wettbewerber || '-'}`,
+    `Vertragslaufzeit beim aktuellen Anbieter: ${report.vertragBis ? new Date(report.vertragBis+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
     `Feedback und Bedarf: ${report.feedback || '-'}`,
     `Muster / Unterlagen: ${report.samples || 'Keine'}`,
     `Ergebnis: ${report.result || 'Offen'}`,
@@ -4116,7 +4128,7 @@ function buildQuickCrmEntry(){
       notiz: c.notiz || '', herkunft: c.herkunft || '',
       musterWanted: !!c.musterWanted, musterListe: c.musterListe || [],
       wettbewerber: c.wettbewerber || '',
-      feedback: c.feedback || '', samples: c.samples || 'Keine', result: c.result || 'Offen', followUp: c.nextFollowUp || '',
+      feedback: c.feedback || '', samples: c.samples || 'Keine', result: c.result || 'Offen', followUp: c.nextFollowUp || '', vertragBis: c.vertragBis || '',
       date: oneToday(), type: state.summaryOccasion.trim() || 'Produktvorstellung',
       nextSteps: '', owner: state.repName || '-'
     };
@@ -4136,6 +4148,7 @@ function buildQuickCrmEntry(){
     wettbewerber: [...(state.crmWettbewerber || []), (state.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
     feedback: (state.crmFeedback || '').trim(), samples: state.crmSamples || 'Keine', result: state.crmResult || 'Offen',
     followUp: (state.crmFollowUpWanted && state.crmFollowUpDate) ? state.crmFollowUpDate : '',
+    vertragBis: (state.crmVertragBisWanted && state.crmVertragBisDate) ? state.crmVertragBisDate : '',
     owner: state.repName || '-'
   };
 }
@@ -4772,6 +4785,16 @@ function bind() {
   }));
   $('#ergebnisFollowUpDate')?.addEventListener('input', e => {
     state.crmFollowUpDate = e.target.value;
+    const weiterBtn = $('[data-action="ergebnis-weiter"]');
+    if (weiterBtn) weiterBtn.disabled = !e.target.value;
+  });
+  document.querySelectorAll('[data-vertragbis-wanted]').forEach(btn => btn.addEventListener('click', () => {
+    state.crmVertragBisWanted = btn.dataset.vertragbisWanted === 'ja';
+    if (!state.crmVertragBisWanted) state.crmVertragBisDate = '';
+    render();
+  }));
+  $('#ergebnisVertragBisDate')?.addEventListener('input', e => {
+    state.crmVertragBisDate = e.target.value;
     const weiterBtn = $('[data-action="ergebnis-weiter"]');
     if (weiterBtn) weiterBtn.disabled = !e.target.value;
   });
@@ -5426,6 +5449,7 @@ function resetCustomerData() {
   state.crmWettbewerber = []; state.crmWettbewerberCustomOpen = false; state.crmWettbewerberCustomText = '';
   state.crmFeedback = ''; state.crmFeedbackSelected = []; state.crmSamples = 'Keine'; state.crmResult = 'Offen';
   state.crmFollowUpWanted = null; state.crmFollowUpDate = '';
+  state.crmVertragBisWanted = null; state.crmVertragBisDate = '';
   state.quoteCustomer = '';
   state.quoteContact = '';
   state.quoteNote = '';
