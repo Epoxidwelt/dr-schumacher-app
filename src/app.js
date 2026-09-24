@@ -1895,6 +1895,62 @@ const KONZEPTE = [
           { ort: 'Dosierhilfen', produkte: ['DOSIERHILFEN'] },
           { ort: 'Vliestuchspendersysteme', produkte: ['ONE SYSTEM BASIC','ONE SYSTEM PLUS','ECO WIPES TÜCHER'] }
         ]
+      },
+      { name: 'Sanitäterraum (EKG, Blutdruckmanschetten)',
+        routine: [
+          { ort: 'Medizinprodukte (z. B. EKG-Kabel, Blutdruckmanschetten, Stethoskop)', produkte: ['DESCODERM PADS'] },
+          { ort: 'Arbeitsflächen & Bedienoberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® MED'] }
+        ],
+        ausbruch: [
+          { ort: 'Oberflächen', produkte: ['ULTRASOL OXY® WIPES'] }
+        ]
+      },
+      { name: 'Leitstelle',
+        routine: [
+          { ort: 'Bedienpulte, Tastaturen & Telefone', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® GEL'] }
+        ]
+      },
+      { name: 'Messgeräte (z. B. Gaswarngeräte)',
+        hinweis: 'Herstellerangaben des jeweiligen Messgeräte-Herstellers zur Materialverträglichkeit beachten.',
+        routine: [
+          { ort: 'Gehäuse & Bedienoberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] }
+        ]
+      },
+      { name: 'Atemschutzwerkstatt',
+        hinweis: 'Die Aufbereitung der Atemschutzmasken/-geräte selbst erfolgt nach den Vorgaben des jeweiligen Atemschutz-Herstellers – die genannten Produkte gelten für Werkbank und Oberflächen.',
+        routine: [
+          { ort: 'Werkbank & Bedienoberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® MED'] }
+        ]
+      },
+      { name: 'Schlauchwerkstatt',
+        hinweis: 'Die Innenreinigung/-desinfektion der Schläuche selbst erfolgt nach Herstellervorgaben – die genannten Produkte gelten für Werkstattoberflächen.',
+        routine: [
+          { ort: 'Werkbank & Oberflächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Händedesinfektion', produkte: ['ASEPTOMAN® MED'] }
+        ]
+      },
+      { name: 'Fitnessraum',
+        routine: [
+          { ort: 'Trainingsgeräte, Matten & Griffe', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Spender', produkte: ['ASEPTOMAN® MED','ASEPTOMAN® PLUS'] }
+        ]
+      },
+      { name: 'Küche',
+        routine: [
+          { ort: 'Arbeitsflächen & Geräte (lebensmittelgeeignet)', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] },
+          { ort: 'Handwaschplatz', produkte: ['ASEPTOMAN® MED','DESCOLIND PURE WASH'] }
+        ]
+      },
+      { name: 'Schlafraum',
+        routine: [
+          { ort: 'Oberflächen & bettnahe Flächen', produkte: ['DESCOSEPT SENSITIVE WIPES'] },
+          { ort: 'Fußboden', produkte: ['OPTISAL® PLUS'] }
+        ]
       }
     ]
   },
