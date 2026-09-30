@@ -441,6 +441,8 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
+  acq: {firma:'', ansprechpartner:'', adresse:'', telefon:'', email:'', step:'kontakt', history:[], gespraech:null, erreicht:null, ansprechpartnerName:'', produkteBesprochen:null, besprochenIds:[], produktSuche:'', interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], terminVorschlagen:null, termine:['','',''], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null},
+  savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]'),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
@@ -665,6 +667,7 @@ function render() {
   if (state.screen === 'kol') html = header(true) + kolScreen() + bottomNav('home');
   if (state.screen === 'konzepte') html = header(true) + konzepteScreen() + bottomNav('home');
   if (state.screen === 'ideenschmiede') html = header(true) + ideenschmiedeScreen() + bottomNav('home');
+  if (state.screen === 'akquise') html = header(true) + acqScreen() + bottomNav('home');
   if (state.screen === 'konzept') html = header(true) + konzeptScreen() + bottomNav('home');
   if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
   if (state.summaryStep) html += occasionPromptModal();
@@ -853,11 +856,12 @@ function menuScreen() {
     ['kol','KOL – Key Opinion Leader','Referenzkunden je Produkt finden – unabhängig vom eigenen Gebiet'],
     ['konzepte','Konzepte','Branchenkonzepte mit den passenden Produkten je Bereich – z. B. Rettungsdienst oder Pflege'],
     ['ideenschmiede','Ideenschmiede','Verbesserungsvorschläge und neue Produktideen direkt an den Innendienst'],
+    ['akquise','Kaltakquise','Erstkontakt in wenigen Fragen erfassen und passende E-Mail erstellen'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','offer','angebot','summary','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
+  if (!can('sales')) cards = cards.filter(card => !['compare','offer','angebot','summary','kundenbesuch','meinekontakte','smartmailing','akquise'].includes(card[0]));
   if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = orderedToolCards(cards.filter(c => !coreKeys.includes(c[0])));
@@ -1576,6 +1580,324 @@ function ideenschmiedeScreen() {
       <label class="modal-field wide"><textarea id="ideaText" rows="6" placeholder="Was ist die Idee? Was würde sich dadurch verbessern?">${escapeHtml(idea.text)}</textarea></label>
       <button type="button" class="primary-button compact" data-action="idea-senden" ${idea.text.trim() && (idea.kategorie !== '__sonstiges__' || idea.kategorieSonstiges.trim()) ? '' : 'disabled'}>${icon('talk')}<span>${idea.editingId ? 'Aktualisierte Idee senden' : 'Idee an Innendienst senden'}</span></button>
     </section>
+  </main>`;
+}
+
+// Kaltakquise-Kachel: eigenständiger, geführter Ablauf für einen frischen Erstkontakt
+// (Kontaktdaten optional, verzweigter Frage-Ablauf, situationsabhängige E-Mail-Vorlage,
+// editierbare Vorschau, kein automatischer Versand). Bewusst getrennt vom Kaltakquise-Teil
+// im Kundenzusammenfassung-Assistenten (state.summaryKaltakquise), der auf einen bereits
+// angelegten Neukunden-Datensatz aufbaut — hier gibt es noch keinen CRM-Eintrag.
+function acqProductName(id) { return (PRODUCTS.find(p => p.id === id) || {}).name || id; }
+function acqFormatTermin(value) {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+function acqReset() {
+  state.acq = {
+    firma:'', ansprechpartner:'', adresse:'', telefon:'', email:'',
+    step:'kontakt', history:[],
+    gespraech:null, erreicht:null, ansprechpartnerName:'',
+    produkteBesprochen:null, besprochenIds:[], produktSuche:'',
+    interesse:null, interesseIds:[],
+    musterHinterlassen:null, musterEintraege:[], musterSuche:'',
+    infoGewuenscht:null, infoIds:[],
+    terminVorschlagen:null, termine:['','',''],
+    previewTo:'', previewSubject:'', previewBody:'', previewTouched:false,
+    sentOk:false, editingId:null
+  };
+}
+function acqGo(next) { state.acq.history.push(state.acq.step); state.acq.step = next; }
+function acqBack() {
+  const a = state.acq;
+  if (a.step === 'vorschau' && a.editingId && !a.history.length) { acqReset(); return; }
+  const prev = a.history.pop();
+  if (prev) a.step = prev;
+}
+function acqNextStepFor(field, value) {
+  const a = state.acq;
+  if (field === 'gespraech') return value === 'ja' ? 'erreicht' : 'muster';
+  if (field === 'erreicht') return 'produkte';
+  if (field === 'produkteBesprochen') return value === 'ja' ? 'produkteAuswahl' : 'muster';
+  if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : 'muster';
+  if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((a.besprochenIds.length || a.interesseIds.length) ? 'info' : 'termin');
+  if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : 'termin';
+  if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'vorschau';
+  return 'vorschau';
+}
+function acqEnterVorschau() {
+  const a = state.acq;
+  acqGo('vorschau');
+  if (!a.previewTouched) {
+    const {subject, body} = buildAcqEmail();
+    a.previewSubject = subject;
+    a.previewBody = body;
+  }
+  if (!a.previewTo) a.previewTo = a.email || '';
+}
+function acqAdvance(field) {
+  const next = acqNextStepFor(field, state.acq[field]);
+  if (next === 'vorschau') acqEnterVorschau(); else acqGo(next);
+}
+function acqToggle(field, id) {
+  const list = state.acq[field];
+  state.acq[field] = list.includes(id) ? list.filter(x => x !== id) : [...list, id];
+}
+function acqMusterToggle(id) {
+  const entries = state.acq.musterEintraege;
+  state.acq.musterEintraege = entries.some(m => m.id === id) ? entries.filter(m => m.id !== id) : [...entries, {id, anzahl:1}];
+}
+// Baut die E-Mail ausschließlich aus bestätigten Angaben (keine erfundenen Gesprächsinhalte
+// oder Termine) — Reihenfolge der Abschluss-Frage folgt der Priorität Termin > Muster >
+// Information > Kontaktanbahnung/kein Interesse, wie im Konzept vorgegeben.
+function buildAcqEmail() {
+  const a = state.acq;
+  const gespraech = a.gespraech === 'ja';
+  const erreicht = gespraech && a.erreicht === 'ja';
+  const name = erreicht ? (a.ansprechpartnerName || '').trim() : '';
+  const besprochen = a.produkteBesprochen === 'ja' ? a.besprochenIds.map(acqProductName) : [];
+  const interesseListe = a.interesse === 'ja' ? a.interesseIds.map(acqProductName) : [];
+  const keinInteresse = a.produkteBesprochen === 'ja' && a.interesse === 'nein' && besprochen.length;
+  const musterListe = a.musterHinterlassen === 'ja' ? a.musterEintraege.filter(m => m.id) : [];
+  const infoListe = a.infoGewuenscht === 'ja' ? a.infoIds.map(acqProductName) : [];
+  const termine = a.terminVorschlagen === 'ja' ? a.termine.filter(t => t && t.trim()) : [];
+
+  const anrede = name ? `Guten Tag ${name},` : 'Guten Tag,';
+  const body = [];
+  let subject = 'Rückmeldung zu unserem Kontakt';
+
+  if (!gespraech || !erreicht) {
+    body.push('ich möchte Ihnen gerne das für Ihren Betrieb passende Angebot von Dr. Schumacher vorstellen.');
+    body.push(gespraech ? 'Ein persönliches Gespräch mit dem zuständigen Ansprechpartner ist dabei bisher noch nicht zustande gekommen.' : 'Ein persönliches Gespräch ist bisher noch nicht zustande gekommen.');
+    subject = 'Der richtige Kontakt für eine kurze Vorstellung';
+  } else {
+    body.push('vielen Dank für das kurze Gespräch.');
+    if (!besprochen.length) {
+      body.push('Konkrete Produkte haben wir noch nicht besprochen. Deshalb möchte ich zunächst erfahren, welche Themen und Anforderungen für Ihren Betrieb aktuell relevant sind.');
+      subject = 'Anknüpfend an unser kurzes Gespräch';
+    }
+  }
+
+  if (besprochen.length) {
+    if (interesseListe.length) {
+      body.push('', `bei unserem Gespräch haben wir über ${interesseListe.join(', ')} gesprochen. Ihr Interesse daran greife ich gerne auf und würde mit Ihnen klären, wie das Produkt zu Ihren Anforderungen passt.`);
+      subject = `Ihr Interesse an ${interesseListe.join(', ')}`;
+    } else if (keinInteresse) {
+      body.push('', `vielen Dank für Ihre offene Rückmeldung zu ${besprochen.join(', ')}. Aktuell besteht daran kein Interesse.`);
+      subject = 'Rückmeldung zu unserem Austausch';
+    }
+  }
+
+  if (musterListe.length) {
+    body.push('', 'bei meinem Besuch habe ich folgende Muster für Sie hinterlassen:', '');
+    musterListe.forEach(m => body.push(`- ${acqProductName(m.id)}${m.anzahl ? ` (${m.anzahl} Stück)` : ''}`));
+    body.push('', 'Ich freue mich über Ihre Rückmeldung, sobald Sie Gelegenheit hatten, die Muster auszuprobieren.');
+    if (!termine.length) subject = 'Ihre Rückmeldung zu den übergebenen Mustern';
+  }
+
+  if (infoListe.length) {
+    body.push('', `Gerne stelle ich Ihnen weitere Informationen zu ${infoListe.join(', ')} zusammen.`);
+  }
+
+  body.push('');
+  if (termine.length) {
+    body.push('Passt Ihnen einer der folgenden Termine für ein vertiefendes Gespräch?', '');
+    termine.forEach(t => body.push(`- ${acqFormatTermin(t)}`));
+    body.push('', 'Falls keiner davon passt, nennen Sie mir gerne eine Alternative.');
+  } else if (musterListe.length) {
+    body.push('Wie fällt Ihr erster Eindruck aus, und welche Fragen sind dabei entstanden?');
+  } else if (infoListe.length) {
+    body.push('Lassen Sie mich gerne wissen, welche Angaben dafür besonders wichtig für Sie sind.');
+  } else if (!gespraech || !erreicht) {
+    body.push('Wer ist bei Ihnen der passende Ansprechpartner für dieses Thema?');
+  } else if (keinInteresse) {
+    body.push('Gibt es stattdessen ein anderes Thema aus unserem Angebot, zu dem Informationen für Sie hilfreich wären?');
+  } else if (!besprochen.length) {
+    body.push('Bei welchem Thema wünschen Sie sich weitere Informationen oder Unterstützung?');
+  } else {
+    body.push('Über eine kurze Rückmeldung von Ihnen würde ich mich freuen.');
+  }
+
+  body.push('', 'Freundliche Grüße', state.repName || '[Absender]');
+  return { subject, body: [anrede, '', ...body].join('\n') };
+}
+function acqSaveToHistory() {
+  const a = state.acq;
+  const now = new Date().toISOString();
+  const entry = { firma: a.firma, ansprechpartner: a.ansprechpartner || a.ansprechpartnerName, email: a.previewTo, subject: a.previewSubject, body: a.previewBody, updatedAt: now };
+  const idx = a.editingId ? state.savedAcq.findIndex(i => i.id === a.editingId) : -1;
+  if (idx > -1) {
+    state.savedAcq[idx] = {...state.savedAcq[idx], ...entry};
+  } else {
+    const id = 'acq' + Date.now().toString(36);
+    a.editingId = id;
+    state.savedAcq = [{id, ...entry, createdAt: now}, ...state.savedAcq].slice(0, 50);
+  }
+  localStorage.setItem('savedAcq', JSON.stringify(state.savedAcq));
+}
+function sendAcqEmail() {
+  const a = state.acq;
+  if (!a.previewTo.trim()) return;
+  openMailto(a.previewSubject, a.previewBody, a.previewTo.trim());
+  acqSaveToHistory();
+  a.sentOk = true;
+}
+function acqLoadForEdit(id) {
+  const saved = state.savedAcq.find(i => i.id === id);
+  if (!saved) return;
+  acqReset();
+  state.acq.firma = saved.firma || '';
+  state.acq.previewTo = saved.email || '';
+  state.acq.previewSubject = saved.subject || '';
+  state.acq.previewBody = saved.body || '';
+  state.acq.previewTouched = true;
+  state.acq.editingId = saved.id;
+  state.acq.step = 'vorschau';
+}
+function acqDelete(id) {
+  state.savedAcq = state.savedAcq.filter(i => i.id !== id);
+  localStorage.setItem('savedAcq', JSON.stringify(state.savedAcq));
+}
+function acqHistoryListHtml() {
+  if (!state.savedAcq.length) return '';
+  return `<section class="saved-reports no-print"><h2>Meine Kaltakquise-Kontakte</h2>${state.savedAcq.slice(0,10).map(entry => `
+    <div class="saved-idea-row">
+      <button data-acq-edit="${entry.id}"><strong>${escapeHtml(entry.firma || entry.ansprechpartner || 'Ohne Namen')}</strong><small>${escapeHtml(entry.email || 'ohne E-Mail')} · ${escapeHtml((entry.subject||'').slice(0,50))}</small></button>
+      <button type="button" class="danger-link" data-acq-delete="${entry.id}" aria-label="Eintrag löschen">✕</button>
+    </div>`).join('')}</section>`;
+}
+function acqProductChips(ids, field) {
+  return `<div class="filter-row" style="flex-wrap:wrap">${ids.map(id => `<button type="button" class="filter-chip ${state.acq[field].includes(id)?'active':''}" data-acq-toggle="${field}:${id}">${escapeHtml(acqProductName(id))}</button>`).join('') || '<p class="muted-copy">Keine Produkte ausgewählt.</p>'}</div>`;
+}
+function acqProductSearchPicker(field) {
+  const a = state.acq;
+  const list = PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind}`, a.produktSuche)).slice(0,40);
+  const favIds = [...new Set(state.favorites.map(f => f.id))];
+  return `
+    <label class="search-box">${icon('search')}<input id="acqProduktSuche" value="${escapeHtml(a.produktSuche)}" placeholder="Produkt suchen"></label>
+    ${favIds.length ? `<div class="filter-row" style="flex-wrap:wrap"><span class="muted-copy" style="align-self:center">Favoriten:</span>${favIds.map(id => `<button type="button" class="filter-chip ${a[field].includes(id)?'active':''}" data-acq-toggle="${field}:${id}">${escapeHtml(acqProductName(id))}</button>`).join('')}</div>` : ''}
+    <div class="filter-row" style="flex-wrap:wrap">${list.map(p => `<button type="button" class="filter-chip ${a[field].includes(p.id)?'active':''}" data-acq-toggle="${field}:${p.id}">${escapeHtml(p.name)}</button>`).join('') || '<p class="muted-copy">Keine Produkte gefunden.</p>'}</div>`;
+}
+function acqMusterPicker() {
+  const a = state.acq;
+  const list = PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind}`, a.musterSuche)).slice(0,40);
+  const selectedIds = a.musterEintraege.map(m => m.id);
+  return `
+    <label class="search-box">${icon('search')}<input id="acqMusterSuche" value="${escapeHtml(a.musterSuche)}" placeholder="Produkt suchen"></label>
+    <div class="filter-row" style="flex-wrap:wrap">${list.map(p => `<button type="button" class="filter-chip ${selectedIds.includes(p.id)?'active':''}" data-acq-muster-toggle="${p.id}">${escapeHtml(p.name)}</button>`).join('') || '<p class="muted-copy">Keine Produkte gefunden.</p>'}</div>
+    ${a.musterEintraege.length ? `<div class="saved-reports" style="margin-top:14px">${a.musterEintraege.map(m => `<div class="saved-idea-row"><span style="flex:1;padding:10px 12px;font-weight:600">${escapeHtml(acqProductName(m.id))}</span><input type="number" min="1" style="width:70px;margin:6px" data-acq-muster-anzahl="${m.id}" value="${m.anzahl}"><button type="button" class="danger-link" data-acq-muster-remove="${m.id}" aria-label="Entfernen">✕</button></div>`).join('')}</div>` : ''}`;
+}
+function acqYesNoStep(opts) {
+  const a = state.acq;
+  const value = a[opts.field];
+  return `<main class="page advisor-page">
+    <div class="section-heading"><div><span class="eyebrow">${opts.eyebrow}</span><h1>${opts.question}</h1>${opts.sub?`<p>${opts.sub}</p>`:''}</div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+    <section class="advisor-card">
+      <div class="answer-grid wizard">
+        <button class="answer-button ${value==='ja'?'active':''}" data-acq-set="${opts.field}:ja">Ja</button>
+        <button class="answer-button ${value==='nein'?'active':''}" data-acq-set="${opts.field}:nein">Nein</button>
+      </div>
+      ${value==='ja' && opts.extra ? opts.extra(a) : ''}
+      ${value ? `<button type="button" class="primary-button compact" data-action="acq-advance" data-field="${opts.field}">${icon('phone')}<span>Weiter</span></button>` : ''}
+    </section>
+  </main>`;
+}
+function acqScreen() {
+  const a = state.acq;
+  if (a.step === 'kontakt') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Kontaktdaten (optional)</h1><p>Alle Angaben sind freiwillig — auch ohne Kontaktdaten kann eine Vorschau erstellt werden.</p></div></div>
+      <section class="advisor-card">
+        <div class="new-customer-form">
+          <div class="wide"><label for="acqFirma">Firma / Kunde</label><input id="acqFirma" data-acq-field="firma" type="text" value="${escapeHtml(a.firma)}"></div>
+          <div><label for="acqAnsprechpartner">Ansprechpartner</label><input id="acqAnsprechpartner" data-acq-field="ansprechpartner" type="text" value="${escapeHtml(a.ansprechpartner)}"></div>
+          <div><label for="acqTelefon">Telefon</label><input id="acqTelefon" data-acq-field="telefon" type="tel" value="${escapeHtml(a.telefon)}"></div>
+          <div class="wide"><label for="acqAdresse">Adresse</label><input id="acqAdresse" data-acq-field="adresse" type="text" value="${escapeHtml(a.adresse)}"></div>
+          <div class="wide"><label for="acqEmail">E-Mail-Adresse</label><input id="acqEmail" data-acq-field="email" type="email" value="${escapeHtml(a.email)}"></div>
+        </div>
+        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="kontakt" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+      </section>
+      ${acqHistoryListHtml()}
+    </main>`;
+  }
+  if (a.step === 'gespraech') return acqYesNoStep({eyebrow:'Kaltakquise', field:'gespraech', question:'Mit jemandem gesprochen?'});
+  if (a.step === 'erreicht') return acqYesNoStep({eyebrow:'Kaltakquise', field:'erreicht', question:'Zuständigen Ansprechpartner erreicht?', extra: a => `<label class="modal-field wide" style="display:block;margin:14px 0"><span class="notiz-baustein-label">Name des Ansprechpartners (optional)</span><input id="acqAnsprechpartnerName" type="text" value="${escapeHtml(a.ansprechpartnerName)}" placeholder="z. B. Herr Meier"></label>`});
+  if (a.step === 'produkte') return acqYesNoStep({eyebrow:'Kaltakquise', field:'produkteBesprochen', question:'Produkte besprochen?'});
+  if (a.step === 'produkteAuswahl') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Produkte wurden besprochen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        ${acqProductSearchPicker('besprochenIds')}
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="interesse" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
+  if (a.step === 'interesse') return acqYesNoStep({eyebrow:'Kaltakquise', field:'interesse', question:'Interesse an besprochenen Produkten vorhanden?'});
+  if (a.step === 'interesseAuswahl') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>An welchen Produkten besteht Interesse?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        ${acqProductChips(a.besprochenIds, 'interesseIds')}
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="muster" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
+  if (a.step === 'muster') return acqYesNoStep({eyebrow:'Kaltakquise', field:'musterHinterlassen', question:'Muster hinterlassen?'});
+  if (a.step === 'musterAuswahl') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Muster wurden hinterlassen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        ${acqMusterPicker()}
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${(a.besprochenIds.length||a.interesseIds.length)?'info':'termin'}" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
+  if (a.step === 'info') return acqYesNoStep({eyebrow:'Kaltakquise', field:'infoGewuenscht', question:'Weitere Informationen gewünscht?'});
+  if (a.step === 'infoAuswahl') {
+    const pool = [...new Set([...a.besprochenIds, ...a.interesseIds])];
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Zu welchen Produkten werden Informationen gewünscht?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        ${acqProductChips(pool, 'infoIds')}
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="termin" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
+  if (a.step === 'termin') return acqYesNoStep({eyebrow:'Kaltakquise', field:'terminVorschlagen', question:'Termin vorschlagen?', sub:'Bis zu drei Vorschläge, alle optional.'});
+  if (a.step === 'terminAuswahl') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Terminvorschläge</h1><p>Nur ausgefüllte Vorschläge werden in die E-Mail übernommen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        ${[0,1,2].map(i => `<label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Vorschlag ${i+1}</span><input type="datetime-local" data-acq-termin="${i}" value="${escapeHtml(a.termine[i]||'')}"></label>`).join('')}
+        <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:4px">${icon('phone')}<span>Weiter zur Vorschau</span></button>
+      </section>
+    </main>`;
+  }
+  return acqVorschauScreen();
+}
+function acqVorschauScreen() {
+  const a = state.acq;
+  if (a.sentOk) {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>E-Mail-Programm geöffnet</h1><p>Ihr E-Mail-Programm wurde mit der vorbereiteten Nachricht geöffnet — der eigentliche Versand erfolgt dort durch Sie. Der Kontakt wurde zusätzlich gespeichert.</p></div></div>
+      <section class="advisor-card"><button type="button" class="primary-button compact" data-action="acq-restart">${icon('phone')}<span>Weitere Kaltakquise erfassen</span></button></section>
+      ${acqHistoryListHtml()}
+    </main>`;
+  }
+  return `<main class="page advisor-page">
+    <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Vorschau &amp; Versand${a.editingId?' · Bearbeiten':''}</h1><p>Es erfolgt kein automatischer Versand — erst ein bewusster Klick öffnet Ihr E-Mail-Programm mit dieser Nachricht.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+    <section class="advisor-card">
+      <label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Empfänger-E-Mail</span><input id="acqPreviewTo" type="email" placeholder="kunde@beispiel.de" value="${escapeHtml(a.previewTo)}"></label>
+      <label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Betreff</span><input id="acqPreviewSubject" type="text" value="${escapeHtml(a.previewSubject)}"></label>
+      <label class="modal-field wide" style="display:block"><span class="notiz-baustein-label">Text</span><textarea id="acqPreviewBody" rows="14">${escapeHtml(a.previewBody)}</textarea></label>
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+        <button type="button" class="secondary-button compact" data-action="acq-copy">${icon('copy')}<span>Text kopieren</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-senden" ${a.previewTo.trim() ? '' : 'disabled'}>${icon('phone')}<span>${a.editingId?'Aktualisiert an E-Mail-Programm übergeben':'An E-Mail-Programm übergeben'}</span></button>
+      </div>
+      ${!a.previewTo.trim() ? `<p class="muted-copy" style="margin-top:8px">Für den Versand wird eine Empfänger-E-Mail-Adresse benötigt.</p>` : ''}
+    </section>
+    ${acqHistoryListHtml()}
   </main>`;
 }
 
@@ -4490,7 +4812,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){acqReset(); state.screen='akquise'; render(); return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
@@ -4534,6 +4856,28 @@ function bind() {
   document.querySelectorAll('[data-idea-delete]').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('Diese Idee wirklich löschen?')) { ideaDelete(button.dataset.ideaDelete); render(); } }));
   $('#ideaText')?.addEventListener('input', e => { state.idea.text = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && (state.idea.kategorie !== '__sonstiges__' || state.idea.kategorieSonstiges.trim())); });
   $('#ideaKategorieSonstiges')?.addEventListener('input', e => { state.idea.kategorieSonstiges = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && state.idea.kategorieSonstiges.trim()); });
+  document.querySelectorAll('[data-acq-field]').forEach(input => input.addEventListener('input', e => { state.acq[input.dataset.acqField] = e.target.value; }));
+  document.querySelectorAll('[data-acq-set]').forEach(button => button.onclick = () => { const [field,value] = button.dataset.acqSet.split(':'); state.acq[field] = value; render(); });
+  $('[data-action="acq-advance"]')?.addEventListener('click', (e) => { const field = e.currentTarget.dataset.field; if (field === 'kontakt') { acqGo('gespraech'); } else { acqAdvance(field); } render(); });
+  $('#acqAnsprechpartnerName')?.addEventListener('input', e => { state.acq.ansprechpartnerName = e.target.value; });
+  document.querySelectorAll('[data-acq-toggle]').forEach(button => button.onclick = () => { const [field,id] = button.dataset.acqToggle.split(':'); acqToggle(field, id); render(); });
+  $('#acqProduktSuche')?.addEventListener('input', e => { state.acq.produktSuche = e.target.value; render(); });
+  $('#acqMusterSuche')?.addEventListener('input', e => { state.acq.musterSuche = e.target.value; render(); });
+  document.querySelectorAll('[data-acq-muster-toggle]').forEach(button => button.onclick = () => { acqMusterToggle(button.dataset.acqMusterToggle); render(); });
+  document.querySelectorAll('[data-acq-muster-anzahl]').forEach(input => input.addEventListener('input', e => { const entry = state.acq.musterEintraege.find(m => m.id === input.dataset.acqMusterAnzahl); if (entry) entry.anzahl = Math.max(1, parseInt(e.target.value, 10) || 1); }));
+  document.querySelectorAll('[data-acq-muster-remove]').forEach(button => button.onclick = () => { state.acq.musterEintraege = state.acq.musterEintraege.filter(m => m.id !== button.dataset.acqMusterRemove); render(); });
+  document.querySelectorAll('[data-acq-termin]').forEach(input => input.addEventListener('input', e => { state.acq.termine[Number(input.dataset.acqTermin)] = e.target.value; }));
+  $('[data-action="acq-goto"]')?.addEventListener('click', (e) => { acqGo(e.currentTarget.dataset.step); render(); });
+  $('[data-action="acq-vorschau"]')?.addEventListener('click', () => { acqEnterVorschau(); render(); });
+  $('[data-action="acq-back"]')?.addEventListener('click', () => { acqBack(); render(); });
+  $('[data-action="acq-restart"]')?.addEventListener('click', () => { acqReset(); render(); });
+  $('#acqPreviewTo')?.addEventListener('input', e => { state.acq.previewTo = e.target.value; state.acq.previewTouched = true; const btn = $('[data-action="acq-senden"]'); if (btn) btn.disabled = !e.target.value.trim(); });
+  $('#acqPreviewSubject')?.addEventListener('input', e => { state.acq.previewSubject = e.target.value; state.acq.previewTouched = true; });
+  $('#acqPreviewBody')?.addEventListener('input', e => { state.acq.previewBody = e.target.value; state.acq.previewTouched = true; });
+  $('[data-action="acq-copy"]')?.addEventListener('click', (e) => { copyEmailText(state.acq.previewSubject, state.acq.previewBody, e.currentTarget); });
+  $('[data-action="acq-senden"]')?.addEventListener('click', () => { sendAcqEmail(); render(); });
+  document.querySelectorAll('[data-acq-edit]').forEach(button => button.addEventListener('click', () => { acqLoadForEdit(button.dataset.acqEdit); state.screen = 'akquise'; render(); }));
+  document.querySelectorAll('[data-acq-delete]').forEach(button => button.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('Diesen Kaltakquise-Kontakt wirklich löschen?')) { acqDelete(button.dataset.acqDelete); render(); } }));
   document.querySelectorAll('[data-compare]').forEach(button => button.onclick = () => toggleCompare(button.dataset.compare));
   $('[data-action="copy-pitch"]')?.addEventListener('click', async () => { const text=comparisonPitch(state.compareIds.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean)); try { await navigator.clipboard.writeText(text); alert('Text wurde kopiert.'); } catch { alert(text); } });
   $('#summaryOccasion')?.addEventListener('change', e => { state.summaryOccasion=e.target.value; localStorage.setItem('summaryOccasion', e.target.value); });
