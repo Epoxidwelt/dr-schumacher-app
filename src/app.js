@@ -441,7 +441,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', ansprechpartner:'', adresse:'', telefon:'', email:'', step:'branche', history:[], gespraech:null, erreicht:null, ansprechpartnerName:'', produkteBesprochen:null, besprochenIds:[], produktSuche:'', interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], terminVorschlagen:null, termine:['','',''], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null},
+  acq: {branche:'', firma:'', ansprechpartner:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', myPos:null, locating:false, locateError:'', step:'branche', history:[], gespraech:null, erreicht:null, produkteBesprochen:null, besprochenIds:[], produktSuche:'', interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], terminVorschlagen:null, termine:['','',''], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]'),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1596,9 +1596,10 @@ function acqFormatTermin(value) {
 }
 function acqReset() {
   state.acq = {
-    branche:'', firma:'', ansprechpartner:'', adresse:'', telefon:'', email:'',
+    branche:'', firma:'', ansprechpartner:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'',
+    myPos:null, locating:false, locateError:'',
     step:'branche', history:[],
-    gespraech:null, erreicht:null, ansprechpartnerName:'',
+    gespraech:null, erreicht:null,
     produkteBesprochen:null, besprochenIds:[], produktSuche:'',
     interesse:null, interesseIds:[],
     musterHinterlassen:null, musterEintraege:[], musterSuche:'',
@@ -1655,7 +1656,7 @@ function buildAcqEmail() {
   const a = state.acq;
   const gespraech = a.gespraech === 'ja';
   const erreicht = gespraech && a.erreicht === 'ja';
-  const name = erreicht ? (a.ansprechpartnerName || '').trim() : '';
+  const name = erreicht ? (a.ansprechpartner || '').trim() : '';
   const besprochen = a.produkteBesprochen === 'ja' ? a.besprochenIds.map(acqProductName) : [];
   const interesseListe = a.interesse === 'ja' ? a.interesseIds.map(acqProductName) : [];
   const keinInteresse = a.produkteBesprochen === 'ja' && a.interesse === 'nein' && besprochen.length;
@@ -1725,7 +1726,7 @@ function buildAcqEmail() {
 function acqSaveToHistory() {
   const a = state.acq;
   const now = new Date().toISOString();
-  const entry = { branche: a.branche, firma: a.firma, ansprechpartner: a.ansprechpartner || a.ansprechpartnerName, email: a.previewTo, subject: a.previewSubject, body: a.previewBody, updatedAt: now };
+  const entry = { branche: a.branche, firma: a.firma, ansprechpartner: a.ansprechpartner, email: a.previewTo, subject: a.previewSubject, body: a.previewBody, updatedAt: now };
   const idx = a.editingId ? state.savedAcq.findIndex(i => i.id === a.editingId) : -1;
   if (idx > -1) {
     state.savedAcq[idx] = {...state.savedAcq[idx], ...entry};
@@ -1798,8 +1799,6 @@ function acqYesNoStep(opts) {
         <button class="answer-button ${value==='ja'?'active':''}" data-acq-set="${opts.field}:ja">Ja</button>
         <button class="answer-button ${value==='nein'?'active':''}" data-acq-set="${opts.field}:nein">Nein</button>
       </div>
-      ${value==='ja' && opts.extra ? opts.extra(a) : ''}
-      ${value==='ja' && opts.extra ? `<button type="button" class="primary-button compact" data-action="acq-advance" data-field="${opts.field}">${icon('phone')}<span>Weiter</span></button>` : ''}
     </section>
   </main>`;
 }
@@ -1812,7 +1811,26 @@ function acqScreen() {
         <div class="category-grid">
           ${NEUKUNDE_BRANCHEN.map(b => `<button class="category-card akquise" data-acq-branche="${escapeHtml(b)}"><span class="category-icon">${icon('kundenbesuch')}</span><span><strong>${escapeHtml(b)}</strong></span><b>›</b></button>`).join('')}
         </div>
-        <button type="button" class="secondary-button compact" data-action="acq-goto" data-step="kontakt" style="margin-top:14px">Überspringen</button>
+        <button type="button" class="secondary-button compact" data-action="acq-goto" data-step="adresse" style="margin-top:14px">Überspringen</button>
+      </section>
+      ${acqHistoryListHtml()}
+    </main>`;
+  }
+  if (a.step === 'adresse') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Adresse (optional)</h1><p>Per Standort übernehmen oder von Hand eintragen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        <div class="wide location-actions">
+          <button type="button" class="secondary-button compact" data-action="acq-locate" ${a.locating?'disabled':''}>${icon('pin')}<span>${a.locating?'Standort wird ermittelt…':'Aktuellen Standort übernehmen'}</span></button>
+        </div>
+        ${a.locateError ? `<p class="region-login-error">${escapeHtml(a.locateError)}</p>` : ''}
+        <div class="new-customer-form">
+          <div><label for="acqStrasse">Straße</label><input id="acqStrasse" data-acq-field="strasse" type="text" value="${escapeHtml(a.strasse)}"></div>
+          <div><label for="acqHausnummer">Hausnummer</label><input id="acqHausnummer" data-acq-field="hausnummer" type="text" value="${escapeHtml(a.hausnummer)}"></div>
+          <div><label for="acqPlz">Postleitzahl</label><input id="acqPlz" data-acq-field="plz" type="text" value="${escapeHtml(a.plz)}"></div>
+          <div><label for="acqOrt">Ort</label><input id="acqOrt" data-acq-field="ort" type="text" value="${escapeHtml(a.ort)}"></div>
+        </div>
+        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="adresse" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
       </section>
       ${acqHistoryListHtml()}
     </main>`;
@@ -1825,7 +1843,6 @@ function acqScreen() {
           <div class="wide"><label for="acqFirma">Firma / Kunde</label><input id="acqFirma" data-acq-field="firma" type="text" value="${escapeHtml(a.firma)}"></div>
           <div><label for="acqAnsprechpartner">Ansprechpartner</label><input id="acqAnsprechpartner" data-acq-field="ansprechpartner" type="text" value="${escapeHtml(a.ansprechpartner)}"></div>
           <div><label for="acqTelefon">Telefon</label><input id="acqTelefon" data-acq-field="telefon" type="tel" value="${escapeHtml(a.telefon)}"></div>
-          <div class="wide"><label for="acqAdresse">Adresse</label><input id="acqAdresse" data-acq-field="adresse" type="text" value="${escapeHtml(a.adresse)}"></div>
           <div class="wide"><label for="acqEmail">E-Mail-Adresse</label><input id="acqEmail" data-acq-field="email" type="email" value="${escapeHtml(a.email)}"></div>
         </div>
         <button type="button" class="primary-button compact" data-action="acq-advance" data-field="kontakt" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
@@ -1834,7 +1851,7 @@ function acqScreen() {
     </main>`;
   }
   if (a.step === 'gespraech') return acqYesNoStep({eyebrow:'Kaltakquise', field:'gespraech', question:'Mit jemandem gesprochen?'});
-  if (a.step === 'erreicht') return acqYesNoStep({eyebrow:'Kaltakquise', field:'erreicht', question:'Zuständigen Ansprechpartner erreicht?', extra: a => `<label class="modal-field wide" style="display:block;margin:14px 0"><span class="notiz-baustein-label">Name des Ansprechpartners (optional)</span><input id="acqAnsprechpartnerName" type="text" value="${escapeHtml(a.ansprechpartnerName)}" placeholder="z. B. Herr Meier"></label>`});
+  if (a.step === 'erreicht') return acqYesNoStep({eyebrow:'Kaltakquise', field:'erreicht', question:'Zuständigen Ansprechpartner erreicht?'});
   if (a.step === 'produkte') return acqYesNoStep({eyebrow:'Kaltakquise', field:'produkteBesprochen', question:'Produkte besprochen?'});
   if (a.step === 'produkteAuswahl') {
     return `<main class="page advisor-page">
@@ -4869,17 +4886,35 @@ function bind() {
   $('#ideaText')?.addEventListener('input', e => { state.idea.text = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && (state.idea.kategorie !== '__sonstiges__' || state.idea.kategorieSonstiges.trim())); });
   $('#ideaKategorieSonstiges')?.addEventListener('input', e => { state.idea.kategorieSonstiges = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && state.idea.kategorieSonstiges.trim()); });
   document.querySelectorAll('[data-acq-field]').forEach(input => input.addEventListener('input', e => { state.acq[input.dataset.acqField] = e.target.value; }));
-  document.querySelectorAll('[data-acq-branche]').forEach(button => button.onclick = () => { state.acq.branche = button.dataset.acqBranche; acqGo('kontakt'); render(); });
-  // Ja/Nein-Fragen kommen den Anwender direkt weiter, sobald geklickt wird — nur "erreicht"
-  // zeigt bei "Ja" noch ein optionales Namensfeld, deshalb dort kein Auto-Weiter.
+  document.querySelectorAll('[data-acq-branche]').forEach(button => button.onclick = () => { state.acq.branche = button.dataset.acqBranche; acqGo('adresse'); render(); });
+  $('[data-action="acq-locate"]')?.addEventListener('click', async () => {
+    const a = state.acq;
+    a.locating = true; a.locateError = ''; render();
+    try {
+      a.myPos = await getMyLocation();
+      const addr = await reverseGeocode(a.myPos.lat, a.myPos.lng);
+      Object.assign(a, addr);
+    } catch (e) {
+      a.locateError = e.message || 'Standort konnte nicht ermittelt werden.';
+    }
+    a.locating = false;
+    render();
+  });
+  // Ja/Nein-Fragen kommen den Anwender direkt weiter, sobald geklickt wird — keine
+  // separate "Weiter"-Bestätigung mehr nötig.
   document.querySelectorAll('[data-acq-set]').forEach(button => button.onclick = () => {
     const [field,value] = button.dataset.acqSet.split(':');
     state.acq[field] = value;
-    if (!(field === 'erreicht' && value === 'ja')) acqAdvance(field);
+    acqAdvance(field);
     render();
   });
-  $('[data-action="acq-advance"]')?.addEventListener('click', (e) => { const field = e.currentTarget.dataset.field; if (field === 'kontakt') { acqGo('gespraech'); } else { acqAdvance(field); } render(); });
-  $('#acqAnsprechpartnerName')?.addEventListener('input', e => { state.acq.ansprechpartnerName = e.target.value; });
+  $('[data-action="acq-advance"]')?.addEventListener('click', (e) => {
+    const field = e.currentTarget.dataset.field;
+    if (field === 'adresse') acqGo('kontakt');
+    else if (field === 'kontakt') acqGo('gespraech');
+    else acqAdvance(field);
+    render();
+  });
   document.querySelectorAll('[data-acq-toggle]').forEach(button => button.onclick = () => { const [field,id] = button.dataset.acqToggle.split(':'); acqToggle(field, id); render(); });
   $('#acqProduktSuche')?.addEventListener('input', e => { state.acq.produktSuche = e.target.value; render(); });
   $('#acqMusterSuche')?.addEventListener('input', e => { state.acq.musterSuche = e.target.value; render(); });
