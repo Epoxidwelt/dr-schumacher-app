@@ -441,7 +441,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', ansprechpartner:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', myPos:null, locating:false, locateError:'', step:'branche', history:[], gespraech:null, erreicht:null, produkteBesprochen:null, besprochenIds:[], produktSuche:'', interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], terminVorschlagen:null, termine:['','',''], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null},
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]'),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1596,19 +1596,20 @@ function acqFormatTermin(value) {
 }
 function acqReset() {
   state.acq = {
-    branche:'', firma:'', ansprechpartner:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'',
+    branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
     myPos:null, locating:false, locateError:'',
     step:'branche', history:[],
-    gespraech:null, erreicht:null,
-    produkteBesprochen:null, besprochenIds:[], produktSuche:'',
+    gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
+    produkteBesprochen:null, produktKategorie:null,
     interesse:null, interesseIds:[],
     musterHinterlassen:null, musterEintraege:[], musterSuche:'',
-    infoGewuenscht:null, infoIds:[],
+    infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false},
     terminVorschlagen:null, termine:['','',''],
     previewTo:'', previewSubject:'', previewBody:'', previewTouched:false,
     sentOk:false, editingId:null
   };
 }
+function acqBesprocheneIds() { return [...new Set(state.favorites.map(f => f.id))]; }
 function acqGo(next) { state.acq.history.push(state.acq.step); state.acq.step = next; }
 function acqBack() {
   const a = state.acq;
@@ -1618,11 +1619,10 @@ function acqBack() {
 }
 function acqNextStepFor(field, value) {
   const a = state.acq;
-  if (field === 'gespraech') return value === 'ja' ? 'erreicht' : 'muster';
-  if (field === 'erreicht') return 'produkte';
+  if (field === 'gespraech') return value === 'ja' ? 'kontaktperson' : 'muster';
   if (field === 'produkteBesprochen') return value === 'ja' ? 'produkteAuswahl' : 'muster';
   if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : 'muster';
-  if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((a.besprochenIds.length || a.interesseIds.length) ? 'info' : 'termin');
+  if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length) ? 'info' : 'termin');
   if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : 'termin';
   if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'vorschau';
   return 'vorschau';
@@ -1655,9 +1655,8 @@ function acqMusterToggle(id) {
 function buildAcqEmail() {
   const a = state.acq;
   const gespraech = a.gespraech === 'ja';
-  const erreicht = gespraech && a.erreicht === 'ja';
-  const name = erreicht ? (a.ansprechpartner || '').trim() : '';
-  const besprochen = a.produkteBesprochen === 'ja' ? a.besprochenIds.map(acqProductName) : [];
+  const name = gespraech ? [a.vorname, a.nachname].filter(Boolean).join(' ').trim() : '';
+  const besprochen = a.produkteBesprochen === 'ja' ? acqBesprocheneIds().map(acqProductName) : [];
   const interesseListe = a.interesse === 'ja' ? a.interesseIds.map(acqProductName) : [];
   const keinInteresse = a.produkteBesprochen === 'ja' && a.interesse === 'nein' && besprochen.length;
   const musterListe = a.musterHinterlassen === 'ja' ? a.musterEintraege.filter(m => m.id) : [];
@@ -1668,9 +1667,9 @@ function buildAcqEmail() {
   const body = [];
   let subject = 'Rückmeldung zu unserem Kontakt';
 
-  if (!gespraech || !erreicht) {
+  if (!gespraech) {
     body.push('ich möchte Ihnen gerne das für Ihren Betrieb passende Angebot von Dr. Schumacher vorstellen.');
-    body.push(gespraech ? 'Ein persönliches Gespräch mit dem zuständigen Ansprechpartner ist dabei bisher noch nicht zustande gekommen.' : 'Ein persönliches Gespräch ist bisher noch nicht zustande gekommen.');
+    body.push('Ein persönliches Gespräch ist bisher noch nicht zustande gekommen.');
     subject = 'Der richtige Kontakt für eine kurze Vorstellung';
   } else {
     body.push('vielen Dank für das kurze Gespräch.');
@@ -1698,7 +1697,20 @@ function buildAcqEmail() {
   }
 
   if (infoListe.length) {
-    body.push('', `Gerne stelle ich Ihnen weitere Informationen zu ${infoListe.join(', ')} zusammen.`);
+    const docLabels = [];
+    if (a.infoDocs.pif) docLabels.push('Produktdatenblatt (PIF)');
+    if (a.infoDocs.sdb) docLabels.push('Sicherheitsdatenblatt (SDB)');
+    if (a.infoDocs.ba) docLabels.push('Betriebsanweisung (BA)');
+    body.push('', `Zu ${infoListe.join(', ')} sende ich Ihnen gerne ${docLabels.length ? docLabels.join(', ') : 'weitere Unterlagen'} zu:`, '');
+    const docLines = [];
+    a.infoIds.forEach(id => {
+      const p = PRODUCTS.find(pp => pp.id === id);
+      if (!p) return;
+      if (a.infoDocs.pif) { const u = productDocUrl(p, 'pif'); if (u) docLines.push(`- ${p.name} – Produktdatenblatt: ${u}`); }
+      if (a.infoDocs.sdb) { const u = productDocUrl(p, 'sdb'); if (u) docLines.push(`- ${p.name} – Sicherheitsdatenblatt: ${u}`); }
+      if (a.infoDocs.ba) { const u = productDocUrl(p, 'ba'); if (u) docLines.push(`- ${p.name} – Betriebsanweisung: ${u}`); }
+    });
+    body.push(...(docLines.length ? docLines : ['(Die Unterlagen ergänze ich im Anschluss.)']));
   }
 
   body.push('');
@@ -1710,7 +1722,7 @@ function buildAcqEmail() {
     body.push('Wie fällt Ihr erster Eindruck aus, und welche Fragen sind dabei entstanden?');
   } else if (infoListe.length) {
     body.push('Lassen Sie mich gerne wissen, welche Angaben dafür besonders wichtig für Sie sind.');
-  } else if (!gespraech || !erreicht) {
+  } else if (!gespraech) {
     body.push('Wer ist bei Ihnen der passende Ansprechpartner für dieses Thema?');
   } else if (keinInteresse) {
     body.push('Gibt es stattdessen ein anderes Thema aus unserem Angebot, zu dem Informationen für Sie hilfreich wären?');
@@ -1726,7 +1738,7 @@ function buildAcqEmail() {
 function acqSaveToHistory() {
   const a = state.acq;
   const now = new Date().toISOString();
-  const entry = { branche: a.branche, firma: a.firma, ansprechpartner: a.ansprechpartner, email: a.previewTo, subject: a.previewSubject, body: a.previewBody, updatedAt: now };
+  const entry = { branche: a.branche, firma: a.firma, ansprechpartner: [a.vorname, a.nachname].filter(Boolean).join(' ').trim(), email: a.previewTo, subject: a.previewSubject, body: a.previewBody, updatedAt: now };
   const idx = a.editingId ? state.savedAcq.findIndex(i => i.id === a.editingId) : -1;
   if (idx > -1) {
     state.savedAcq[idx] = {...state.savedAcq[idx], ...entry};
@@ -1771,14 +1783,17 @@ function acqHistoryListHtml() {
 function acqProductChips(ids, field) {
   return `<div class="filter-row" style="flex-wrap:wrap">${ids.map(id => `<button type="button" class="filter-chip ${state.acq[field].includes(id)?'active':''}" data-acq-toggle="${field}:${id}">${escapeHtml(acqProductName(id))}</button>`).join('') || '<p class="muted-copy">Keine Produkte ausgewählt.</p>'}</div>`;
 }
-function acqProductSearchPicker(field) {
-  const a = state.acq;
-  const list = PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind}`, a.produktSuche)).slice(0,40);
-  const favIds = [...new Set(state.favorites.map(f => f.id))];
+// Besprochene Produkte = Favoriten (★), genau wie im Hauptmenü/Kundenzusammenfassung: Kachel
+// antippen öffnet die echte Produktliste dieser Rubrik, dort markierte Produkte (★) gelten als
+// besprochen. So werden bereits vorher favorisierte Produkte automatisch übernommen.
+function acqProduktBereichPickerHtml() {
+  const entries = acqBesprocheneIds().map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+  const countByCat = {};
+  entries.forEach(p => { countByCat[p.category] = (countByCat[p.category]||0) + 1; });
   return `
-    <label class="search-box">${icon('search')}<input id="acqProduktSuche" value="${escapeHtml(a.produktSuche)}" placeholder="Produkt suchen"></label>
-    ${favIds.length ? `<div class="filter-row" style="flex-wrap:wrap"><span class="muted-copy" style="align-self:center">Favoriten:</span>${favIds.map(id => `<button type="button" class="filter-chip ${a[field].includes(id)?'active':''}" data-acq-toggle="${field}:${id}">${escapeHtml(acqProductName(id))}</button>`).join('')}</div>` : ''}
-    <div class="filter-row" style="flex-wrap:wrap">${list.map(p => `<button type="button" class="filter-chip ${a[field].includes(p.id)?'active':''}" data-acq-toggle="${field}:${p.id}">${escapeHtml(p.name)}</button>`).join('') || '<p class="muted-copy">Keine Produkte gefunden.</p>'}</div>`;
+    <p>Kachel antippen und dort die passenden Produkte markieren (★) — genau wie im Hauptmenü.</p>
+    <div class="category-grid">${PRODUKTBEREICHE.map(([key,title,sub]) => { const count = countByCat[key] || 0; return `<button type="button" class="category-card ${key} ${count?'on':''}" data-acq-produktbereich-open="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${count ? count + ' ausgewählt' : sub}</small></span><b>${count ? '✓' : '›'}</b></button>`; }).join('')}</div>
+    ${entries.length ? `<div class="produkte-picked">${entries.map(p => `<span>${escapeHtml(p.name)}</span>`).join('')}</div>` : '<p class="muted-copy">Noch keine Produkte markiert.</p>'}`;
 }
 function acqMusterPicker() {
   const a = state.acq;
@@ -1825,40 +1840,39 @@ function acqScreen() {
         </div>
         ${a.locateError ? `<p class="region-login-error">${escapeHtml(a.locateError)}</p>` : ''}
         <div class="new-customer-form">
+          <div class="wide"><label for="acqFirma">Firma / Einrichtung</label><input id="acqFirma" data-acq-field="firma" type="text" value="${escapeHtml(a.firma)}"></div>
           <div><label for="acqStrasse">Straße</label><input id="acqStrasse" data-acq-field="strasse" type="text" value="${escapeHtml(a.strasse)}"></div>
           <div><label for="acqHausnummer">Hausnummer</label><input id="acqHausnummer" data-acq-field="hausnummer" type="text" value="${escapeHtml(a.hausnummer)}"></div>
           <div><label for="acqPlz">Postleitzahl</label><input id="acqPlz" data-acq-field="plz" type="text" value="${escapeHtml(a.plz)}"></div>
           <div><label for="acqOrt">Ort</label><input id="acqOrt" data-acq-field="ort" type="text" value="${escapeHtml(a.ort)}"></div>
         </div>
-        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="adresse" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
-      </section>
-      ${acqHistoryListHtml()}
-    </main>`;
-  }
-  if (a.step === 'kontakt') {
-    return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Kontaktdaten (optional)</h1><p>Alle Angaben sind freiwillig — auch ohne Kontaktdaten kann eine Vorschau erstellt werden.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
-      <section class="advisor-card">
-        <div class="new-customer-form">
-          <div class="wide"><label for="acqFirma">Firma / Kunde</label><input id="acqFirma" data-acq-field="firma" type="text" value="${escapeHtml(a.firma)}"></div>
-          <div><label for="acqAnsprechpartner">Ansprechpartner</label><input id="acqAnsprechpartner" data-acq-field="ansprechpartner" type="text" value="${escapeHtml(a.ansprechpartner)}"></div>
-          <div><label for="acqTelefon">Telefon</label><input id="acqTelefon" data-acq-field="telefon" type="tel" value="${escapeHtml(a.telefon)}"></div>
-          <div class="wide"><label for="acqEmail">E-Mail-Adresse</label><input id="acqEmail" data-acq-field="email" type="email" value="${escapeHtml(a.email)}"></div>
-        </div>
-        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="kontakt" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="adresse" style="margin-top:14px"><span>Weiter</span></button>
       </section>
       ${acqHistoryListHtml()}
     </main>`;
   }
   if (a.step === 'gespraech') return acqYesNoStep({eyebrow:'Kaltakquise', field:'gespraech', question:'Mit jemandem gesprochen?'});
-  if (a.step === 'erreicht') return acqYesNoStep({eyebrow:'Kaltakquise', field:'erreicht', question:'Zuständigen Ansprechpartner erreicht?'});
+  if (a.step === 'kontaktperson') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Kontaktdaten der Person</h1><p>Alle Angaben sind optional.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        <div class="new-customer-form">
+          <div><label for="acqVorname">Vorname</label><input id="acqVorname" data-acq-field="vorname" type="text" value="${escapeHtml(a.vorname)}"></div>
+          <div><label for="acqNachname">Nachname</label><input id="acqNachname" data-acq-field="nachname" type="text" value="${escapeHtml(a.nachname)}"></div>
+          <div><label for="acqTelefon">Telefon</label><input id="acqTelefon" data-acq-field="telefon" type="tel" value="${escapeHtml(a.telefon)}"></div>
+          <div><label for="acqEmail">E-Mail-Adresse</label><input id="acqEmail" data-acq-field="email" type="email" value="${escapeHtml(a.email)}"></div>
+        </div>
+        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="kontaktperson" style="margin-top:14px"><span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
   if (a.step === 'produkte') return acqYesNoStep({eyebrow:'Kaltakquise', field:'produkteBesprochen', question:'Produkte besprochen?'});
   if (a.step === 'produkteAuswahl') {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Produkte wurden besprochen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
-        ${acqProductSearchPicker('besprochenIds')}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="interesse" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+        ${acqProduktBereichPickerHtml()}
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="interesse" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
@@ -1867,8 +1881,8 @@ function acqScreen() {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>An welchen Produkten besteht Interesse?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
-        ${acqProductChips(a.besprochenIds, 'interesseIds')}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="muster" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+        ${acqProductChips(acqBesprocheneIds(), 'interesseIds')}
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="muster" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
@@ -1878,18 +1892,25 @@ function acqScreen() {
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Muster wurden hinterlassen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${acqMusterPicker()}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${(a.besprochenIds.length||a.interesseIds.length)?'info':'termin'}" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${(acqBesprocheneIds().length||a.interesseIds.length)?'info':'termin'}" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
   if (a.step === 'info') return acqYesNoStep({eyebrow:'Kaltakquise', field:'infoGewuenscht', question:'Weitere Informationen gewünscht?'});
   if (a.step === 'infoAuswahl') {
-    const pool = [...new Set([...a.besprochenIds, ...a.interesseIds])];
+    const pool = [...new Set([...acqBesprocheneIds(), ...a.interesseIds])];
+    const d = a.infoDocs;
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Zu welchen Produkten werden Informationen gewünscht?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${acqProductChips(pool, 'infoIds')}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="termin" style="margin-top:14px">${icon('phone')}<span>Weiter</span></button>
+        <p class="notiz-baustein-label" style="margin-top:14px">Welche Unterlagen?</p>
+        <div class="filter-row">
+          <button type="button" class="filter-chip ${d.pif?'active':''}" data-acq-infodoc="pif">Produktdatenblatt (PIF)</button>
+          <button type="button" class="filter-chip ${d.sdb?'active':''}" data-acq-infodoc="sdb">Sicherheitsdatenblatt (SDB)</button>
+          <button type="button" class="filter-chip ${d.ba?'active':''}" data-acq-infodoc="ba">Betriebsanweisung (BA)</button>
+        </div>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="termin" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
@@ -1899,7 +1920,7 @@ function acqScreen() {
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Terminvorschläge</h1><p>Nur ausgefüllte Vorschläge werden in die E-Mail übernommen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${[0,1,2].map(i => `<label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Vorschlag ${i+1}</span><input type="datetime-local" data-acq-termin="${i}" value="${escapeHtml(a.termine[i]||'')}"></label>`).join('')}
-        <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:4px">${icon('phone')}<span>Weiter zur Vorschau</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:4px"><span>Weiter zur Vorschau</span></button>
       </section>
     </main>`;
   }
@@ -1910,7 +1931,7 @@ function acqVorschauScreen() {
   if (a.sentOk) {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>E-Mail-Programm geöffnet</h1><p>Ihr E-Mail-Programm wurde mit der vorbereiteten Nachricht geöffnet — der eigentliche Versand erfolgt dort durch Sie. Der Kontakt wurde zusätzlich gespeichert.</p></div></div>
-      <section class="advisor-card"><button type="button" class="primary-button compact" data-action="acq-restart">${icon('phone')}<span>Weitere Kaltakquise erfassen</span></button></section>
+      <section class="advisor-card"><button type="button" class="primary-button compact" data-action="acq-restart"><span>Weitere Kaltakquise erfassen</span></button></section>
       ${acqHistoryListHtml()}
     </main>`;
   }
@@ -1922,7 +1943,7 @@ function acqVorschauScreen() {
       <label class="modal-field wide" style="display:block"><span class="notiz-baustein-label">Text</span><textarea id="acqPreviewBody" rows="14">${escapeHtml(a.previewBody)}</textarea></label>
       <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
         <button type="button" class="secondary-button compact" data-action="acq-copy">${icon('copy')}<span>Text kopieren</span></button>
-        <button type="button" class="primary-button compact" data-action="acq-senden" ${a.previewTo.trim() ? '' : 'disabled'}>${icon('phone')}<span>${a.editingId?'Aktualisiert an E-Mail-Programm übergeben':'An E-Mail-Programm übergeben'}</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-senden" ${a.previewTo.trim() ? '' : 'disabled'}>${icon('talk')}<span>${a.editingId?'Aktualisiert an E-Mail-Programm übergeben':'An E-Mail-Programm übergeben'}</span></button>
       </div>
       ${!a.previewTo.trim() ? `<p class="muted-copy" style="margin-top:8px">Für den Versand wird eine Empfänger-E-Mail-Adresse benötigt.</p>` : ''}
     </section>
@@ -4832,6 +4853,7 @@ function bind() {
     if (state.screen === 'konzept') { state.screen = 'konzepte'; state.selectedKonzept = null; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'messe') { state.previousScreen = null; state.screen = 'messe'; render(); return; }
     if (state.screen === 'products' && state.previousScreen === 'kaltakquise-produkte') { state.previousScreen = null; if (state.newCustomer) newCustomerSave(); state.screen = 'summary'; state.summaryStep = 'produktbereiche'; render(); return; }
+    if (state.screen === 'products' && state.previousScreen === 'akquise-produkte') { state.previousScreen = null; state.screen = 'akquise'; state.acq.step = 'produkteAuswahl'; render(); return; }
     state.previousScreen = null;
     state.screen = 'menu';
     render();
@@ -4910,13 +4932,21 @@ function bind() {
   });
   $('[data-action="acq-advance"]')?.addEventListener('click', (e) => {
     const field = e.currentTarget.dataset.field;
-    if (field === 'adresse') acqGo('kontakt');
-    else if (field === 'kontakt') acqGo('gespraech');
+    if (field === 'adresse') acqGo('gespraech');
+    else if (field === 'kontaktperson') acqGo('produkte');
     else acqAdvance(field);
     render();
   });
+  document.querySelectorAll('[data-acq-produktbereich-open]').forEach(button => button.addEventListener('click', () => {
+    state.previousScreen = 'akquise-produkte';
+    state.category = button.dataset.acqProduktbereichOpen;
+    state.screen = 'products';
+    state.query = '';
+    state.spectrum = 'all';
+    render();
+  }));
+  document.querySelectorAll('[data-acq-infodoc]').forEach(button => button.onclick = () => { const key = button.dataset.acqInfodoc; state.acq.infoDocs[key] = !state.acq.infoDocs[key]; render(); });
   document.querySelectorAll('[data-acq-toggle]').forEach(button => button.onclick = () => { const [field,id] = button.dataset.acqToggle.split(':'); acqToggle(field, id); render(); });
-  $('#acqProduktSuche')?.addEventListener('input', e => { state.acq.produktSuche = e.target.value; render(); });
   $('#acqMusterSuche')?.addEventListener('input', e => { state.acq.musterSuche = e.target.value; render(); });
   document.querySelectorAll('[data-acq-muster-toggle]').forEach(button => button.onclick = () => { acqMusterToggle(button.dataset.acqMusterToggle); render(); });
   document.querySelectorAll('[data-acq-muster-anzahl]').forEach(input => input.addEventListener('input', e => { const entry = state.acq.musterEintraege.find(m => m.id === input.dataset.acqMusterAnzahl); if (entry) entry.anzahl = Math.max(1, parseInt(e.target.value, 10) || 1); }));
