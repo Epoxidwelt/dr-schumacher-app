@@ -912,6 +912,7 @@ const AROUND_ME_CATEGORIES = [
   {key:'ambulance', label:'Rettungswachen', tag:'emergency=ambulance_station'},
   {key:'doctors', label:'Arztpraxen', tag:'amenity=doctors'},
   {key:'dentist', label:'Zahnarztpraxen', tag:'amenity=dentist'},
+  {key:'veterinary', label:'Tierarztpraxen', tag:'amenity=veterinary'},
   {key:'pharmacy', label:'Apotheken', tag:'amenity=pharmacy'},
   {key:'nursing_home', label:'Pflegeheime', tag:'amenity=nursing_home'}
 ];
@@ -959,13 +960,37 @@ async function reverseGeocode(lat, lng){
     ort: a.city || a.town || a.village || a.municipality || a.county || ''
   };
 }
+// Die kostenlose, öffentliche Overpass-API (overpass-api.de) ist gelegentlich überlastet und
+// antwortet dann mit 504 oder — ganz ohne expliziten Accept-Header — sogar mit 406. Deshalb hier
+// bewusst mit Accept-Header UND mit zwei alternativen öffentlichen Spiegelservern als Fallback,
+// jeweils mit eigenem Timeout, statt beim ersten Fehler sofort aufzugeben.
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter'
+];
+async function overpassFetch(ql) {
+  let lastError = new Error('Umgebungssuche aktuell nicht erreichbar.');
+  for (const url of OVERPASS_ENDPOINTS) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const res = await fetch(url, { method:'POST', body: ql, headers:{'Accept':'application/json'}, signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) { lastError = new Error('Suchdienst meldet Status ' + res.status); continue; }
+      return await res.json();
+    } catch (e) {
+      clearTimeout(timer);
+      lastError = e;
+    }
+  }
+  throw new Error('Umgebungssuche aktuell nicht erreichbar (Kartendienst überlastet) — bitte in ein paar Sekunden erneut versuchen. ' + lastError.message);
+}
 async function searchNearbyCategory(tag, lat, lng, radiusKm){
   const radiusM = Math.round(radiusKm * 1000);
   const [k, v] = tag.split('=');
-  const ql = `[out:json][timeout:25];(node["${k}"="${v}"](around:${radiusM},${lat},${lng});way["${k}"="${v}"](around:${radiusM},${lat},${lng}););out center 30;`;
-  const res = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body: ql });
-  if (!res.ok) throw new Error('Suche fehlgeschlagen (Server nicht erreichbar)');
-  const data = await res.json();
+  const ql = `[out:json][timeout:20];(node["${k}"="${v}"](around:${radiusM},${lat},${lng});way["${k}"="${v}"](around:${radiusM},${lat},${lng}););out center 30;`;
+  const data = await overpassFetch(ql);
   return (data.elements||[]).map(el => {
     const elLat = el.lat != null ? el.lat : (el.center && el.center.lat);
     const elLng = el.lon != null ? el.lon : (el.center && el.center.lon);
