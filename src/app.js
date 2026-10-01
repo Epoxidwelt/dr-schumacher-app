@@ -1685,7 +1685,17 @@ function buildAcqEmail() {
 
   if (besprochen.length) {
     if (interesseListe.length) {
-      body.push('', `bei unserem Gespräch haben wir über ${interesseListe.join(', ')} gesprochen. Ihr Interesse daran greife ich gerne auf und würde mit Ihnen klären, wie das Produkt zu Ihren Anforderungen passt.`);
+      body.push('', `bei unserem Gespräch haben wir über ${interesseListe.join(', ')} gesprochen. Ihr Interesse daran greife ich gerne auf — hier der Mehrwert im Überblick:`, '');
+      a.interesseIds.forEach(id => {
+        const p = PRODUCTS.find(pp => pp.id === id);
+        if (!p) return;
+        const facts = productFactsForBranche(p, a.branche);
+        if (!facts.length) return;
+        body.push(`${p.name}:`);
+        facts.forEach(f => body.push(`  ✓ ${f}`));
+        body.push('');
+      });
+      body.push('Gerne kläre ich mit Ihnen, wie das Produkt zu Ihren Anforderungen passt.');
       subject = `Ihr Interesse an ${interesseListe.join(', ')}`;
     } else if (keinInteresse) {
       body.push('', `vielen Dank für Ihre offene Rückmeldung zu ${besprochen.join(', ')}. Aktuell besteht daran kein Interesse.`);
@@ -3735,7 +3745,10 @@ function buildKaltakquiseNachfassEmail(){
     entries.forEach(({product: p, size}) => {
       lines.push(`▸ ${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
       const facts = productFactsForBranche(p, currentSummaryBranche());
-      if (facts.length) lines.push(`✓ ${facts[0]}`);
+      if (facts.length) {
+        lines.push('Vorteile:');
+        facts.forEach(f => lines.push(`  ✓ ${f}`));
+      }
       lines.push('');
     });
   }
