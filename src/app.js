@@ -721,6 +721,7 @@ function regionScreen() {
         <button class="primary-button" type="submit">Anmelden</button>
       </form>
       ${state.regionLoginError ? `<p class="region-login-error">${escapeHtml(state.regionLoginError)}</p>` : ''}
+      <button type="button" class="secondary-button" data-action="region-back" style="width:100%;margin-top:12px">Zurück</button>
       <p class="privacy-note">Zugangsdaten werden vom Admin unter „Dr. Schumacher ONE → Mitarbeiter" vergeben.</p>
     </section>
   </main>`;
@@ -4919,6 +4920,13 @@ function bind() {
     render();
   });
   document.querySelectorAll('[data-action="profile"]').forEach(button => button.onclick = () => { state.screen='profile'; render(); });
+  $('[data-action="region-back"]')?.addEventListener('click', () => {
+    const returnTo = state.previousScreen;
+    state.previousScreen = null;
+    state.regionLoginError = '';
+    state.screen = (returnTo && returnTo !== 'region' && returnTo !== 'profile') ? returnTo : 'profile';
+    render();
+  });
   document.querySelectorAll('[data-price]').forEach(button => button.onclick = () => {
     if (button.dataset.price === 'hide') {
       state.customerMode = true;
@@ -7858,6 +7866,7 @@ function oneViewLogin(){
     </form>
     <button class="one-forgot-link" data-one-act="forgot-password">Passwort vergessen?</button>
     ${O.authError ? `<div class="one-note stop" style="margin-top:10px">${escapeHtml(O.authError)}</div>` : ''}
+    <div class="one-wizard-actions" style="margin-top:16px"><button type="button" class="one-btn" id="oneLoginBack" style="width:100%">Zurück</button></div>
     <div class="one-note warn" style="margin-top:16px; text-align:left">
       <strong>Simulation für die Präsentation.</strong> Die Prüfung läuft im Browser und ist kein Sicherheitsmerkmal. Produktiv gehört hierhin eine echte Anmeldung — Single Sign-On über das Firmenkonto plus Zwei-Faktor, serverseitig geprüft.
       Demo-Zugänge: Name aus der Mitarbeiterliste (z. B. „Admin Demo" oder „Mitarbeiter A"), Passwort siehe Mitarbeiterliste.
@@ -7926,6 +7935,8 @@ function bindOne(){
     oneAudit('Angemeldet', match.name);
     render();
   };
+  const loginBack = document.getElementById('oneLoginBack');
+  if (loginBack) loginBack.onclick = () => { O.authError = ''; state.screen = 'profile'; render(); };
   const loginNameEl = document.getElementById('oneLoginName');
   if (loginNameEl && !loginNameEl.value) loginNameEl.focus();
 
