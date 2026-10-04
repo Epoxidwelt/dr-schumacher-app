@@ -438,6 +438,8 @@ const state = {
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
   dashboardToolOrder: JSON.parse(localStorage.getItem('dashboardToolOrder') || 'null'),
   dashboardArrangeMode: false,
+  acqBrancheOrder: JSON.parse(localStorage.getItem('acqBrancheOrder') || 'null'),
+  acqArrangeMode: false,
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
   vsCompare: {productId:'', size:'', competitorName:'', competitorCustom:false, competitorPrice:'', competitorUnits:'', annualUnits:'', ...(JSON.parse(localStorage.getItem('vsCompare') || 'null') || {})},
   advisor: {category:'', subtype:'', need:''},
@@ -772,6 +774,15 @@ function persistToolOrder(order) {
   state.dashboardToolOrder = full;
   localStorage.setItem('dashboardToolOrder', JSON.stringify(full));
 }
+function orderedBranchen() {
+  const order = (state.acqBrancheOrder || []).filter(b => NEUKUNDE_BRANCHEN.includes(b));
+  NEUKUNDE_BRANCHEN.forEach(b => { if (!order.includes(b)) order.push(b); });
+  return order;
+}
+function persistAcqBrancheOrder(order) {
+  state.acqBrancheOrder = order.slice();
+  localStorage.setItem('acqBrancheOrder', JSON.stringify(state.acqBrancheOrder));
+}
 // Kacheln per Ziehen (Maus + Touch über Pointer Events) statt über Pfeil-Buttons anordnen.
 // Während des Ziehens werden nur die CSS-"order"-Werte der Geschwisterkacheln angepasst statt
 // die DOM-Knoten zu verschieben — sonst würde ein render()-Zwischenstand die gerade gezogene
@@ -836,7 +847,7 @@ function endTileDrag(e) {
   el.removeEventListener('pointercancel', endTileDrag);
   el.style.transform = '';
   el.classList.remove('dragging');
-  if (moved) persistToolOrder(order);
+  if (moved) { if (tileDrag.grid.dataset.arrangeStore === 'acqBranche') persistAcqBrancheOrder(order); else persistToolOrder(order); }
   tileDrag = null;
   render();
 }
@@ -1627,6 +1638,7 @@ function acqFormatTermin(value) {
   return d.toLocaleString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
 }
 function acqReset() {
+  state.acqArrangeMode = false;
   state.acq = {
     branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
     myPos:null, locating:false, locateError:'',
@@ -1863,12 +1875,14 @@ function acqScreen() {
   const a = state.acq;
   if (a.step === 'branche') {
     return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Um welche Branche geht es?</h1><p>Ein Klick genügt — es geht direkt weiter.</p></div></div>
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Um welche Branche geht es?</h1><p>${state.acqArrangeMode ? 'Kachel gedrückt halten und an die gewünschte Stelle ziehen.' : 'Ein Klick genügt — es geht direkt weiter.'}</p></div><button class="secondary-button compact" data-action="acq-toggle-arrange">${state.acqArrangeMode ? 'Fertig' : 'Anordnen'}</button></div>
       <section class="advisor-card">
-        <div class="category-grid">
-          ${NEUKUNDE_BRANCHEN.map(b => `<button class="category-card akquise" data-acq-branche="${escapeHtml(b)}"><span class="category-icon">${icon('kundenbesuch')}</span><span><strong>${escapeHtml(b)}</strong></span><b>›</b></button>`).join('')}
+        <div class="category-grid" data-arrange-store="acqBranche">
+          ${orderedBranchen().map(b => state.acqArrangeMode
+            ? `<div class="category-card akquise arrange-card" data-tool-key="${escapeHtml(b)}"><span class="category-icon">${icon('kundenbesuch')}</span><span><strong>${escapeHtml(b)}</strong></span><span class="drag-handle" aria-hidden="true">⠿</span></div>`
+            : `<button class="category-card akquise" data-acq-branche="${escapeHtml(b)}"><span class="category-icon">${icon('kundenbesuch')}</span><span><strong>${escapeHtml(b)}</strong></span><b>›</b></button>`).join('')}
         </div>
-        <button type="button" class="secondary-button compact" data-action="acq-goto" data-step="adresse" style="margin-top:14px">Überspringen</button>
+        ${state.acqArrangeMode ? '' : `<button type="button" class="secondary-button compact" data-action="acq-goto" data-step="adresse" style="margin-top:14px">Überspringen</button>`}
       </section>
       ${acqHistoryListHtml()}
     </main>`;
@@ -4994,6 +5008,8 @@ function bind() {
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
   $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
   if (state.dashboardArrangeMode) bindTileDrag();
+  $('[data-action="acq-toggle-arrange"]')?.addEventListener('click', () => { state.acqArrangeMode = !state.acqArrangeMode; render(); });
+  if (state.acqArrangeMode && state.screen === 'akquise' && state.acq.step === 'branche') bindTileDrag();
   $('#excel')?.addEventListener('change', importExcel);
   document.querySelectorAll('[data-advisor]').forEach(button => button.onclick = () => { state.advisor[button.dataset.advisor]=button.dataset.value; render(); });
   $('[data-action="reset-advisor"]')?.addEventListener('click', () => { state.advisor={category:'',subtype:'',need:''}; render(); });
