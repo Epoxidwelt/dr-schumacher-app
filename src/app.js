@@ -428,7 +428,7 @@ const state = {
   aroundMe: { mode:'kunden', radiusKm:10, myPos:null, category:null, results:[], loading:false, error:'', searched:false, kundenFilter:'all', savedIndices:[] },
   priceList: localStorage.getItem('priceList') || 'UVP',
   customerMode: sessionStorage.getItem('customerMode') === 'true',
-  category: 'all', query: '', spectrum: 'all', rkiFilter: 'all', selected: null,
+  category: 'all', query: '', spectrum: 'all', selected: null,
   // Preise liegen ausschliesslich unter der Artikelnummer - kein Namensabgleich mehr.
   // {'00-208-005': {'UVP':14, 'PL 1':9, …, ve:'20'}}
   priceByArt: JSON.parse(localStorage.getItem('priceByArt') || '{}'),
@@ -1165,23 +1165,15 @@ function productsScreen() {
   if (state.category === 'downloads') return downloadsScreen();
   const names = {surface:'Fläche',hands:'Hände & Haut',instruments:'Instrumente',application:'Applikation',all:'Alle Produkte'};
   const spectra = ['all','begrenzt viruzid','begrenzt viruzid PLUS','viruzid','sporizid'];
-  const rkiCount = k => PRODUCTS.filter(p => (p.rkiListe||[]).includes(k)).length;
-  const hasAnyRki = PRODUCTS.some(p => (p.rkiListe||[]).length);
   const list = PRODUCTS.filter(p =>
     (state.category === 'all' || p.category === state.category) &&
     matchesQuery(`${p.name} ${p.kind} ${p.sku}`, state.query) &&
-    (state.spectrum === 'all' || p.spectrum.includes(state.spectrum)) &&
-    (state.rkiFilter === 'all' || (p.rkiListe||[]).includes(state.rkiFilter))
+    (state.spectrum === 'all' || p.spectrum.includes(state.spectrum))
   );
   return `<main class="page products-page">
     <div class="section-heading"><div><span class="eyebrow">Produktbereich</span><h1>${names[state.category]}</h1></div><span class="result-count">${list.length} Produkte</span></div>
     <label class="search-box">${icon('search')}<input id="search" value="${escapeHtml(state.query)}" placeholder="Produktname oder Artikelnummer suchen"></label>
     <div class="filter-row">${spectra.map(s => `<button class="filter-chip ${s==='all'?'':spectrumClass(s)} ${state.spectrum===s?'active':''}" data-spectrum="${s}">${s==='all'?'Alle':s}</button>`).join('')}</div>
-    ${hasAnyRki ? `<div class="filter-row">
-      <button class="filter-chip ${state.rkiFilter==='all'?'active':''}" data-rki-filter="all">RKI-Liste: Alle</button>
-      <button class="filter-chip rki-a ${state.rkiFilter==='A'?'active':''}" data-rki-filter="A">RKI-Liste A (${rkiCount('A')})</button>
-      <button class="filter-chip rki-b ${state.rkiFilter==='B'?'active':''}" data-rki-filter="B">RKI-Liste B (${rkiCount('B')})</button>
-    </div>` : ''}
     <div class="product-list">${list.map(productCard).join('') || '<div class="empty-state"><h2>Keine Produkte gefunden</h2><p>Bitte ändern Sie Ihre Suche oder den Filter.</p></div>'}</div>
   </main>`;
 }
@@ -1229,7 +1221,7 @@ function detailScreen() {
   return `<main class="page detail-page">
     <section class="detail-hero">
       <div class="detail-image" style="--product-color:${p.color}">${(() => { const img = (p.sizePhotos && p.sizePhotos[state.size]) || p.photo; return img ? `<img src="${img}" alt="${escapeHtml(p.name)}">` : `<div class="bottle"><span>${p.name.split(' ')[0]}</span></div>`; })()}</div>
-      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${(p.rkiListe||[]).map(rkiBadge).join('')}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
+      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${p.einwirkzeitEntries && p.einwirkzeitEntries.length ? `<div class="einwirkzeit-list">${p.einwirkzeitEntries.map(e => `<div class="einwirkzeit-badge ${e.kind}">⏱ ${escapeHtml(e.label)} in ${escapeHtml(e.time)}${e.detail ? ` <span class="einwirkzeit-tier">${escapeHtml(e.detail)}</span>` : ''}</div>`).join('')}</div>` : ''}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
@@ -1299,13 +1291,56 @@ function buildStarredProductsEmail() {
   return { subject, body: lines.join('\n') };
 }
 
+// Im privaten Modus, in eingebetteten/gesandboxten Ansichten (z. B. Artifact) oder ohne
+// eingerichtetes Mail-Programm blockiert der Browser mailto:-Links stillschweigend. Deshalb wird
+// nach dem Öffnen geprüft, ob das Fenster den Fokus verloren hat (= Mail-Programm hat sich
+// geöffnet); wenn nicht, erscheint ein Hinweisfenster mit direkten Alternativen (mailto per
+// eigenem Tipp, Gmail, Outlook im Web, Text kopieren), statt dass nichts passiert.
 function openMailto(subject, body, to='', cc='') {
+  const url = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc ? '&cc=' + encodeURIComponent(cc) : ''}`;
+  let left = false;
+  const mark = () => { left = true; };
+  window.addEventListener('blur', mark, {once:true});
+  document.addEventListener('visibilitychange', mark, {once:true});
   const a = document.createElement('a');
-  a.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${cc ? '&cc=' + encodeURIComponent(cc) : ''}`;
+  a.href = url;
   a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   a.remove();
+  setTimeout(() => {
+    window.removeEventListener('blur', mark);
+    document.removeEventListener('visibilitychange', mark);
+    if (!left && !document.hidden) showMailFallback(subject, body, to, cc, url);
+  }, 1500);
+}
+function showMailFallback(subject, body, to, cc, mailtoUrl) {
+  document.getElementById('mailFallback')?.remove();
+  const q = encodeURIComponent;
+  const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${q(to)}&cc=${q(cc)}&su=${q(subject)}&body=${q(body)}`;
+  const outlook = `https://outlook.office.com/mail/deeplink/compose?to=${q(to)}&cc=${q(cc)}&subject=${q(subject)}&body=${q(body)}`;
+  const btn = 'text-decoration:none;display:flex;justify-content:center;align-items:center';
+  const el = document.createElement('div');
+  el.id = 'mailFallback';
+  el.className = 'modal-overlay';
+  el.innerHTML = `<div class="modal-card" style="width:min(520px,100%)">
+    <button type="button" class="modal-close" data-mf="close" aria-label="Schließen">×</button>
+    <h2>E-Mail wurde nicht automatisch geöffnet</h2>
+    <p>Im privaten Modus oder in dieser Ansicht blockiert der Browser das Mail-Programm. Bitte einen der Wege wählen:</p>
+    ${to ? `<p style="margin-bottom:10px"><strong>An:</strong> ${escapeHtml(to)}</p>` : ''}
+    <div class="modal-choices">
+      <a class="modal-choice" style="${btn}" href="${escapeHtml(mailtoUrl)}" target="_blank" rel="noopener">E-Mail-Programm öffnen</a>
+      <a class="modal-choice" style="${btn}" href="${escapeHtml(outlook)}" target="_blank" rel="noopener">In Outlook (Web) öffnen</a>
+      <a class="modal-choice" style="${btn}" href="${escapeHtml(gmail)}" target="_blank" rel="noopener">In Gmail öffnen</a>
+      <button type="button" class="modal-choice" style="justify-content:center" data-mf="copy">Empfänger &amp; Text kopieren</button>
+    </div>
+  </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => {
+    const act = e.target.closest('[data-mf]')?.dataset.mf;
+    if (act === 'close' || e.target === el) el.remove();
+    if (act === 'copy') copyEmailText(subject, (to ? `An: ${to}\n` : '') + body, e.target.closest('[data-mf]'));
+  });
 }
 
 function sendStarredProductsEmail() {
@@ -4741,9 +4776,6 @@ function spectrumClass(s) {
 function spectrumBadge(s) {
   return `<span class="badge ${spectrumClass(s)}">${s}</span>`;
 }
-function rkiBadge(k) {
-  return `<span class="badge rki">RKI-Liste ${k}</span>`;
-}
 function biozidBadge() {
   return `<span class="badge biozid">Biozidprodukt</span>`;
 }
@@ -4980,7 +5012,6 @@ function bind() {
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
   document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){acqReset(); state.screen='akquise'; render(); return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
-  document.querySelectorAll('[data-rki-filter]').forEach(button => button.onclick = () => { state.rkiFilter=button.dataset.rkiFilter; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
   document.querySelectorAll('[data-aroundme-kundenfilter]').forEach(button => button.onclick = () => { state.aroundMe.kundenFilter=button.dataset.aroundmeKundenfilter; render(); });
