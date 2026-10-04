@@ -6253,7 +6253,7 @@ function oneSeed() {
       {id:'k9', externeNr:'EX-10029', kundenNr:'K-4479', name:'Praxis Grenzfall',        plz:'99999', ort:'',          strasse:'',                 hausnummer:'',   bezirk:'',          preisliste:'UVP',  email:'',                            telefon:'',             comm:'bestand',     active:true, override:null, abc:null,nextFollowUp:null, kundenstatus:'kunde', anrede:'', ansprechpartnerVorname:'', ansprechpartnerNachname:''}
     ],
     users:[
-      {id:'admin', name:'Admin Demo',      email:'admin@example.com',                  password:'demo', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlzRanges:[], active:true, telefon:'0000 000000'},
+      {id:'admin', name:'Admin',           email:'admin@example.com',                  password:'1234', role:'admin',    funktion:null,           medNonMed:[],                        team:null,   territories:[],       individualPlzRanges:[], active:true, telefon:'0000 000000'},
       {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical'],               team:'nord', territories:['nord'], individualPlzRanges:[], active:true, telefon:'0170 1234501'},
       {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['nonmedical'],            team:'ost',  territories:['ost'],  individualPlzRanges:[], active:true, telefon:'0170 1234502'},
       {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlzRanges:[], active:true, telefon:'0170 1234503'},
@@ -6305,7 +6305,12 @@ state.one = oneSeed();
 (function onePersistedInit(){
   try {
     const saved = JSON.parse(localStorage.getItem('oneUsers') || 'null');
-    if (Array.isArray(saved) && saved.length) state.one.users = saved;
+    if (Array.isArray(saved) && saved.length) {
+      // Alter Demo-Admin ("Admin Demo"/"demo") auf bereits genutzten Geräten auf die neuen Zugangsdaten umstellen.
+      const oldAdmin = saved.find(u => u.id === 'admin' && u.name === 'Admin Demo' && u.password === 'demo');
+      if (oldAdmin) { oldAdmin.name = 'Admin'; oldAdmin.password = '1234'; localStorage.setItem('oneUsers', JSON.stringify(saved)); }
+      state.one.users = saved;
+    }
   } catch (e) { console.warn('Gespeicherte ONE-Mitarbeiter konnten nicht geladen werden', e); }
   try {
     const savedContacts = JSON.parse(localStorage.getItem('oneContacts') || 'null');
@@ -7869,7 +7874,7 @@ function oneViewLogin(){
     <div class="one-wizard-actions" style="margin-top:16px"><button type="button" class="one-btn" id="oneLoginBack" style="width:100%">Zurück</button></div>
     <div class="one-note warn" style="margin-top:16px; text-align:left">
       <strong>Simulation für die Präsentation.</strong> Die Prüfung läuft im Browser und ist kein Sicherheitsmerkmal. Produktiv gehört hierhin eine echte Anmeldung — Single Sign-On über das Firmenkonto plus Zwei-Faktor, serverseitig geprüft.
-      Demo-Zugänge: Name aus der Mitarbeiterliste (z. B. „Admin Demo" oder „Mitarbeiter A"), Passwort siehe Mitarbeiterliste.
+      Demo-Zugänge: Name aus der Mitarbeiterliste (z. B. „Admin" oder „Mitarbeiter A"), Passwort siehe Mitarbeiterliste.
     </div>
   </div></div>`;
 }
