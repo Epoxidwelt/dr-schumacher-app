@@ -6257,7 +6257,9 @@ function oneSeed() {
       {id:'ma',    name:'Mitarbeiter A',  email:'ma@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical'],               team:'nord', territories:['nord'], individualPlzRanges:[], active:true, telefon:'0170 1234501'},
       {id:'mb',    name:'Mitarbeiter B',  email:'mb@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['nonmedical'],            team:'ost',  territories:['ost'],  individualPlzRanges:[], active:true, telefon:'0170 1234502'},
       {id:'mc',    name:'Mitarbeiter C',  email:'mc@example.com',                     password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlzRanges:[], active:true, telefon:'0170 1234503'},
-      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:['nonmedical'],            team:'sued', territories:['sued'], individualPlzRanges:[], active:true, telefon:'0170 1234504'}
+      {id:'md',    name:'Mitarbeiter D',  email:'md@example.com',                     password:'1234', role:'employee', funktion:'innendienst',  medNonMed:['nonmedical'],            team:'sued', territories:['sued'], individualPlzRanges:[], active:true, telefon:'0170 1234504'},
+      {id:'gg',    name:'Gerald Gampp',   email:'gerald.gampp@schumacher-online.com', password:'2345', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlzRanges:[], active:true, telefon:''},
+      {id:'mm',    name:'Max Mustermann', email:'max.mustermann@example.com',         password:'1234', role:'employee', funktion:'aussendienst', medNonMed:['medical','nonmedical'],  team:'west', territories:['west'], individualPlzRanges:[], active:true, telefon:''}
     ],
     templates:[
       {id:'t1', name:'Produktneuheit',            promo:true,  subject:'Neu im Sortiment: {{produkt}}',                 body:'wir haben unser Sortiment erweitert. {{produkt}} ist ab sofort lieferbar.\n\nGerne stelle ich Ihnen das Produkt bei Ihrem nächsten Termin persönlich vor.'},
@@ -6309,6 +6311,9 @@ state.one = oneSeed();
       // Alter Demo-Admin ("Admin Demo"/"demo") auf bereits genutzten Geräten auf die neuen Zugangsdaten umstellen.
       const oldAdmin = saved.find(u => u.id === 'admin' && u.name === 'Admin Demo' && u.password === 'demo');
       if (oldAdmin) { oldAdmin.name = 'Admin'; oldAdmin.password = '1234'; localStorage.setItem('oneUsers', JSON.stringify(saved)); }
+      // Neu hinzugekommene Standard-Mitarbeiter auch auf Geräten mit bereits gespeicherter Liste ergänzen.
+      state.one.users.filter(s => ['gg','mm'].includes(s.id) && !saved.some(u => u.id === s.id)).forEach(s => saved.push(s));
+      localStorage.setItem('oneUsers', JSON.stringify(saved));
       state.one.users = saved;
     }
   } catch (e) { console.warn('Gespeicherte ONE-Mitarbeiter konnten nicht geladen werden', e); }
