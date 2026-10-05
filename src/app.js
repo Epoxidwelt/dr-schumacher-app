@@ -440,6 +440,7 @@ const state = {
   dashboardArrangeMode: false,
   ezOpen: false,
   fitOpen: false,
+  aktionOpen: null,
   acqBrancheOrder: JSON.parse(localStorage.getItem('acqBrancheOrder') || 'null'),
   acqArrangeMode: false,
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
@@ -677,6 +678,7 @@ function render() {
   if (state.screen === 'kol') html = header(true) + kolScreen() + bottomNav('home');
   if (state.screen === 'konzepte') html = header(true) + konzepteScreen() + bottomNav('home');
   if (state.screen === 'ideenschmiede') html = header(true) + ideenschmiedeScreen() + bottomNav('home');
+  if (state.screen === 'aktionen') html = header(true) + aktionenScreen() + bottomNav('home');
   if (state.screen === 'akquise') html = header(true) + acqScreen() + bottomNav('home');
   if (state.screen === 'konzept') html = header(true) + konzeptScreen() + bottomNav('home');
   if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
@@ -876,12 +878,13 @@ function menuScreen() {
     ['kol','KOL – Key Opinion Leader','Referenzkunden je Produkt finden – unabhängig vom eigenen Gebiet'],
     ['konzepte','Konzepte','Branchenkonzepte mit den passenden Produkten je Bereich – z. B. Rettungsdienst oder Pflege'],
     ['ideenschmiede','Ideenschmiede','Verbesserungsvorschläge und neue Produktideen direkt an den Innendienst'],
+    ['aktionen','Aktionen','Aktuelle Vertriebsaktionen vom Innendienst – z. B. Hygienefachkraft-Mangel / EQmed'],
     ['akquise','Kaltakquise','Erstkontakt in wenigen Fragen erfassen und passende E-Mail erstellen'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','offer','angebot','summary','kundenbesuch','meinekontakte','smartmailing','akquise'].includes(card[0]));
+  if (!can('sales')) cards = cards.filter(card => !['compare','offer','angebot','summary','kundenbesuch','meinekontakte','smartmailing','akquise','aktionen'].includes(card[0]));
   if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = orderedToolCards(cards.filter(c => !coreKeys.includes(c[0])));
@@ -893,6 +896,7 @@ function menuScreen() {
   const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind} ${p.sku} ${p.summary}`, state.globalQuery)).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
     <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.customerMode?'Preise ausgeblendet':state.priceList}</h1></div></section>
+    ${aktionenUnseen().length ? `<button type="button" class="aktion-banner" data-category="aktionen"><span>Neue Aktion</span><strong>${escapeHtml(aktionenUnseen()[0].titel)}</strong><small>${escapeHtml(aktionenUnseen()[0].teaser)}</small></button>` : ''}
     ${coreCategoryGrid()}
     <label class="global-search">${icon('search')}<input id="globalSearch" value="${escapeHtml(state.globalQuery)}" placeholder="Produkt, Artikelnummer oder Anwendung suchen"><span>⌘ K</span></label>
     ${state.globalQuery.trim() ? `<section class="cockpit-search-results"><div class="section-heading"><div><span class="eyebrow">Sofortsuche</span><h2>${searchResults.length} Treffer</h2></div><button class="secondary-button" data-action="clear-global-search">Suche löschen</button></div><div class="product-list">${searchResults.map(productCard).join('') || '<div class="empty-state"><h2>Kein Produkt gefunden</h2><p>Versuchen Sie einen anderen Suchbegriff.</p></div>'}</div></section>` : ''}
@@ -1608,6 +1612,31 @@ function ideaHistoryListHtml() {
       <button data-idea-edit="${entry.id}"><strong>${escapeHtml(ideaKategorieLabel(entry))}</strong><small>${escapeHtml(entry.bereich === 'produkt' ? 'Neue Produktidee' : 'Prozessoptimierung')} · ${escapeHtml((entry.text || '').slice(0,60))}${entry.text && entry.text.length>60 ? '…' : ''}</small></button>
       <button type="button" class="danger-link" data-idea-delete="${entry.id}" aria-label="Idee löschen">✕</button>
     </div>`).join('')}</section>`;
+}
+function aktionenScreen() {
+  const list = aktionenForCurrentUser();
+  const open = state.aktionOpen ? list.find(a => a.id === state.aktionOpen) : null;
+  aktionenMarkSeen();
+  if (open) {
+    const partner = AKTION_PARTNER[open.partner];
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Aktion${open.gueltigBis ? ' · gültig bis ' + new Date(open.gueltigBis + 'T12:00:00').toLocaleDateString('de-DE') : ''}</span><h1>${escapeHtml(open.titel)}</h1></div><button class="secondary-button" data-action="aktion-close">Zurück</button></div>
+      <section class="advisor-card">
+        <p>${escapeHtml(open.text).replace(/\n/g, '<br>')}</p>
+        ${(open.leistungen || []).length ? `<div class="info-card" style="margin-top:12px"><h2>Das Angebot im Überblick</h2><ul>${open.leistungen.map(l => `<li><span>✓</span>${escapeHtml(l)}</li>`).join('')}</ul></div>` : ''}
+        ${(open.zielgruppen || []).length ? `<p class="muted-copy" style="margin-top:10px">Passt besonders zu: ${open.zielgruppen.map(escapeHtml).join(', ')}</p>` : ''}
+        ${partner ? `<div class="info-card" style="margin-top:12px"><h2>${escapeHtml(partner.name)}</h2><p>${escapeHtml(partner.zusatz)}. ${escapeHtml(partner.beschreibung)}</p><p class="muted-copy">${escapeHtml(partner.adresse)} · ${escapeHtml(partner.telefon)} · ${escapeHtml(partner.email)}</p><p><a href="${escapeHtml(partner.website)}" target="_blank" rel="noopener">${escapeHtml(partner.website.replace('https://',''))} ↗</a></p></div>` : ''}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+          <button type="button" class="primary-button compact" data-aktion-kunde="${open.id}">${icon('talk')}<span>E-Mail an den Kunden erstellen</span></button>
+          <button type="button" class="secondary-button compact" data-aktion-anfrage="${open.id}"><span>Anfrage senden</span></button>
+        </div>
+      </section>
+    </main>`;
+  }
+  return `<main class="page advisor-page">
+    <div class="section-heading"><div><span class="eyebrow">Vertrieb</span><h1>Aktionen</h1><p>Aktuelle Themen und Angebote, die der Innendienst für Sie freigeschaltet hat.</p></div></div>
+    ${list.length ? list.map(a => `<button type="button" class="category-card akquise aktion-card" data-aktion-open="${a.id}"><span class="category-icon">${icon('ideenschmiede')}</span><span><strong>${escapeHtml(a.titel)}</strong><small>${escapeHtml(a.teaser)}</small></span><b>›</b></button>`).join('') : '<div class="empty-state"><h2>Aktuell keine Aktion freigeschaltet</h2><p>Sobald der Innendienst eine Aktion für Sie freigibt, erscheint sie hier.</p></div>'}
+  </main>`;
 }
 function ideenschmiedeScreen() {
   const idea = state.idea;
@@ -5112,7 +5141,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){acqReset(); state.screen='akquise'; render(); return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){acqReset(); state.screen='akquise'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
@@ -5142,6 +5171,10 @@ function bind() {
   $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
   if (state.dashboardArrangeMode) bindTileDrag();
   document.querySelectorAll('.ez-box').forEach(box => box.addEventListener('toggle', e => { state[box.dataset.ez === 'fit' ? 'fitOpen' : 'ezOpen'] = e.target.open; }));
+  document.querySelectorAll('[data-aktion-open]').forEach(b => b.onclick = () => { state.aktionOpen = b.dataset.aktionOpen; render(); });
+  $('[data-action="aktion-close"]')?.addEventListener('click', () => { state.aktionOpen = null; render(); });
+  document.querySelectorAll('[data-aktion-kunde]').forEach(b => b.onclick = () => { const a = state.one.aktionen.find(x => x.id === b.dataset.aktionKunde); if (a) { const m = buildAktionKundenEmail(a); openMailto(m.subject, m.body, ''); } });
+  document.querySelectorAll('[data-aktion-anfrage]').forEach(b => b.onclick = () => { const a = state.one.aktionen.find(x => x.id === b.dataset.aktionAnfrage); if (a) { const m = buildAktionAnfrageEmail(a); openMailto(m.subject, m.body, a.anfrageAn || OUTGOING_SENDER_EMAIL); } });
   $('[data-action="acq-toggle-arrange"]')?.addEventListener('click', () => { state.acqArrangeMode = !state.acqArrangeMode; render(); });
   if (state.acqArrangeMode && state.screen === 'akquise' && state.acq.step === 'branche') bindTileDrag();
   $('#excel')?.addEventListener('change', importExcel);
@@ -6379,6 +6412,83 @@ const ONE_COMM = {
 };
 
 const ONE_CADENCE_DAYS = { A:60, B:90, C:120 };
+// ===================== Aktionen (Vertriebs-Pushs, im Admin angelegt, für Mitarbeiter freigeschaltet) =====================
+// Der Admin legt Aktionen an (z. B. zum Hygienefachkraft-Mangel), wählt einen Partner aus dem
+// Dr.-Schumacher-Verbund und schaltet sie für alle, Teams oder einzelne Mitarbeiter frei. Der
+// Außendienst sieht freigegebene Aktionen im Produktberater (Kachel "Aktionen") und kann daraus
+// eine Kunden-E-Mail oder eine Anfrage erstellen. Wie die übrigen ONE-Daten liegen sie lokal im
+// Browser dieses Geräts (kein Server) — Freigaben wirken daher nur auf Geräten mit denselben Daten.
+const AKTION_PARTNER = {
+  eqmed: {
+    name:'EQmed Hygieneberatung',
+    zusatz:'Dienstleistungsmarke der Dr. Schumacher GmbH',
+    beschreibung:'Seit über 20 Jahren Hygieneberatung für Pflegeeinrichtungen und außerklinische Einrichtungen – mit Kompetenz, Verlässlichkeit und individuellen Lösungen.',
+    website:'https://www.eqmed-hygieneberatung.de',
+    email:'info@eqmed.de',
+    telefon:'05664 – 94 96 6002',
+    adresse:'Am Roggenfeld 3, 34323 Malsfeld'
+  }
+};
+function oneDefaultAktionen() {
+  return [{
+    id:'ak-hygienefachkraft',
+    titel:'Hygienefachkraft-Mangel: externe Hygieneberatung durch EQmed',
+    teaser:'Qualifizierte Hygienefachkräfte sind knapp. EQmed stellt externe Hygienefachkräfte als festen Ansprechpartner – ohne Neueinstellung.',
+    text:'Viele Einrichtungen finden keine ausreichend qualifizierten Mitarbeitenden für die Hygiene oder es fehlt die entsprechende Erfahrung. EQmed Hygieneberatung, eine Dienstleistungsmarke der Dr. Schumacher GmbH, unterstützt Pflegeeinrichtungen und außerklinische Einrichtungen seit über 20 Jahren mit externer Fachberatung und stellt eine Hygienefachkraft als festen Ansprechpartner.',
+    leistungen:['Externe Hygienefachkraft als fester Ansprechpartner','Hygienebegehungen und Risikoanalysen','Individuelle Hygienekonzepte und Hygienehandbücher','Betreuung von Hygienekommissionen','Planung und Durchführung von Hygieneschulungen','Ausbildung von Hygienebeauftragten nach DGKH-Leitlinie','Unterstützung bei behördlichen Begehungen','Beratung im Ausbruchs- und Isolierungsmanagement'],
+    partner:'eqmed',
+    zielgruppen:['Pflegedienst / Pflegeeinrichtung'],
+    gueltigBis:'',
+    anfrageAn:'gerald.gampp@schumacher-online.com',
+    status:'entwurf',
+    freigabe:{alle:false, teams:[], users:[]},
+    createdAt:new Date().toISOString()
+  }];
+}
+function aktionVisibleFor(a, u) {
+  if (!a || !u || a.status !== 'freigegeben') return false;
+  if (a.gueltigBis && a.gueltigBis < new Date().toISOString().slice(0,10)) return false;
+  const f = a.freigabe || {};
+  return !!(f.alle || (f.teams || []).includes(u.team) || (f.users || []).includes(u.id));
+}
+function aktionenForCurrentUser() {
+  const u = oneCurrentUser();
+  return u ? state.one.aktionen.filter(a => aktionVisibleFor(a, u)) : [];
+}
+function aktionenUnseen() {
+  let seen = [];
+  try { seen = JSON.parse(localStorage.getItem('aktionenSeen') || '[]'); } catch (e) {}
+  return aktionenForCurrentUser().filter(a => !seen.includes(a.id));
+}
+function aktionenMarkSeen() {
+  try { localStorage.setItem('aktionenSeen', JSON.stringify([...new Set([...JSON.parse(localStorage.getItem('aktionenSeen') || '[]'), ...aktionenForCurrentUser().map(a => a.id)])])); } catch (e) {}
+}
+function aktionFreigabeText(a) {
+  if (a.status !== 'freigegeben') return 'Entwurf – für Mitarbeiter nicht sichtbar';
+  const f = a.freigabe || {};
+  if (f.alle) return 'Freigegeben für alle Mitarbeiter';
+  const parts = [];
+  if ((f.teams || []).length) parts.push('Team ' + f.teams.map(id => (ONE_TEAMS.find(t => t.id === id) || {}).label || id).join(', '));
+  if ((f.users || []).length) parts.push(f.users.map(id => (state.one.users.find(x => x.id === id) || {}).name || id).join(', '));
+  return parts.length ? 'Freigegeben für ' + parts.join(' · ') : 'Freigegeben – aber an niemanden';
+}
+function buildAktionKundenEmail(a) {
+  const partner = AKTION_PARTNER[a.partner];
+  const lines = ['Guten Tag,', '', a.text.trim(), ''];
+  if ((a.leistungen || []).length) {
+    lines.push('Das Angebot im Überblick:', '');
+    a.leistungen.forEach(l => lines.push(`  ✓ ${l}`));
+    lines.push('');
+  }
+  if (partner) lines.push(`${partner.name} – ${partner.zusatz}`, partner.website, `Telefon: ${partner.telefon} · E-Mail: ${partner.email}`, '');
+  lines.push('Gerne bespreche ich mit Ihnen in einem unverbindlichen Gespräch, wie wir Sie dabei konkret unterstützen können. Wann passt es Ihnen in den nächsten Tagen?', '', 'Freundliche Grüße' + (state.repName ? '\n' + state.repName : ''));
+  return { subject: a.titel, body: lines.join('\n') };
+}
+function buildAktionAnfrageEmail(a) {
+  const partner = AKTION_PARTNER[a.partner];
+  const lines = ['Hallo,', '', `aus dem Außendienst kommt eine Anfrage zur Aktion „${a.titel}“${partner ? ' (' + partner.name + ')' : ''}:`, '', 'Einrichtung / Kunde: ', 'Ansprechpartner: ', 'Telefon / E-Mail: ', 'Anliegen / Bedarf: ', '', 'Bitte um Rückmeldung bzw. Kontaktaufnahme.', '', 'Danke und Grüße' + (state.repName ? ', ' + state.repName : '')];
+  return { subject: `Anfrage: ${a.titel}`, body: lines.join('\n') };
+}
 const ONE_TEAMS = [
   {id:'nord', label:'Nord'}, {id:'sued', label:'Süd'}, {id:'ost', label:'Ost'}, {id:'west', label:'West'}
 ];
@@ -6445,7 +6555,9 @@ function oneSeed() {
     mailings:[],        // Smart-Mailing-Kampagnen (Entwürfe + versendete), pro Mitarbeiter über createdBy erkennbar
     mailingTab:'home',  // aktiver Reiter innerhalb "Smart Mailing": home|new|drafts|sent|templates|history
     mailWizard:null,    // {step, data} während "Neues Mailing erstellen"
-    mailingBlocks: oneDefaultMailingBlocks() // zentral vom Admin gepflegte Einstiegs-/Abschluss-Bausteine
+    mailingBlocks: oneDefaultMailingBlocks(), // zentral vom Admin gepflegte Einstiegs-/Abschluss-Bausteine
+    aktionen: oneDefaultAktionen(),
+    aktionEdit:null
   };
 }
 state.one = oneSeed();
@@ -6480,6 +6592,10 @@ state.one = oneSeed();
     if (savedBlocks && Array.isArray(savedBlocks.einstieg) && Array.isArray(savedBlocks.abschluss)) state.one.mailingBlocks = savedBlocks;
   } catch (e) { console.warn('Gespeicherte Mailing-Bausteine konnten nicht geladen werden', e); }
   try {
+    const savedAktionen = JSON.parse(localStorage.getItem('oneAktionen') || 'null');
+    if (Array.isArray(savedAktionen)) state.one.aktionen = savedAktionen;
+  } catch (e) { console.warn('Gespeicherte Aktionen konnten nicht geladen werden', e); }
+  try {
     const savedKol = JSON.parse(localStorage.getItem('oneKol') || 'null');
     if (Array.isArray(savedKol)) state.one.kol = savedKol;
   } catch (e) { console.warn('Gespeicherte KOL-Referenzen konnten nicht geladen werden', e); }
@@ -6488,6 +6604,7 @@ function onePersistUsers(){ try { localStorage.setItem('oneUsers', JSON.stringif
 function onePersistContacts(){ try { localStorage.setItem('oneContacts', JSON.stringify(state.one.contacts)); } catch (e) {} }
 function onePersistMailings(){ try { localStorage.setItem('oneMailings', JSON.stringify(state.one.mailings)); } catch (e) {} }
 function onePersistMailingBlocks(){ try { localStorage.setItem('oneMailingBlocks', JSON.stringify(state.one.mailingBlocks)); } catch (e) {} }
+function onePersistAktionen(){ try { localStorage.setItem('oneAktionen', JSON.stringify(state.one.aktionen)); } catch (e) {} }
 function onePersistKol(){ try { localStorage.setItem('oneKol', JSON.stringify(state.one.kol)); } catch (e) {} }
 
 // ===================== ONE Smart Mailing =====================
@@ -6852,7 +6969,7 @@ function oneKundenstatusChip(c){ return c.kundenstatus === 'kontakt' ? '<span cl
 
 const ONE_ADMIN_NAV = [
   ['dashboard','Dashboard'], ['staff','Mitarbeiter'], ['terr','Gebiete'],
-  ['contacts','Kontakte'], ['templates','E-Mail-Vorlagen'], ['mailingBlocks','Smart Mailing Bausteine'], ['security','Sicherheit'], ['tests','Testfälle'], ['settings','Einstellungen']
+  ['contacts','Kontakte'], ['aktionen','Aktionen'], ['templates','E-Mail-Vorlagen'], ['mailingBlocks','Smart Mailing Bausteine'], ['security','Sicherheit'], ['tests','Testfälle'], ['settings','Einstellungen']
 ];
 const ONE_EMP_NAV = [ ['home','Startseite'], ['mine','Meine Kontakte'], ['mailing','Smart Mailing'], ['tasks','Aufgaben'], ['mail','E-Mail erstellen'], ['tpl','Vorlagen'], ['settings','Einstellungen'] ];
 function oneNavFor(u){ return (u && u.role === 'admin') ? ONE_ADMIN_NAV : ONE_EMP_NAV; }
@@ -6865,7 +6982,7 @@ function oneRailHtml(){
   const counts = {
     staff:O.users.filter(x=>x.role==='employee').length, contacts:O.contacts.length,
     templates:O.templates.length, mine:oneVisibleContacts(u).length, terr:O.territories.length,
-    tasks:oneDueContacts(u).length
+    tasks:oneDueContacts(u).length, aktionen:O.aktionen.length
   };
   return '<div class="one-rail-group">'
     + '<div class="one-rail-title">'+(u.role==='admin'?'Administration':'Mein Bereich')+'</div>'
@@ -7272,6 +7389,52 @@ function oneViewTemplates(){
   </div></div>`;
 }
 
+function oneViewAktionen(){
+  const O = state.one;
+  const edit = O.aktionEdit ? O.aktionen.find(a => a.id === O.aktionEdit) : null;
+  const head = `<div class="one-page-head"><div>
+    <span class="one-eyebrow">Administration</span>
+    <h1>Aktionen</h1>
+    <p>Aktionen wie der Hygienefachkraft-Mangel werden hier angelegt, mit einem Partner aus dem Dr.-Schumacher-Verbund verknüpft und für Mitarbeiter freigeschaltet. Der Außendienst sieht sie im Produktberater unter „Aktionen“.</p>
+  </div></div>`;
+  if (edit) {
+    const f = edit.freigabe || (edit.freigabe = {alle:false, teams:[], users:[]});
+    const emps = O.users.filter(u => u.role === 'employee');
+    const partner = AKTION_PARTNER[edit.partner];
+    const chk = (attr, val, on, label) => `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" ${attr}="${escapeHtml(val)}" ${on ? 'checked' : ''}> ${escapeHtml(label)}</label>`;
+    return head + `<div class="one-panel"><div class="one-panel-head"><h2>Aktion bearbeiten</h2><p>Änderungen werden automatisch gespeichert.</p></div><div class="one-panel-body">
+      <div class="one-field"><label>Titel</label><input type="text" data-ak-field="titel" value="${escapeHtml(edit.titel)}"></div>
+      <div class="one-field" style="margin-top:12px"><label>Kurzbeschreibung (Teaser)</label><input type="text" data-ak-field="teaser" value="${escapeHtml(edit.teaser)}"></div>
+      <div class="one-field" style="margin-top:12px"><label>Beschreibung (steht auch im Text der Kunden-E-Mail)</label><textarea data-ak-field="text" rows="5" style="width:100%;border:1px solid var(--one-line);border-radius:8px;padding:8px 10px;font:inherit">${escapeHtml(edit.text)}</textarea></div>
+      <div class="one-field" style="margin-top:12px"><label>Leistungen / Argumente (eine pro Zeile)</label><textarea data-ak-field="leistungen" rows="6" style="width:100%;border:1px solid var(--one-line);border-radius:8px;padding:8px 10px;font:inherit">${escapeHtml((edit.leistungen || []).join('\n'))}</textarea></div>
+      <div class="one-field" style="margin-top:12px"><label>Partner-Firma</label><select data-ak-field="partner"><option value="">Kein Partner</option>${Object.entries(AKTION_PARTNER).map(([k,v]) => `<option value="${k}" ${edit.partner===k?'selected':''}>${escapeHtml(v.name)}</option>`).join('')}</select></div>
+      ${partner ? `<div class="one-note" style="margin-top:8px"><strong>${escapeHtml(partner.name)}</strong> – ${escapeHtml(partner.zusatz)}<br>${escapeHtml(partner.beschreibung)}<br><span class="muted">${escapeHtml(partner.website)} · ${escapeHtml(partner.telefon)} · ${escapeHtml(partner.email)} · ${escapeHtml(partner.adresse)}</span></div>` : ''}
+      <div class="one-field" style="margin-top:12px"><label>Anfragen der Mitarbeiter gehen an (E-Mail)</label><input type="text" data-ak-field="anfrageAn" value="${escapeHtml(edit.anfrageAn || '')}"></div>
+      <div class="one-field" style="margin-top:12px"><label>Gültig bis (optional)</label><input type="date" data-ak-field="gueltigBis" value="${escapeHtml(edit.gueltigBis || '')}"></div>
+      <div class="one-field" style="margin-top:12px"><label>Passende Zielgruppen (Hinweis für den Außendienst)</label><div style="display:flex;flex-wrap:wrap;gap:6px 16px">${NEUKUNDE_BRANCHEN.map(b => chk('data-ak-zg', b, (edit.zielgruppen || []).includes(b), b)).join('')}</div></div>
+      <div class="one-field" style="margin-top:16px"><label>Freischalten für</label>
+        ${chk('data-ak-alle', 'alle', f.alle, 'Alle Mitarbeiter')}
+        <div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin:8px 0">${ONE_TEAMS.map(tm => chk('data-ak-team', tm.id, (f.teams || []).includes(tm.id), 'Team ' + tm.label)).join('')}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px 16px">${emps.map(u => chk('data-ak-user', u.id, (f.users || []).includes(u.id), u.name)).join('')}</div>
+      </div>
+    </div><div class="one-panel-body" style="border-top:1px solid var(--one-line);display:flex;gap:8px;flex-wrap:wrap">
+      ${edit.status === 'freigegeben'
+        ? `<button class="one-btn" data-one-act="aktion-unpublish" data-one-value="${edit.id}">Zurückziehen (Entwurf)</button>`
+        : `<button class="one-btn primary" data-one-act="aktion-publish" data-one-value="${edit.id}">Für Mitarbeiter freischalten</button>`}
+      <button class="one-btn" data-one-act="aktion-done">Fertig</button>
+      <span class="muted" style="align-self:center;font-size:13px">${escapeHtml(aktionFreigabeText(edit))}</span>
+    </div></div>`;
+  }
+  return head + `<div class="one-panel"><div class="one-panel-head"><h2>Alle Aktionen</h2><p>${O.aktionen.length} angelegt · ${O.aktionen.filter(a=>a.status==='freigegeben').length} freigegeben</p></div>
+    <div class="one-panel-body flush">${O.aktionen.map(a => `<div class="one-recipient">
+      <span style="flex:1"><strong>${escapeHtml(a.titel)}</strong><br><span class="muted" style="font-size:13px">${escapeHtml(a.teaser)}</span><br>
+        <span class="one-chip ${a.status==='freigegeben'?'ok':'quiet'}">${a.status==='freigegeben'?'freigegeben':'Entwurf'}</span> <span class="muted" style="font-size:12px">${escapeHtml(aktionFreigabeText(a))}${AKTION_PARTNER[a.partner] ? ' · Partner: ' + escapeHtml(AKTION_PARTNER[a.partner].name) : ''}</span></span>
+      <button class="one-btn sm" data-one-act="aktion-edit" data-one-value="${a.id}">Bearbeiten</button>
+      <button class="one-btn sm danger" data-one-act="aktion-delete" data-one-value="${a.id}">Löschen</button>
+    </div>`).join('') || '<div class="one-recipient muted">Noch keine Aktion angelegt.</div>'}</div>
+    <div class="one-panel-body" style="border-top:1px solid var(--one-line)"><button class="one-btn primary" data-one-act="aktion-new">+ Neue Aktion</button></div></div>
+  <div class="one-panel"><div class="one-panel-body"><div class="one-note">Hinweis: Wie alle ONE-Daten in diesem Prototyp liegen Aktionen und Freigaben lokal im Browser des jeweiligen Geräts. Für eine geräteübergreifende Verteilung an alle Mitarbeiter braucht es einen zentralen Server.</div></div></div>`;
+}
 function oneViewMailingBlocks(){
   const O = state.one;
   return `
@@ -7990,7 +8153,7 @@ function oneViewSettings(){
 
 const ONE_VIEWS = {
   dashboard:oneViewDashboard, staff:oneViewStaff, terr:oneViewTerr, contacts:oneViewContacts,
-  templates:oneViewTemplates, security:oneViewSecurity, tests:oneViewTests, mailingBlocks:oneViewMailingBlocks,
+  templates:oneViewTemplates, security:oneViewSecurity, tests:oneViewTests, mailingBlocks:oneViewMailingBlocks, aktionen:oneViewAktionen,
   home:oneViewHome, mine:oneViewMine, mailing:oneViewSmartMailing, tasks:oneViewTasks, mail:oneViewMail, tpl:oneViewTpl, settings:oneViewSettings
 };
 
@@ -8566,6 +8729,29 @@ function bindOne(){
     }
     if (a === 'mailwizard-done'){ O.mailWizard = null; O.mailingTab = 'sent'; render(); return; }
 
+    // ===================== Aktionen (Admin) =====================
+    if (a === 'aktion-new'){
+      const id = 'ak' + Date.now().toString(36);
+      O.aktionen.unshift({ id, titel:'Neue Aktion', teaser:'', text:'', leistungen:[], partner:'', zielgruppen:[], gueltigBis:'', anfrageAn:OUTGOING_SENDER_EMAIL, status:'entwurf', freigabe:{alle:false, teams:[], users:[]}, createdAt:new Date().toISOString() });
+      O.aktionEdit = id; onePersistAktionen(); render(); return;
+    }
+    if (a === 'aktion-edit'){ O.aktionEdit = el.dataset.oneValue; render(); return; }
+    if (a === 'aktion-done'){ O.aktionEdit = null; render(); return; }
+    if (a === 'aktion-delete'){
+      const ak = O.aktionen.find(x => x.id === el.dataset.oneValue);
+      if (ak && confirm('Aktion „' + ak.titel + '“ wirklich löschen?')) { O.aktionen = O.aktionen.filter(x => x.id !== ak.id); oneAudit('Aktion gelöscht', ak.titel); onePersistAktionen(); render(); }
+      return;
+    }
+    if (a === 'aktion-publish'){
+      const ak = O.aktionen.find(x => x.id === el.dataset.oneValue); if (!ak) return;
+      const f = ak.freigabe || {};
+      if (!f.alle && !(f.teams || []).length && !(f.users || []).length) { alert('Bitte zuerst auswählen, für wen die Aktion freigeschaltet werden soll (alle, ein Team oder einzelne Mitarbeiter).'); return; }
+      ak.status = 'freigegeben'; oneAudit('Aktion freigeschaltet', ak.titel + ' — ' + aktionFreigabeText(ak)); onePersistAktionen(); render(); return;
+    }
+    if (a === 'aktion-unpublish'){
+      const ak = O.aktionen.find(x => x.id === el.dataset.oneValue); if (!ak) return;
+      ak.status = 'entwurf'; oneAudit('Aktion zurückgezogen', ak.titel); onePersistAktionen(); render(); return;
+    }
     // ===================== Smart Mailing Bausteine (Admin) =====================
     if (a === 'mailblock-add-einstieg'){
       O.mailingBlocks.einstieg.push({ id:'e'+Date.now().toString(36), label:'Neuer Baustein', tones:[], text:'' });
@@ -8609,6 +8795,24 @@ function bindOne(){
       const btn = document.querySelector('[data-one-act="mailwizard-next"]');
       if (btn) btn.disabled = !d.subject.trim();
     };
+  }
+  // ===================== Aktionen — Admin-Felder =====================
+  if (O.aktionEdit){
+    const ak = O.aktionen.find(x => x.id === O.aktionEdit);
+    if (ak){
+      document.querySelectorAll('[data-ak-field]').forEach(el => el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
+        const fld = el.dataset.akField;
+        ak[fld] = fld === 'leistungen' ? el.value.split('\n').map(s => s.trim()).filter(Boolean) : el.value;
+        if (fld === 'partner') render();
+        onePersistAktionen();
+      }));
+      const toggleIn = (list, v, on) => on ? (list.includes(v) ? list : [...list, v]) : list.filter(x => x !== v);
+      ak.freigabe = ak.freigabe || {alle:false, teams:[], users:[]};
+      document.querySelectorAll('[data-ak-zg]').forEach(cb => cb.onchange = () => { ak.zielgruppen = toggleIn(ak.zielgruppen || [], cb.dataset.akZg, cb.checked); onePersistAktionen(); });
+      document.querySelectorAll('[data-ak-team]').forEach(cb => cb.onchange = () => { ak.freigabe.teams = toggleIn(ak.freigabe.teams || [], cb.dataset.akTeam, cb.checked); onePersistAktionen(); });
+      document.querySelectorAll('[data-ak-user]').forEach(cb => cb.onchange = () => { ak.freigabe.users = toggleIn(ak.freigabe.users || [], cb.dataset.akUser, cb.checked); onePersistAktionen(); });
+      document.querySelectorAll('[data-ak-alle]').forEach(cb => cb.onchange = () => { ak.freigabe.alle = cb.checked; onePersistAktionen(); });
+    }
   }
   // ===================== Smart Mailing Bausteine — Admin-Felder =====================
   document.querySelectorAll('[data-mb-field]').forEach(el => {
