@@ -1307,6 +1307,7 @@ function openMailto(subject, body, to='', cc='') {
   let left = false;
   const mark = () => { left = true; };
   window.addEventListener('blur', mark, {once:true});
+  window.addEventListener('pagehide', mark, {once:true});
   document.addEventListener('visibilitychange', mark, {once:true});
   const a = document.createElement('a');
   a.href = url;
@@ -1314,11 +1315,14 @@ function openMailto(subject, body, to='', cc='') {
   document.body.appendChild(a);
   a.click();
   a.remove();
+  // Hinweis nur, wenn wirklich nichts passiert ist: Fenster hat weiter den Fokus und wurde nie
+  // verlassen. Ein langsam startendes Mail-Programm nimmt den Fokus und löst so keinen Hinweis aus.
   setTimeout(() => {
     window.removeEventListener('blur', mark);
+    window.removeEventListener('pagehide', mark);
     document.removeEventListener('visibilitychange', mark);
-    if (!left && !document.hidden) showMailFallback(subject, body, to, cc, url);
-  }, 1500);
+    if (!left && !document.hidden && document.hasFocus()) showMailFallback(subject, body, to, cc, url);
+  }, 3500);
 }
 function showMailFallback(subject, body, to, cc, mailtoUrl) {
   document.getElementById('mailFallback')?.remove();
