@@ -441,6 +441,7 @@ const state = {
   ezOpen: false,
   fitOpen: false,
   aktionOpen: null,
+  aktionStars: JSON.parse(localStorage.getItem('aktionStars') || '[]'),
   acqBrancheOrder: JSON.parse(localStorage.getItem('acqBrancheOrder') || 'null'),
   acqArrangeMode: false,
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
@@ -878,7 +879,6 @@ function menuScreen() {
     ['kol','KOL – Key Opinion Leader','Referenzkunden je Produkt finden – unabhängig vom eigenen Gebiet'],
     ['konzepte','Konzepte','Branchenkonzepte mit den passenden Produkten je Bereich – z. B. Rettungsdienst oder Pflege'],
     ['ideenschmiede','Ideenschmiede','Verbesserungsvorschläge und neue Produktideen direkt an den Innendienst'],
-    ['aktionen','Aktionen','Aktuelle Vertriebsaktionen vom Innendienst – z. B. Hygienefachkraft-Mangel / EQmed'],
     ['akquise','Kaltakquise','Erstkontakt in wenigen Fragen erfassen und passende E-Mail erstellen'],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
@@ -896,7 +896,7 @@ function menuScreen() {
   const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind} ${p.sku} ${p.summary}`, state.globalQuery)).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
     <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.customerMode?'Preise ausgeblendet':state.priceList}</h1></div></section>
-    ${aktionenUnseen().length ? `<button type="button" class="aktion-banner" data-category="aktionen"><span>Neue Aktion</span><strong>${escapeHtml(aktionenUnseen()[0].titel)}</strong><small>${escapeHtml(aktionenUnseen()[0].teaser)}</small></button>` : ''}
+    ${(() => { const al = aktionenForCurrentUser(); if (!al.length) return ''; const a0 = al.find(x => !state.aktionStars.includes(x.id) && aktionenUnseen().some(u => u.id === x.id)) || al[0]; const neu = aktionenUnseen().length > 0; return `<button type="button" class="aktion-hero" data-category="aktionen"><span class="aktion-hero-icon">${icon('ideenschmiede')}</span><span class="aktion-hero-copy"><em>${neu ? 'NEU · ' : ''}Aktion${al.length > 1 ? ' · ' + al.length + ' aktuell' : ''}${state.aktionStars.includes(a0.id) ? ' · ★ besprochen' : ''}</em><strong>${escapeHtml(a0.titel)}</strong><small>${escapeHtml(a0.teaser)}</small></span><b>›</b></button>`; })()}
     ${coreCategoryGrid()}
     <label class="global-search">${icon('search')}<input id="globalSearch" value="${escapeHtml(state.globalQuery)}" placeholder="Produkt, Artikelnummer oder Anwendung suchen"><span>⌘ K</span></label>
     ${state.globalQuery.trim() ? `<section class="cockpit-search-results"><div class="section-heading"><div><span class="eyebrow">Sofortsuche</span><h2>${searchResults.length} Treffer</h2></div><button class="secondary-button" data-action="clear-global-search">Suche löschen</button></div><div class="product-list">${searchResults.map(productCard).join('') || '<div class="empty-state"><h2>Kein Produkt gefunden</h2><p>Versuchen Sie einen anderen Suchbegriff.</p></div>'}</div></section>` : ''}
@@ -1620,8 +1620,9 @@ function aktionenScreen() {
   if (open) {
     const partner = AKTION_PARTNER[open.partner];
     return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Aktion${open.gueltigBis ? ' · gültig bis ' + new Date(open.gueltigBis + 'T12:00:00').toLocaleDateString('de-DE') : ''}</span><h1>${escapeHtml(open.titel)}</h1></div><button class="secondary-button" data-action="aktion-close">Zurück</button></div>
-      <section class="advisor-card">
+      <div class="section-heading"><div><span class="eyebrow">Aktion · ${escapeHtml(aktionZeitraumText(open))}</span><h1>${escapeHtml(open.titel)}</h1></div><button class="secondary-button" data-action="aktion-close">Zurück</button></div>
+      <section class="advisor-card aktion-detail">
+        <button type="button" class="aktion-star ${state.aktionStars.includes(open.id) ? 'on' : ''}" data-aktion-star="${open.id}">${state.aktionStars.includes(open.id) ? '★ Mit Kunde besprochen – wird in die E-Mail übernommen' : '☆ Als „mit Kunde besprochen“ markieren'}</button>
         <p>${escapeHtml(open.text).replace(/\n/g, '<br>')}</p>
         ${(open.leistungen || []).length ? `<div class="info-card" style="margin-top:12px"><h2>Das Angebot im Überblick</h2><ul>${open.leistungen.map(l => `<li><span>✓</span>${escapeHtml(l)}</li>`).join('')}</ul></div>` : ''}
         ${(open.zielgruppen || []).length ? `<p class="muted-copy" style="margin-top:10px">Passt besonders zu: ${open.zielgruppen.map(escapeHtml).join(', ')}</p>` : ''}
@@ -1635,7 +1636,7 @@ function aktionenScreen() {
   }
   return `<main class="page advisor-page">
     <div class="section-heading"><div><span class="eyebrow">Vertrieb</span><h1>Aktionen</h1><p>Aktuelle Themen und Angebote, die der Innendienst für Sie freigeschaltet hat.</p></div></div>
-    ${list.length ? list.map(a => `<button type="button" class="category-card akquise aktion-card" data-aktion-open="${a.id}"><span class="category-icon">${icon('ideenschmiede')}</span><span><strong>${escapeHtml(a.titel)}</strong><small>${escapeHtml(a.teaser)}</small></span><b>›</b></button>`).join('') : '<div class="empty-state"><h2>Aktuell keine Aktion freigeschaltet</h2><p>Sobald der Innendienst eine Aktion für Sie freigibt, erscheint sie hier.</p></div>'}
+    ${list.length ? list.map(a => `<button type="button" class="category-card aktion aktion-card" data-aktion-open="${a.id}"><span class="category-icon">${icon('ideenschmiede')}</span><span><strong>${state.aktionStars.includes(a.id) ? '★ ' : ''}${escapeHtml(a.titel)}</strong><small>${escapeHtml(a.teaser)}</small></span><b>›</b></button>`).join('') : '<div class="empty-state"><h2>Aktuell keine Aktion freigeschaltet</h2><p>Sobald der Innendienst eine Aktion für Sie freigibt, erscheint sie hier.</p></div>'}
   </main>`;
 }
 function ideenschmiedeScreen() {
@@ -1732,11 +1733,12 @@ function acqNextStepFor(field, value) {
   if (field === 'gespraech') return value === 'ja' ? 'kontaktperson' : 'muster';
   if (field === 'produkteBesprochen') return value === 'ja' ? 'produkteAuswahl' : 'muster';
   if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : 'muster';
-  if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length) ? 'info' : 'termin');
-  if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : 'termin';
+  if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length) ? 'info' : acqPreTermin());
+  if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : acqPreTermin();
   if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'vorschau';
   return 'vorschau';
 }
+function acqPreTermin() { return aktionenForCurrentUser().length ? 'aktionen' : 'termin'; }
 function acqEnterVorschau() {
   const a = state.acq;
   acqGo('vorschau');
@@ -1831,6 +1833,12 @@ function buildAcqEmail() {
       if (a.infoDocs.ba) { const u = productDocUrl(p, 'ba'); if (u) docLines.push(`- ${p.name} – Betriebsanweisung: ${u}`); }
     });
     body.push(...(docLines.length ? docLines : ['(Die Unterlagen ergänze ich im Anschluss.)']));
+  }
+
+  const aktionen = aktionenStarred();
+  if (aktionen.length) {
+    body.push('', gespraech ? 'Außerdem haben wir über folgendes Thema gesprochen:' : 'Außerdem möchte ich Ihnen gerne folgendes Thema vorstellen:', '');
+    aktionen.forEach(ak => body.push(...aktionMailLines(ak)));
   }
 
   body.push('');
@@ -2014,7 +2022,7 @@ function acqScreen() {
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Muster wurden hinterlassen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${acqMusterPicker()}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${(acqBesprocheneIds().length||a.interesseIds.length)?'info':'termin'}" style="margin-top:14px"><span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${(acqBesprocheneIds().length||a.interesseIds.length)?'info':acqPreTermin()}" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
@@ -2032,6 +2040,15 @@ function acqScreen() {
           <button type="button" class="filter-chip ${d.sdb?'active':''}" data-acq-infodoc="sdb">Sicherheitsdatenblatt (SDB)</button>
           <button type="button" class="filter-chip ${d.ba?'active':''}" data-acq-infodoc="ba">Betriebsanweisung (BA)</button>
         </div>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${acqPreTermin()}" style="margin-top:14px"><span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
+  if (a.step === 'aktionen') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Aktion besprochen?</h1><p>Mit „Ja“ wird das Thema mit ★ markiert und passend in die E-Mail übernommen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        ${aktionenForCurrentUser().map(ak => { const on = state.aktionStars.includes(ak.id); return `<div class="aktion-ask"><strong>${escapeHtml(ak.titel)}</strong><small>${escapeHtml(ak.teaser)}</small><div class="notiz-baustein-chips"><button type="button" class="notiz-chip ${on?'active':''}" data-aktion-gesprochen="${ak.id}:ja">★ Ja, besprochen</button><button type="button" class="notiz-chip ${!on?'active':''}" data-aktion-gesprochen="${ak.id}:nein">Nein</button></div></div>`; }).join('')}
         <button type="button" class="primary-button compact" data-action="acq-goto" data-step="termin" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
@@ -3058,7 +3075,9 @@ function occasionPromptModal() {
     : isNew
       ? { kundentyp:2, neukunde:3, produktbereiche:4, musterfrage:5, notiz:6, ergebnis:7, occasion:8 }
       : { kundentyp:2, salutation:3, name:4, produktbereiche:5, musterfrage:6, notiz:7, ergebnis:8, occasion:9 };
-  const total = isAngebot ? 2 : (isNew ? 8 : 9);
+  let total = isAngebot ? 2 : (isNew ? 8 : 9);
+  const hasAkt = !isAngebot && aktionenForCurrentUser().length > 0;
+  if (hasAkt) { stepNum.aktionen = stepNum.produktbereiche + 1; ['musterfrage','notiz','ergebnis','occasion'].forEach(k => { stepNum[k]++; }); total++; }
 
   if (state.summaryStep === 'purpose') {
     return `<div class="modal-overlay">
@@ -3121,6 +3140,23 @@ function occasionPromptModal() {
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="${state.newCustomer ? 'occasion-back-neukunde' : 'produktbereiche-back-name'}">Zurück</button>
           <button class="primary-button compact" data-action="produktbereiche-weiter" ${entries.length || state.newCustomer ?'':'disabled'}>Weiter</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'aktionen') {
+    const list = aktionenForCurrentUser();
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(520px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Schritt ${stepNum.aktionen} von ${total}</span>
+        <h2>Aktion besprochen?</h2>
+        <p>Wurde im Gespräch über folgendes Thema gesprochen? Mit „Ja“ wird es mit ★ markiert und passend in die E-Mail an den Kunden übernommen.</p>
+        ${list.map(a => { const on = state.aktionStars.includes(a.id); return `<div class="aktion-ask"><strong>${escapeHtml(a.titel)}</strong><small>${escapeHtml(a.teaser)}</small>
+          <div class="notiz-baustein-chips"><button type="button" class="notiz-chip ${on?'active':''}" data-aktion-gesprochen="${a.id}:ja">★ Ja, besprochen</button><button type="button" class="notiz-chip ${!on?'active':''}" data-aktion-gesprochen="${a.id}:nein">Nein</button></div></div>`; }).join('')}
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="aktionen-back">Zurück</button>
+          <button class="primary-button compact" data-action="aktionen-weiter">Weiter</button>
         </div>
       </div>
     </div>`;
@@ -3783,6 +3819,11 @@ function buildCustomerSummaryEmail(){
     }
     lines.push('');
   });
+  const aktionenGesprochen = aktionenStarred();
+  if (aktionenGesprochen.length) {
+    lines.push('Außerdem haben wir über folgendes Thema gesprochen:', '');
+    aktionenGesprochen.forEach(ak => lines.push(...aktionMailLines(ak)));
+  }
   lines.push(
     'Kurz gesagt: Mit den genannten Produkten von Dr. Schumacher profitieren Sie von zuverlässiger Qualität, einfacher Anwendung und einem Höchstmaß an Sicherheit in Ihren Hygieneprozessen.',
     '',
@@ -3795,7 +3836,7 @@ function buildCustomerSummaryEmail(){
   return {subject:`Ihr Mehrwert im Überblick – Zusammenfassung unseres Gesprächs (Dr. Schumacher)`, body:lines.join('\n')};
 }
 function sendCustomerSummaryEmail(){
-  if(!state.favorites.length)return;
+  if(!state.favorites.length && !aktionenStarred().length)return;
   const {subject,body}=buildCustomerSummaryEmail();
   // Bei Neukunde ist die E-Mail-Adresse bereits aus dem Adressformular bekannt
   // (summaryPendingRecipient). Bei Bestandskunde gibt es kein E-Mail-Feld im Ablauf — dafür
@@ -3863,6 +3904,10 @@ function buildKaltakquiseNachfassEmail(){
       }
       lines.push('');
     });
+  }
+  if (!keinInteresse && aktionenStarred().length) {
+    lines.push('Außerdem hatten wir über folgendes Thema gesprochen:', '');
+    aktionenStarred().forEach(ak => lines.push(...aktionMailLines(ak)));
   }
   lines.push(
     keinInteresse
@@ -4570,6 +4615,10 @@ function produktbereichLabel(key){
 function reportDisplayName(r){
   return (r.firma !== undefined ? r.firma : r.customer) || '';
 }
+function crmAddAktion(text) {
+  const titles = aktionStarredTitles();
+  return titles.length ? text.replace(/^(Besprochene Produkte: .*)$/m, `$1\nBesprochene Aktion: ${titles.join(', ')}`) : text;
+}
 function buildCrmSummary(report = state.visitReport) {
   const date = report.date ? new Date(report.date+'T12:00:00').toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE');
   if (report.firma !== undefined) {
@@ -4599,7 +4648,7 @@ function buildCrmSummary(report = state.visitReport) {
       `Nächster Schritt: ${report.nextSteps || report.type || '-'}`,
       `Zuständiger Mitarbeiter: ${report.owner || '-'}`
     ];
-    return parts.join('\n');
+    return crmAddAktion(parts.join('\n'));
   }
   const parts = [
     `Besuchsbericht vom ${date}`,
@@ -4621,7 +4670,7 @@ function buildCrmSummary(report = state.visitReport) {
     `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
     `Verantwortlich: ${report.owner || '-'}`
   ];
-  return parts.join('\n');
+  return crmAddAktion(parts.join('\n'));
 }
 
 function currentRepUser(){
@@ -5171,6 +5220,8 @@ function bind() {
   $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
   if (state.dashboardArrangeMode) bindTileDrag();
   document.querySelectorAll('.ez-box').forEach(box => box.addEventListener('toggle', e => { state[box.dataset.ez === 'fit' ? 'fitOpen' : 'ezOpen'] = e.target.open; }));
+  document.querySelectorAll('[data-aktion-star]').forEach(b => b.onclick = () => { aktionSetStar(b.dataset.aktionStar, !state.aktionStars.includes(b.dataset.aktionStar)); render(); });
+  document.querySelectorAll('[data-aktion-gesprochen]').forEach(b => b.onclick = () => { const [id, v] = b.dataset.aktionGesprochen.split(':'); aktionSetStar(id, v === 'ja'); render(); });
   document.querySelectorAll('[data-aktion-open]').forEach(b => b.onclick = () => { state.aktionOpen = b.dataset.aktionOpen; render(); });
   $('[data-action="aktion-close"]')?.addEventListener('click', () => { state.aktionOpen = null; render(); });
   document.querySelectorAll('[data-aktion-kunde]').forEach(b => b.onclick = () => { const a = state.one.aktionen.find(x => x.id === b.dataset.aktionKunde); if (a) { const m = buildAktionKundenEmail(a); openMailto(m.subject, m.body, ''); } });
@@ -5290,7 +5341,9 @@ function bind() {
   }));
   $('[data-action="occasion-back-kundentyp"]')?.addEventListener('click', () => { state.summaryStep = 'kundentyp'; render(); });
   $('[data-action="occasion-back-neukunde"]')?.addEventListener('click', () => { state.summaryStep = 'neukunde'; render(); });
-  $('[data-action="occasion-back-produktbereiche"]')?.addEventListener('click', () => { state.summaryStep = 'produktbereiche'; render(); });
+  $('[data-action="occasion-back-produktbereiche"]')?.addEventListener('click', () => { state.summaryStep = aktionenForCurrentUser().length && state.summaryPurpose !== 'angebot' ? 'aktionen' : 'produktbereiche'; render(); });
+  $('[data-action="aktionen-back"]')?.addEventListener('click', () => { state.summaryStep = 'produktbereiche'; render(); });
+  $('[data-action="aktionen-weiter"]')?.addEventListener('click', () => { state.summaryStep = 'musterfrage'; render(); });
   document.querySelectorAll('[data-nc-field]').forEach(input => input.addEventListener('input', e => {
     const field = e.target.dataset.ncField;
     let val = e.target.value;
@@ -5342,7 +5395,7 @@ function bind() {
     state.spectrum = 'all';
     render();
   }));
-  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { if (state.newCustomer) newCustomerSave(); state.summaryStep = 'musterfrage'; render(); });
+  $('[data-action="produktbereiche-weiter"]')?.addEventListener('click', () => { if (state.newCustomer) newCustomerSave(); state.summaryStep = aktionenForCurrentUser().length && state.summaryPurpose !== 'angebot' ? 'aktionen' : 'musterfrage'; render(); });
   $('[data-action="produktbereiche-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'name'; render(); });
   $('[data-action="name-to-produktbereiche"]')?.addEventListener('click', () => { state.summaryStep = 'produktbereiche'; render(); });
   $('[data-action="additional-contact-open"]')?.addEventListener('click', () => {
@@ -6136,8 +6189,9 @@ function customerHistoryScreen() {
 function resetCustomerData() {
   if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf, Messe-Erfassung und der Konzept-Gesprächsstand (besprochene Bereiche, eigene Bereiche, Hersteller-Auswahl) werden zurückgesetzt. Preise, bereits gespeicherte Besuchsberichte und branchentypische Hersteller-Vorschläge bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryAdditionalContacts','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter','konzeptErledigt','konzeptCustomBereiche','konzeptWettbewerberSelected'].forEach(key => localStorage.removeItem(key));
+  ['favorites','aktionStars','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryAdditionalContacts','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter','konzeptErledigt','konzeptCustomBereiche','konzeptWettbewerberSelected'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
+  state.aktionStars = [];
   state.summaryCustomer = '';
   state.summaryKundenNr = '';
   state.summaryNotiz = '';
@@ -6438,6 +6492,8 @@ function oneDefaultAktionen() {
     leistungen:['Externe Hygienefachkraft als fester Ansprechpartner','Hygienebegehungen und Risikoanalysen','Individuelle Hygienekonzepte und Hygienehandbücher','Betreuung von Hygienekommissionen','Planung und Durchführung von Hygieneschulungen','Ausbildung von Hygienebeauftragten nach DGKH-Leitlinie','Unterstützung bei behördlichen Begehungen','Beratung im Ausbruchs- und Isolierungsmanagement'],
     partner:'eqmed',
     zielgruppen:['Pflegedienst / Pflegeeinrichtung'],
+    laufzeit:'dauer',
+    gueltigAb:'',
     gueltigBis:'',
     anfrageAn:'gerald.gampp@schumacher-online.com',
     status:'entwurf',
@@ -6445,9 +6501,34 @@ function oneDefaultAktionen() {
     createdAt:new Date().toISOString()
   }];
 }
+function aktionLaufzeit(a) { return a.laufzeit || (a.gueltigBis || a.gueltigAb ? 'zeitraum' : 'dauer'); }
+function aktionZeitraumText(a) {
+  if (aktionLaufzeit(a) !== 'zeitraum') return 'dauerhaft';
+  const d = s => new Date(s + 'T12:00:00').toLocaleDateString('de-DE');
+  return (a.gueltigAb ? 'ab ' + d(a.gueltigAb) : '') + (a.gueltigAb && a.gueltigBis ? ' ' : '') + (a.gueltigBis ? 'bis ' + d(a.gueltigBis) : '') || 'zeitlich begrenzt';
+}
+// "Besprochen" = Stern, wie bei den Produkten: markierte Aktionen werden in Kundenzusammenfassung,
+// Kaltakquise-E-Mail und CRM-Eintrag aufgegriffen.
+function aktionenStarred() { return aktionenForCurrentUser().filter(a => state.aktionStars.includes(a.id)); }
+function aktionStarredTitles() { return aktionenStarred().map(a => a.titel); }
+function aktionSetStar(id, on) {
+  state.aktionStars = on ? [...new Set([...state.aktionStars, id])] : state.aktionStars.filter(x => x !== id);
+  try { localStorage.setItem('aktionStars', JSON.stringify(state.aktionStars)); } catch (e) {}
+}
+function aktionMailLines(a) {
+  const partner = AKTION_PARTNER[a.partner];
+  const lines = [`▸ ${a.titel.toUpperCase()}`, a.text.trim(), ''];
+  (a.leistungen || []).forEach(l => lines.push(`  ✓ ${l}`));
+  if ((a.leistungen || []).length) lines.push('');
+  if (partner) lines.push(`${partner.name} – ${partner.zusatz}`, `${partner.website} · Telefon: ${partner.telefon} · E-Mail: ${partner.email}`, '');
+  return lines;
+}
 function aktionVisibleFor(a, u) {
   if (!a || !u || a.status !== 'freigegeben') return false;
-  if (a.gueltigBis && a.gueltigBis < new Date().toISOString().slice(0,10)) return false;
+  if (aktionLaufzeit(a) === 'zeitraum') {
+    const today = new Date().toISOString().slice(0,10);
+    if ((a.gueltigAb && a.gueltigAb > today) || (a.gueltigBis && a.gueltigBis < today)) return false;
+  }
   const f = a.freigabe || {};
   return !!(f.alle || (f.teams || []).includes(u.team) || (f.users || []).includes(u.id));
 }
@@ -7410,7 +7491,8 @@ function oneViewAktionen(){
       <div class="one-field" style="margin-top:12px"><label>Partner-Firma</label><select data-ak-field="partner"><option value="">Kein Partner</option>${Object.entries(AKTION_PARTNER).map(([k,v]) => `<option value="${k}" ${edit.partner===k?'selected':''}>${escapeHtml(v.name)}</option>`).join('')}</select></div>
       ${partner ? `<div class="one-note" style="margin-top:8px"><strong>${escapeHtml(partner.name)}</strong> – ${escapeHtml(partner.zusatz)}<br>${escapeHtml(partner.beschreibung)}<br><span class="muted">${escapeHtml(partner.website)} · ${escapeHtml(partner.telefon)} · ${escapeHtml(partner.email)} · ${escapeHtml(partner.adresse)}</span></div>` : ''}
       <div class="one-field" style="margin-top:12px"><label>Anfragen der Mitarbeiter gehen an (E-Mail)</label><input type="text" data-ak-field="anfrageAn" value="${escapeHtml(edit.anfrageAn || '')}"></div>
-      <div class="one-field" style="margin-top:12px"><label>Gültig bis (optional)</label><input type="date" data-ak-field="gueltigBis" value="${escapeHtml(edit.gueltigBis || '')}"></div>
+      <div class="one-field" style="margin-top:12px"><label>Laufzeit</label><select data-ak-field="laufzeit"><option value="dauer" ${aktionLaufzeit(edit)==='dauer'?'selected':''}>Dauerhaft (läuft, bis Sie sie zurückziehen)</option><option value="zeitraum" ${aktionLaufzeit(edit)==='zeitraum'?'selected':''}>Zeitraum (von – bis)</option></select></div>
+      ${aktionLaufzeit(edit)==='zeitraum' ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px"><div class="one-field" style="flex:1;min-width:150px"><label>Beginnt am</label><input type="date" data-ak-field="gueltigAb" value="${escapeHtml(edit.gueltigAb || '')}"></div><div class="one-field" style="flex:1;min-width:150px"><label>Endet am</label><input type="date" data-ak-field="gueltigBis" value="${escapeHtml(edit.gueltigBis || '')}"></div></div>` : ''}
       <div class="one-field" style="margin-top:12px"><label>Passende Zielgruppen (Hinweis für den Außendienst)</label><div style="display:flex;flex-wrap:wrap;gap:6px 16px">${NEUKUNDE_BRANCHEN.map(b => chk('data-ak-zg', b, (edit.zielgruppen || []).includes(b), b)).join('')}</div></div>
       <div class="one-field" style="margin-top:16px"><label>Freischalten für</label>
         ${chk('data-ak-alle', 'alle', f.alle, 'Alle Mitarbeiter')}
@@ -7428,7 +7510,7 @@ function oneViewAktionen(){
   return head + `<div class="one-panel"><div class="one-panel-head"><h2>Alle Aktionen</h2><p>${O.aktionen.length} angelegt · ${O.aktionen.filter(a=>a.status==='freigegeben').length} freigegeben</p></div>
     <div class="one-panel-body flush">${O.aktionen.map(a => `<div class="one-recipient">
       <span style="flex:1"><strong>${escapeHtml(a.titel)}</strong><br><span class="muted" style="font-size:13px">${escapeHtml(a.teaser)}</span><br>
-        <span class="one-chip ${a.status==='freigegeben'?'ok':'quiet'}">${a.status==='freigegeben'?'freigegeben':'Entwurf'}</span> <span class="muted" style="font-size:12px">${escapeHtml(aktionFreigabeText(a))}${AKTION_PARTNER[a.partner] ? ' · Partner: ' + escapeHtml(AKTION_PARTNER[a.partner].name) : ''}</span></span>
+        <span class="one-chip ${a.status==='freigegeben'?'ok':'quiet'}">${a.status==='freigegeben'?'freigegeben':'Entwurf'}</span> <span class="muted" style="font-size:12px">${escapeHtml(aktionFreigabeText(a))} · Laufzeit: ${escapeHtml(aktionZeitraumText(a))}${AKTION_PARTNER[a.partner] ? ' · Partner: ' + escapeHtml(AKTION_PARTNER[a.partner].name) : ''}</span></span>
       <button class="one-btn sm" data-one-act="aktion-edit" data-one-value="${a.id}">Bearbeiten</button>
       <button class="one-btn sm danger" data-one-act="aktion-delete" data-one-value="${a.id}">Löschen</button>
     </div>`).join('') || '<div class="one-recipient muted">Noch keine Aktion angelegt.</div>'}</div>
@@ -8732,7 +8814,7 @@ function bindOne(){
     // ===================== Aktionen (Admin) =====================
     if (a === 'aktion-new'){
       const id = 'ak' + Date.now().toString(36);
-      O.aktionen.unshift({ id, titel:'Neue Aktion', teaser:'', text:'', leistungen:[], partner:'', zielgruppen:[], gueltigBis:'', anfrageAn:OUTGOING_SENDER_EMAIL, status:'entwurf', freigabe:{alle:false, teams:[], users:[]}, createdAt:new Date().toISOString() });
+      O.aktionen.unshift({ id, titel:'Neue Aktion', teaser:'', text:'', leistungen:[], partner:'', zielgruppen:[], laufzeit:'dauer', gueltigAb:'', gueltigBis:'', anfrageAn:OUTGOING_SENDER_EMAIL, status:'entwurf', freigabe:{alle:false, teams:[], users:[]}, createdAt:new Date().toISOString() });
       O.aktionEdit = id; onePersistAktionen(); render(); return;
     }
     if (a === 'aktion-edit'){ O.aktionEdit = el.dataset.oneValue; render(); return; }
@@ -8803,7 +8885,7 @@ function bindOne(){
       document.querySelectorAll('[data-ak-field]').forEach(el => el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
         const fld = el.dataset.akField;
         ak[fld] = fld === 'leistungen' ? el.value.split('\n').map(s => s.trim()).filter(Boolean) : el.value;
-        if (fld === 'partner') render();
+        if (fld === 'partner' || fld === 'laufzeit') render();
         onePersistAktionen();
       }));
       const toggleIn = (list, v, on) => on ? (list.includes(v) ? list : [...list, v]) : list.filter(x => x !== v);
