@@ -6500,8 +6500,8 @@ function oneDefaultAktionen() {
     gueltigAb:'',
     gueltigBis:'',
     anfrageAn:'gerald.gampp@schumacher-online.com',
-    status:'entwurf',
-    freigabe:{alle:false, teams:[], users:[]},
+    status:'freigegeben',
+    freigabe:{alle:false, teams:[], users:['gg']},
     createdAt:new Date().toISOString()
   }];
 }
@@ -6556,6 +6556,41 @@ function aktionFreigabeText(a) {
   if ((f.teams || []).length) parts.push('Team ' + f.teams.map(id => (ONE_TEAMS.find(t => t.id === id) || {}).label || id).join(', '));
   if ((f.users || []).length) parts.push(f.users.map(id => (state.one.users.find(x => x.id === id) || {}).name || id).join(', '));
   return parts.length ? 'Freigegeben für ' + parts.join(' · ') : 'Freigegeben – aber an niemanden';
+}
+// Ohne Server gibt es keinen gemeinsamen Speicher. Damit Freigaben trotzdem andere Geräte erreichen,
+// erzeugt der Admin einen Link mit allen freigegebenen Aktionen; öffnet ein Mitarbeiter ihn einmal
+// auf seinem Gerät, werden die Aktionen dort übernommen (Änderungen später = neuen Link senden).
+const PUBLIC_APP_URL = 'https://epoxidwelt.github.io/dr-schumacher-app/';
+function aktionShareLink() {
+  const payload = {v:1, aktionen: state.one.aktionen.filter(a => a.status === 'freigegeben')};
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return PUBLIC_APP_URL + '#aktionen=' + b64;
+}
+function aktionSanitize(a) {
+  const s = (v, n) => String(v == null ? '' : v).slice(0, n);
+  const list = (v, n) => (Array.isArray(v) ? v : []).map(x => s(x, 300)).slice(0, n);
+  if (!a || typeof a !== 'object' || !a.id) return null;
+  const f = a.freigabe || {};
+  return {
+    id: s(a.id, 60), titel: s(a.titel, 200), teaser: s(a.teaser, 400), text: s(a.text, 4000), leistungen: list(a.leistungen, 20),
+    partner: AKTION_PARTNER[a.partner] ? a.partner : '', zielgruppen: list(a.zielgruppen, 20),
+    laufzeit: a.laufzeit === 'zeitraum' ? 'zeitraum' : 'dauer', gueltigAb: s(a.gueltigAb, 10), gueltigBis: s(a.gueltigBis, 10),
+    anfrageAn: s(a.anfrageAn, 200), status: 'freigegeben',
+    freigabe: { alle: !!f.alle, teams: list(f.teams, 10), users: list(f.users, 100) }, createdAt: s(a.createdAt, 40)
+  };
+}
+function aktionenImportFromLink() {
+  const m = location.hash.match(/^#aktionen=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  try {
+    const json = decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/'))));
+    const payload = JSON.parse(json);
+    const incoming = (payload.aktionen || []).map(aktionSanitize).filter(Boolean);
+    incoming.forEach(a => { const i = state.one.aktionen.findIndex(x => x.id === a.id); if (i > -1) state.one.aktionen[i] = {...state.one.aktionen[i], ...a}; else state.one.aktionen.push(a); });
+    onePersistAktionen();
+    history.replaceState(null, '', location.pathname + location.search);
+    if (incoming.length) setTimeout(() => alert(incoming.length + ' Aktion(en) vom Innendienst übernommen.'), 400);
+  } catch (e) { console.warn('Aktionen-Link konnte nicht gelesen werden', e); }
 }
 function buildAktionKundenEmail(a) {
   const partner = AKTION_PARTNER[a.partner];
@@ -6685,6 +6720,17 @@ state.one = oneSeed();
     if (Array.isArray(savedKol)) state.one.kol = savedKol;
   } catch (e) { console.warn('Gespeicherte KOL-Referenzen konnten nicht geladen werden', e); }
 })();
+// Einmalige Migration: die vorbereitete Hygienefachkraft-Aktion ist für Gerald Gampp freigeschaltet –
+// auch auf Geräten, die noch den früheren Entwurf gespeichert haben.
+(function aktionSeedMigration(){
+  try {
+    if (localStorage.getItem('aktionSeedMigrated3')) return;
+    const a = state.one.aktionen.find(x => x.id === 'ak-hygienefachkraft');
+    if (a) { a.status = 'freigegeben'; a.freigabe = a.freigabe || {alle:false,teams:[],users:[]}; if (!(a.freigabe.users || (a.freigabe.users = [])).includes('gg')) a.freigabe.users.push('gg'); onePersistAktionen(); }
+    localStorage.setItem('aktionSeedMigrated3', '1');
+  } catch (e) {}
+})();
+aktionenImportFromLink();
 function onePersistUsers(){ try { localStorage.setItem('oneUsers', JSON.stringify(state.one.users)); } catch (e) {} }
 function onePersistContacts(){ try { localStorage.setItem('oneContacts', JSON.stringify(state.one.contacts)); } catch (e) {} }
 function onePersistMailings(){ try { localStorage.setItem('oneMailings', JSON.stringify(state.one.mailings)); } catch (e) {} }
@@ -7518,7 +7564,8 @@ function oneViewAktionen(){
       <button class="one-btn sm" data-one-act="aktion-edit" data-one-value="${a.id}">Bearbeiten</button>
       <button class="one-btn sm danger" data-one-act="aktion-delete" data-one-value="${a.id}">Löschen</button>
     </div>`).join('') || '<div class="one-recipient muted">Noch keine Aktion angelegt.</div>'}</div>
-    <div class="one-panel-body" style="border-top:1px solid var(--one-line)"><button class="one-btn primary" data-one-act="aktion-new">+ Neue Aktion</button></div></div>
+    <div class="one-panel-body" style="border-top:1px solid var(--one-line);display:flex;gap:8px;flex-wrap:wrap"><button class="one-btn primary" data-one-act="aktion-new">+ Neue Aktion</button><button class="one-btn" data-one-act="aktion-link">Link für Mitarbeiter erzeugen</button></div>
+    ${O.aktionLink ? `<div class="one-panel-body" style="border-top:1px solid var(--one-line)"><div class="one-field"><label>Link – Mitarbeiter öffnen ihn einmal auf ihrem Gerät, dann ist die Aktion dort freigeschaltet</label><input type="text" readonly id="aktionLinkField" value="${escapeHtml(O.aktionLink)}" onfocus="this.select()"></div><button class="one-btn sm" style="margin-top:8px" data-one-act="aktion-link-copy">Link kopieren</button></div>` : ''}</div>
   <div class="one-panel"><div class="one-panel-body"><div class="one-note">Hinweis: Wie alle ONE-Daten in diesem Prototyp liegen Aktionen und Freigaben lokal im Browser des jeweiligen Geräts. Für eine geräteübergreifende Verteilung an alle Mitarbeiter braucht es einen zentralen Server.</div></div></div>`;
 }
 function oneViewMailingBlocks(){
@@ -8820,6 +8867,13 @@ function bindOne(){
       const id = 'ak' + Date.now().toString(36);
       O.aktionen.unshift({ id, titel:'Neue Aktion', teaser:'', text:'', leistungen:[], partner:'', zielgruppen:[], laufzeit:'dauer', gueltigAb:'', gueltigBis:'', anfrageAn:OUTGOING_SENDER_EMAIL, status:'entwurf', freigabe:{alle:false, teams:[], users:[]}, createdAt:new Date().toISOString() });
       O.aktionEdit = id; onePersistAktionen(); render(); return;
+    }
+    if (a === 'aktion-link'){ O.aktionLink = aktionShareLink(); render(); return; }
+    if (a === 'aktion-link-copy'){
+      const f = document.getElementById('aktionLinkField'); if (!f) return;
+      f.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(f.value) : Promise.reject()).catch(() => { try { document.execCommand('copy'); } catch (e) {} });
+      el.textContent = 'Kopiert ✓'; return;
     }
     if (a === 'aktion-edit'){ O.aktionEdit = el.dataset.oneValue; render(); return; }
     if (a === 'aktion-done'){ O.aktionEdit = null; render(); return; }
