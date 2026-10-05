@@ -7554,6 +7554,7 @@ function oneViewAktionen(){
         ? `<button class="one-btn" data-one-act="aktion-unpublish" data-one-value="${edit.id}">Zurückziehen (Entwurf)</button>`
         : `<button class="one-btn primary" data-one-act="aktion-publish" data-one-value="${edit.id}">Für Mitarbeiter freischalten</button>`}
       <button class="one-btn" data-one-act="aktion-done">Fertig</button>
+      <button class="one-btn danger" data-one-act="aktion-delete" data-one-value="${edit.id}">Aktion löschen</button>
       <span class="muted" style="align-self:center;font-size:13px">${escapeHtml(aktionFreigabeText(edit))}</span>
     </div></div>`;
   }
@@ -8879,7 +8880,7 @@ function bindOne(){
     if (a === 'aktion-done'){ O.aktionEdit = null; render(); return; }
     if (a === 'aktion-delete'){
       const ak = O.aktionen.find(x => x.id === el.dataset.oneValue);
-      if (ak && confirm('Aktion „' + ak.titel + '“ wirklich löschen?')) { O.aktionen = O.aktionen.filter(x => x.id !== ak.id); oneAudit('Aktion gelöscht', ak.titel); onePersistAktionen(); render(); }
+      if (ak && confirm('Aktion „' + ak.titel + '“ wirklich löschen?')) { O.aktionen = O.aktionen.filter(x => x.id !== ak.id); if (O.aktionEdit === ak.id) O.aktionEdit = null; state.aktionStars = state.aktionStars.filter(x => x !== ak.id); try { localStorage.setItem('aktionStars', JSON.stringify(state.aktionStars)); } catch (e) {} oneAudit('Aktion gelöscht', ak.titel); onePersistAktionen(); render(); }
       return;
     }
     if (a === 'aktion-publish'){
