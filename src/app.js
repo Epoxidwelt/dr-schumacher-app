@@ -439,6 +439,7 @@ const state = {
   dashboardToolOrder: JSON.parse(localStorage.getItem('dashboardToolOrder') || 'null'),
   dashboardArrangeMode: false,
   ezOpen: false,
+  fitOpen: false,
   acqBrancheOrder: JSON.parse(localStorage.getItem('acqBrancheOrder') || 'null'),
   acqArrangeMode: false,
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
@@ -1225,7 +1226,7 @@ function detailScreen() {
       <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
-      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${einwirkzeitenHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
+      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${einwirkzeitenHtml(p)}${dispenserFitHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
       <div class="price-card-detail"><span>Gebinde auswählen${p.sizes.length>1?' · anklicken markiert die Variante als Favorit':''}</span><div class="size-selector">${p.sizes.map(size => {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
@@ -4846,7 +4847,42 @@ function einwirkzeitenHtml(p) {
   } else {
     body = `<table class="ez-table"><tbody>${sorted.map(r => `<tr><td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1])}</td></tr>`).join('')}</tbody></table>`;
   }
-  return `<details class="ez-box" ${state.ezOpen ? 'open' : ''}><summary>⏱ Einwirkzeiten nach Wirkungsspektrum <small>(${rows.length})</small></summary>${body}<p class="ez-note">${plain ? '' : 'Bei Konzentraten gilt die Zeit für die jeweils angegebene Konzentration. '}Aus der aktuellen Produktinformation (PIF) übernommen, inkl. ergänzender Prüfergebnisse – verbindlich ist die aktuelle PIF.</p></details>`;
+  return `<details class="ez-box" data-ez="ez" ${state.ezOpen ? 'open' : ''}><summary>⏱ Einwirkzeiten nach Wirkungsspektrum <small>(${rows.length})</small></summary>${body}<p class="ez-note">${plain ? '' : 'Bei Konzentraten gilt die Zeit für die jeweils angegebene Konzentration. '}Aus der aktuellen Produktinformation (PIF) übernommen, inkl. ergänzender Prüfergebnisse – verbindlich ist die aktuelle PIF.</p></details>`;
+}
+// Welche Gebinde passen in welche Wandspender? Zusammengestellt aus den Produktseiten und der
+// GHK-Broschüre (Stand 04/2026) von schumacher-online.com. null = in der Produktinformation
+// nicht angegeben (nicht als "passt nicht" lesen), 'ja' = ohne Zubehör, sonst Zubehörhinweis.
+const DISPENSER_FIT = [
+  {n:'AK 500 PLUS / AK 1000 PLUS (Armhebel)', b500:'ja', b1l:'ja', vb:'ja'},
+  {n:'AK 1000 PLUS TOUCHLESS', b500:'ja', b1l:'ja', vb:'ja'},
+  {n:'SPE 500 (Armhebel)', b500:'ja', b1l:'ja', vb:'mit ESH-Adapter 00-918-KOMB-01'},
+  {n:'SPE 1000 (Armhebel)', b500:'ja', b1l:'ja', vb:null},
+  {n:'SPE Touchless 1000 ml', b500:'ja', b1l:'ja', vb:null},
+  {n:'RX5 TOUCHLESS', b500:'ja', b1l:null, vb:'ja'},
+  {n:'SPE ALU FLEX', b500:'mit Flaschenklemme 00-907-KOMB-03', b1l:'ja', vb:'mit ESH-Adapter 00-907-KOMB-01'},
+  {n:'ingo-man® plus / RX Eurospender (OPHARDT, vorhandene Spender)', b500:null, b1l:null, vb:'ja'}
+];
+const DISPENSER_FIT_PRODUCTS = ['descoderm','aseptoman-parfümfrei','aseptoman-med','aseptoman-duo','aseptoman-plus','aseptoman-forte','aseptoman-viral','aseptoman-gel','descolind-comfort-wash','descolind-comfort','descolind-pure-wash','descolind-pure','descolind-pure-intensive-cream','descolind-expert-wash','descolind-expert','descolind-expert-protect-cream'];
+const DISPENSER_PRODUCTS = ['ak-plus-500-wandspender','ak-plus-1000-wandspender','ak-plus-1000-touchless','rx5-touchless','spe-500-touchless','spe-1000-touchless'];
+function dispenserFitHtml(p) {
+  const src = 'Quelle: Produktseiten und GHK-Broschüre von schumacher-online.com (Stand 04/2026). ';
+  const note = src + '„–“ = keine Angabe in der Produktinformation, nicht als „passt nicht“ lesen.';
+  const hint = v => v && v !== 'ja' ? ` <small>(${escapeHtml(v)})</small>` : '';
+  if (DISPENSER_PRODUCTS.includes(p.id)) {
+    const cell = d => { const parts = []; if (d.b500) parts.push('500 ml' + (d.b500 !== 'ja' ? ` (${d.b500})` : '')); if (d.b1l) parts.push('1 L' + (d.b1l !== 'ja' ? ` (${d.b1l})` : '')); return parts.length ? '✓ ' + parts.join(' · ') : '–'; };
+    const vb = d => d.vb ? '✓ ' + (d.vb === 'ja' ? 'ja' : d.vb) : '–';
+    return `<details class="ez-box" data-ez="fit" ${state.fitOpen ? 'open' : ''}><summary>🔌 Passende Gebinde je Spender</summary><table class="ez-table fit-table"><thead><tr><td><strong>Spender</strong></td><td><strong>Flaschen</strong></td><td><strong>ESH Vacu-Bag 700 ml</strong></td></tr></thead><tbody>${DISPENSER_FIT.map(d => `<tr><td>${escapeHtml(d.n)}</td><td>${escapeHtml(cell(d))}</td><td>${escapeHtml(vb(d))}</td></tr>`).join('')}</tbody></table><p class="ez-note">Als ESH Vacu-Bag erhältlich: ASEPTOMAN® MED, ASEPTOMAN® FORTE, DESCOLIND PURE WASH, DESCOLIND EXPERT PROTECT CREAM. ${note}</p></details>`;
+  }
+  if (!DISPENSER_FIT_PRODUCTS.includes(p.id)) return '';
+  const sizes = p.sizes || [];
+  const groups = [];
+  if (sizes.some(s => /^500 ml/.test(s) && !/Vacu/.test(s))) groups.push(['500 ml Spenderflasche', DISPENSER_FIT.filter(d => d.b500), 'b500']);
+  if (sizes.includes('1 L')) groups.push(['1 L Spenderflasche', DISPENSER_FIT.filter(d => d.b1l), 'b1l']);
+  if (sizes.some(s => /Vacu-Bag/.test(s))) groups.push(['700 ml ESH Vacu-Bag (kurze/lange Pumpe)', DISPENSER_FIT.filter(d => d.vb), 'vb']);
+  if (!groups.length) return '';
+  const body = groups.map(([title, list, key]) => `<div class="ez-group"><strong class="ez-time" style="flex-basis:150px">${escapeHtml(title)}</strong><ul>${list.map(d => `<li>${escapeHtml(d.n)}${hint(d[key])}</li>`).join('')}</ul></div>`).join('');
+  const vbNote = groups.some(g => g[2] === 'vb') ? 'Der Vacu-Bag ist mit kurzem oder langem Pumpenauslass erhältlich – je nach vorhandenem Spender wählen, bei Unsicherheit den Innendienst fragen. ' : '';
+  return `<details class="ez-box" data-ez="fit" ${state.fitOpen ? 'open' : ''}><summary>🔌 Passt in diese Wandspender</summary>${body}<p class="ez-note">${vbNote}${src}Weitere Spender: Angabe nur, wenn in der Produktinformation genannt.</p></details>`;
 }
 function productDocUrl(product, kind) {
   const docs = PRODUCT_DOCS[product.id];
@@ -5105,7 +5141,7 @@ function bind() {
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
   $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
   if (state.dashboardArrangeMode) bindTileDrag();
-  document.querySelector('.ez-box')?.addEventListener('toggle', e => { state.ezOpen = e.target.open; });
+  document.querySelectorAll('.ez-box').forEach(box => box.addEventListener('toggle', e => { state[box.dataset.ez === 'fit' ? 'fitOpen' : 'ezOpen'] = e.target.open; }));
   $('[data-action="acq-toggle-arrange"]')?.addEventListener('click', () => { state.acqArrangeMode = !state.acqArrangeMode; render(); });
   if (state.acqArrangeMode && state.screen === 'akquise' && state.acq.step === 'branche') bindTileDrag();
   $('#excel')?.addEventListener('change', importExcel);
