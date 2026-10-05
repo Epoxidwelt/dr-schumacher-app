@@ -438,6 +438,7 @@ const state = {
   recent: JSON.parse(localStorage.getItem('recentProducts') || '[]'),
   dashboardToolOrder: JSON.parse(localStorage.getItem('dashboardToolOrder') || 'null'),
   dashboardArrangeMode: false,
+  ezOpen: false,
   acqBrancheOrder: JSON.parse(localStorage.getItem('acqBrancheOrder') || 'null'),
   acqArrangeMode: false,
   emailInclude: {price:true, sheet:true, safety:true, ba:true, muster:false},
@@ -1224,7 +1225,7 @@ function detailScreen() {
       <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
-      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${p.einwirkzeitEntries && p.einwirkzeitEntries.length ? `<div class="einwirkzeit-list">${p.einwirkzeitEntries.map(e => `<div class="einwirkzeit-badge ${e.kind}">⏱ ${escapeHtml(e.label)} in ${escapeHtml(e.time)}${e.detail ? ` <span class="einwirkzeit-tier">${escapeHtml(e.detail)}</span>` : ''}</div>`).join('')}</div>` : ''}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
+      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${einwirkzeitenHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
       <div class="price-card-detail"><span>Gebinde auswählen${p.sizes.length>1?' · anklicken markiert die Variante als Favorit':''}</span><div class="size-selector">${p.sizes.map(size => {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
@@ -4782,6 +4783,71 @@ function biozidBadge() {
 function documentLink(title, sub, url, emoji) {
   return `<a class="document-link" href="${url}" target="_blank" rel="noopener"><span>${emoji}</span><div><strong>${title}</strong><small>${sub}</small></div><b>↗</b></a>`;
 }
+// Einwirkzeiten je Wirkungsspektrum, aus der jeweils aktuellen Produktinformation (PIF) von
+// schumacher-online.com übernommen: [Wirkungsspektrum, Zeit (bei Konzentraten mit Konzentration),
+// 1 = ergänzendes Prüfergebnis]. Bei mehreren Prüfnormen/Belastungen steht die längere (sichere)
+// Zeit. Produkte ohne Eintrag zeigen weiter die bisherigen Kurzangaben (einwirkzeitEntries).
+const EINWIRKZEITEN = {
+  "aseptoderm": [["Begrenzt viruzid RKI/DVV inkl. HBV/HIV/HCV","15 Sek.",0],["Hautantiseptik vor Injektionen und Punktionen","15 Sek.",0],["Hautantiseptik vor Punktionen von Gelenken, Körperhöhlen, Hohlorganen und operativen Eingriffen","1 Min.",0],["Hautantiseptik auf talgdrüsenreicher Haut","10 Min. (VAH-Gutachten: mind. 3 Min.)",0],["Begrenzt viruzid","15 Sek.",1],["Bakterizid","15 Sek.",1],["Levurozid (Candida albicans)","15 Sek.",1],["Tuberkulozid (M. terrae)","30 Sek.",1]],
+  "aseptoderm-gefärbt": [["Begrenzt viruzid RKI/DVV inkl. HBV/HIV/HCV","15 Sek.",0],["Hautantiseptik vor Injektionen und Punktionen","15 Sek.",0],["Hautantiseptik vor Punktionen von Gelenken, Körperhöhlen, Hohlorganen und operativen Eingriffen","1 Min.",0],["Hautantiseptik auf talgdrüsenreicher Haut","10 Min. (VAH-Gutachten: mind. 3 Min.)",0],["Begrenzt viruzid","15 Sek.",1],["Bakterizid","15 Sek.",1],["Levurozid (Candida albicans)","15 Sek.",1],["Tuberkulozid (M. terrae)","30 Sek.",1]],
+  "aseptoman-duo": [["Begrenzt viruzid","15 Sek.",0],["Tuberkulozid (M. terrae)","15 Sek.",0],["Hygienische Händedesinfektion","30 Sek.",0],["Begrenzt viruzid PLUS","30 Sek.",0],["Wirksam gegen Noroviren (MNV)","30 Sek.",0],["Mykobakterizid (M. terrae, M. avium)","30 Sek.",0],["Chirurgische Händedesinfektion","1,5 Min.",0]],
+  "aseptoman-forte": [["Hygienische Händedesinfektion","30 Sek.",0],["Tuberkulozid (M. terrae)","30 Sek.",0],["Mykobakterizid (M. terrae und M. avium)","30 Sek.",0],["Viruzid","30 Sek.",0],["Begrenzt viruzid PLUS","30 Sek.",0],["Chirurgische Händedesinfektion","1,5 Min.",0],["Fungizid (A. brasiliensis)","2 Min.",0],["Wirksam gegen Noroviren (MNV)","15 Sek.",1],["Bakterizid","15 Sek.",1],["Levurozid (C. albicans)","15 Sek.",1],["Wirksam gegen Polioviren","30 Sek.",1],["Wirksam gegen Adenoviren","30 Sek.",1]],
+  "aseptoman-med": [["Hygienische Händedesinfektion","30 Sek.",0],["Tuberkulozid (M. terrae)","30 Sek.",0],["Mykobakterizid (M. terrae und M. avium)","30 Sek.",0],["Begrenzt viruzid PLUS","30 Sek.",0],["Chirurgische Händedesinfektion","2 Min.",0],["Begrenzt viruzid","15 Sek.",1],["Bakterizid","30 Sek.",1],["Levurozid (Candida albicans)","30 Sek.",1],["Wirksam gegen Adenoviren","30 Sek.",1],["Wirksam gegen Noroviren (MNV)","30 Sek.",1],["Wirksam gegen Coronaviren","30 Sek.",1]],
+  "aseptoman-parfümfrei": [["Tuberkulozid (M. terrae)","15 Sek.",0],["Begrenzt viruzid","30 Sek.",0],["Mykobakterizid","30 Sek.",0],["Hygienische Händedesinfektion","30 Sek.",0],["Chirurgische Händedesinfektion","1,5 Min.",0],["Begrenzt viruzid RKI/DVV inkl. HBV/HIV/HCV","15 Sek.",1],["Wirksam gegen Rotaviren","15 Sek.",1],["Bakterizid","15 Sek.",1],["Levurozid (Candida albicans)","15 Sek.",1],["Wirksam gegen Coronaviren (bovines Coronavirus)","30 Sek.",1],["Wirksam gegen Noroviren (MNV)","1 Min.",1]],
+  "aseptoman-plus": [["Begrenzt viruzid","15 Sek.",0],["Tuberkulozid (M. terrae)","15 Sek.",0],["Hygienische Händedesinfektion","30 Sek.",0],["Begrenzt viruzid PLUS","30 Sek.",0],["Mykobakterizid (M. terrae und M. avium)","30 Sek.",0],["Chirurgische Händedesinfektion","1,5 Min.",0],["Bakterizid","15 Sek.",1],["Levurozid (C. albicans)","15 Sek.",1],["Begrenzt viruzid RKI/DVV","15 Sek.",1],["Wirksam gegen Noroviren (MNV)","30 Sek.",1],["Wirksam gegen Adenoviren","30 Sek.",1]],
+  "aseptoman-viral": [["Tuberkulozid (M. terrae)","15 Sek.",0],["Hygienische Händedesinfektion","30 Sek.",0],["Begrenzt viruzid RKI/DVV","30 Sek.",0],["Hygienische Händedesinfektion im Seuchenfall gemäß IfSG","1 Min.",0],["Viruzid RKI/DVV","1 Min.",0],["Wirksam gegen Rotaviren RKI/DVV","15 Sek.",1],["Wirksam gegen Vacciniaviren RKI/DVV","15 Sek.",1],["Wirksam gegen BVDV RKI/DVV","15 Sek.",1],["Bakterizid","15 Sek.",1],["Levurozid (Candida albicans)","15 Sek.",1],["Begrenzt viruzid PLUS","30 Sek.",1],["Wirksam gegen Noroviren (MNV)","30 Sek.",1],["Wirksam gegen Adenoviren RKI/DVV","30 Sek.",1],["Wirksam gegen Adenoviren","30 Sek.",1],["Wirksam gegen SV40/Papova-/Polyomaviren RKI/DVV","30 Sek.",1],["Wirksam gegen Polioviren RKI/DVV","1 Min.",1]],
+  "biguanid-fläche-nr": [["Bakterizid, levurozid","5 Min. (1 %) · 60 Min. (0,5 %)",0],["Begrenzt viruzid","15 Min. (1 %)",0]],
+  "cleanisept": [["Bakterizid, levurozid","1 Min. (7,5 %) · 15 Min. (2,5 %) · 30 Min. (1 %)",0],["Begrenzt viruzid","1 Min. (7,5 %) · 15 Min. (2 %) · 30 Min. (1,25 %)",0],["Wirksam gegen Noroviren","60 Min. (7,5 %)",0],["Bakterizid, levurozid (nicht-medizinische Bereiche)","5 Min. (0,5 %)",1]],
+  "cleanisept-wipes": [["Bakterizid, levurozid","1 Min.",0],["Begrenzt viruzid","1 Min.",0],["Bakterizid","1 Min.",1],["Levurozid (C. albicans)","1 Min.",1],["Wirksam gegen Papova-/SV40-Viren","2 Min.",1]],
+  "cleanisept-wipes-forte": [["Bakterizid, levurozid","1 Min.",0],["Viruzid","1 Min.",0],["Wirksam gegen Polyomaviren/SV40","2 Min.",0],["Wirksam gegen Noroviren (MNV)","1 Min.",1],["Wirksam gegen Adenoviren","1 Min.",1],["Wirksam gegen Polioviren","1 Min.",1],["Bakterizid","2 Min.",1],["Levurozid","2 Min.",1],["Fungizid (Aspergillus brasiliensis)","15 Min.",1]],
+  "cleanisept-wipes-forte-maxi": [["Bakterizid, levurozid","1 Min.",0],["Viruzid","1 Min.",0],["Wirksam gegen Polyomaviren/SV40","2 Min.",0],["Wirksam gegen Noroviren (MNV)","1 Min.",1],["Wirksam gegen Adenoviren","1 Min.",1],["Wirksam gegen Polioviren","1 Min.",1],["Bakterizid","2 Min.",1],["Levurozid","2 Min.",1],["Fungizid (Aspergillus brasiliensis)","15 Min.",1]],
+  "cleanisept-wipes-maxi": [["Bakterizid, levurozid","1 Min.",0],["Begrenzt viruzid","1 Min.",0],["Bakterizid","1 Min.",1],["Levurozid (C. albicans)","1 Min.",1],["Wirksam gegen Papova-/SV40-Viren","2 Min.",1]],
+  "decontaman-pre-cap": [["Levurozid (C. albicans)","3 Min.",0],["Desinfizierende Haarwäsche","5 Min.",0],["Bakterizid","5 Min.",0]],
+  "decontaman-pre-wash": [["Hygienische Händewaschung","30 Sek.",0],["Begrenzt viruzid","30 Sek.",0],["Bakterizid","15 Sek.",1],["Levurozid (C. albicans)","30 Sek.",1]],
+  "decontaman-pre-wipes": [["Levurozid (C. albicans)","3 Min.",0],["Desinfizierende Patientenwaschung","5 Min.",0],["Bakterizid","5 Min.",0]],
+  "desco-bohrerbad": [["Bakterizid, levurozid","1 Min.",0],["Begrenzt viruzid","1 Min.",0],["Tuberkulozid (M. terrae)","5 Min.",0]],
+  "descoderm": [["Begrenzt viruzid RKI/DVV","30 Sek.",0],["Mykobakterizid (M. avium und M. terrae)","30 Sek.",0],["Hygienische Händedesinfektion","30 Sek.",0],["Chirurgische Händedesinfektion","1,5 Min.",0],["Wirksam gegen Rotaviren","15 Sek.",1],["Tuberkulozid (M. terrae)","15 Sek.",1],["Bakterizid","15 Sek.",1],["Levurozid (Candida albicans)","15 Sek.",1],["Wirksam gegen Noroviren (MNV)","1 Min.",1]],
+  "descoderm-pads": [["Tuberkulozid (M. terrae)","15 Sek.",0],["Begrenzt viruzid","15 Sek.",0],["Mykobakterizid (M. avium und M. terrae)","30 Sek.",0],["Oberflächendesinfektion","1 Min.",0],["Bakterizid","15 Sek.",1],["Levurozid (Candida albicans)","1 Min.",1]],
+  "descoprent": [["Bakterizid, levurozid","5 Min.",0],["Begrenzt viruzid","15 Min.",0],["Bakterizid","1 Min.",1],["Levurozid (C. albicans)","5 Min.",1]],
+  "descosept-pur": [["Begrenzt viruzid","1 Min.",0],["Bakterizid, levurozid","5 Min.",0],["Tuberkulozid","5 Min.",0],["Mykobakterizid","5 Min.",0],["Begrenzt viruzid PLUS","5 Min.",0]],
+  "descosept-pur-wipes-rtu": [["Tuberkulozid (M. terrae)","30 Sek.",0],["Mykobakterizid (M.avium und M. terrae)","1 Min.",0],["Begrenzt viruzid","1 Min.",0],["Begrenzt viruzid PLUS","3 Min.",0],["Bakterizid, levurozid","5 Min.",0],["Wirksam gegen Noroviren (MNV)","1 Min.",1],["Bakterizid","1 Min.",1],["Levurozid (C. albicans)","1 Min.",1],["Wirksam gegen Adenoviren","3 Min.",1]],
+  "descosept-sensitive": [["Tuberkulozid","1 Min.",0],["Bakterizid, levurozid","2 Min.",0],["Mykobakterizid","2 Min.",0],["Begrenzt viruzid PLUS","5 Min.",0],["Begrenzt viruzid","5 Min.",0],["Bakterizid","2 Min.",1],["Levurozid","2 Min.",1],["Wirksam gegen Adenoviren","3 Min.",1],["Wirksam gegen Noroviren (MNV)","5 Min.",1],["Wirksam gegen Vacciniaviren","5 Min.",1]],
+  "descosept-sensitive-wipes": [["Tuberkulozid","1 Min.",0],["Begrenzt viruzid","1 Min.",0],["Bakterizid, levurozid","2 Min.",0],["Mykobakterizid","2 Min.",0],["Begrenzt viruzid PLUS","3 Min.",0],["Wirksam gegen Noroviren (MNV)","30 Sek.",1],["Wirksam gegen Coronaviren","30 Sek.",1],["Wirksam gegen Vacciniaviren","1 Min.",1],["Bakterizid","2 Min.",1],["Levurozid","2 Min.",1],["Wirksam gegen Adenoviren","3 Min.",1]],
+  "descosept-sensitive-wipes-xl": [["Tuberkulozid","1 Min.",0],["Begrenzt viruzid","1 Min.",0],["Bakterizid, levurozid","2 Min.",0],["Mykobakterizid","2 Min.",0],["Begrenzt viruzid PLUS","3 Min.",0],["Wirksam gegen Noroviren (MNV)","30 Sek.",1],["Wirksam gegen Coronaviren","30 Sek.",1],["Wirksam gegen Vacciniaviren","1 Min.",1],["Bakterizid","2 Min.",1],["Levurozid","2 Min.",1],["Wirksam gegen Adenoviren","3 Min.",1]],
+  "descosept-spezial": [["Begrenzt viruzid","1 Min.",0],["Bakterizid, levurozid","5 Min.",0]],
+  "descosept-spezial-wipes": [["Bakterizid, levurozid","1 Min.",0],["Begrenzt viruzid","1 Min.",0],["Bakterizid","1 Min.",1],["Levurozid (C. albicans)","1 Min.",1],["Wirksam gegen Papova-/SV40-Viren","2 Min.",1]],
+  "descosuc": [["Bakterizid, levurozid","15 Min. (2 %) · 30 Min. (1 %)",0],["Begrenzt viruzid (behüllte Viren)","15 Min. (2 %)",0]],
+  "optisal-n": [["Bakterizid, levurozid","15 Min. (1 %) · 60 Min. (0,5 %)",0],["Begrenzt viruzid","15 Min. (1 %) · 60 Min. (0,5 %)",0],["Tuberkulozid (M. terrae)","60 Min. (0,5 %)",0]],
+  "optisept": [["Bakterizid, levurozid","15 Min. (1 %) · 30 Min. (0,5 %)",0],["Tuberkulozid (M. terrae)","60 Min. (4 %)",0],["Viruzid","60 Min. (4 %)",0],["Begrenzt viruzid","60 Min. (0,5 %)",0],["Desinfektion im Seuchenfall (RKI)","240 Min. (7 %)",0]],
+  "ultrasol-active": [["Begrenzt viruzid PLUS","5 Min. (0,5 %)",0],["Sporizid gegen C. diff. (R027)","5 Min. (1,5 %) · 15 Min. (1 %) · 60 Min. (0,5 %)",0],["Tuberkulozid (M. terrae)","15 Min. (2 %) · 60 Min. (1 %)",0],["Sporizid (B. subtilis, B. cereus)","15 Min. (2 %) · 30 Min. (1 %)",0],["Viruzid","15 Min. (2 %) · 30 Min. (1,5 %) · 60 Min. (1 %)",0],["Bakterizid, levurozid","30 Min. (1 %) · 60 Min. (0,5 %)",0],["Mykobakterizid","30 Min. (2 %)",0],["Fungizid (A. brasiliensis)","30 Min. (3 %) · 60 Min. (2 %)",0],["Desinfektion im Seuchenfall (RKI)","60 Min. (3 %)",0],["Wirksam gegen Noro-, Adeno-, Rotaviren","5 Min. (0,5 %)",1],["Wirksam gegen Polyomaviren","5 Min. (1 %) · 15 Min. (0,5 %)",1]],
+  "ultrasol-oxy": [["Begrenzt viruzid PLUS","1 Min.",0],["Bakterizid, levurozid","5 Min.",0],["Tuberkulozid","5 Min.",0],["Mykobakterizid","5 Min.",0],["Sporizid gegen C. diff.","5 Min.",0],["Viruzid","5 Min.",0],["Sporizid","15 Min.",0],["Fungizid","15 Min.",0]],
+  "ultrasol-oxy-wipes": [["Bakterizid, levurozid","5 Min.",0],["Tuberkulozid","5 Min.",0],["Mykobakterizid","5 Min.",0],["Fungizid","5 Min.",0],["Viruzid","5 Min.",0],["Begrenzt viruzid PLUS","5 Min.",0],["Sporizid gegen C. diff. (Clostridioides difficile)","5 Min.",0],["Sporizid","15 Min.",0],["Bakterizid","1 Min.",1],["Levurozid (Candida albicans)","1 Min.",1]],
+  "ultrasol-oxy-wipes-xl": [["Bakterizid, levurozid","5 Min.",0],["Tuberkulozid","5 Min.",0],["Mykobakterizid","5 Min.",0],["Fungizid","5 Min.",0],["Viruzid","5 Min.",0],["Begrenzt viruzid PLUS","5 Min.",0],["Sporizid gegen C. diff. (Clostridioides difficile)","5 Min.",0],["Sporizid","15 Min.",0],["Bakterizid","1 Min.",1],["Levurozid (Candida albicans)","1 Min.",1]]
+};
+function ezSeconds(t) {
+  const m = String(t).match(/([\d,]+)\s*(Sek|Min)/);
+  if (!m) return 0;
+  return parseFloat(m[1].replace(',', '.')) * (m[2] === 'Sek' ? 1 : 60);
+}
+function einwirkzeitenHtml(p) {
+  const rows = EINWIRKZEITEN[p.id];
+  if (!rows) {
+    return p.einwirkzeitEntries && p.einwirkzeitEntries.length
+      ? `<div class="einwirkzeit-list">${p.einwirkzeitEntries.map(e => `<div class="einwirkzeit-badge ${e.kind}">⏱ ${escapeHtml(e.label)} in ${escapeHtml(e.time)}${e.detail ? ` <span class="einwirkzeit-tier">${escapeHtml(e.detail)}</span>` : ''}</div>`).join('')}</div>`
+      : '';
+  }
+  const sorted = rows.slice().sort((a, b) => ezSeconds(a[1]) - ezSeconds(b[1]));
+  const plain = rows.every(r => !r[1].includes('%') && !r[1].includes(' · ') && !r[1].includes('('));
+  let body;
+  if (plain) {
+    const groups = new Map();
+    sorted.forEach(r => { if (!groups.has(r[1])) groups.set(r[1], []); groups.get(r[1]).push(r[0]); });
+    body = [...groups].map(([time, labels]) => `<div class="ez-group"><strong class="ez-time">${escapeHtml(time)}</strong><ul>${labels.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul></div>`).join('');
+  } else {
+    body = `<table class="ez-table"><tbody>${sorted.map(r => `<tr><td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1])}</td></tr>`).join('')}</tbody></table>`;
+  }
+  return `<details class="ez-box" ${state.ezOpen ? 'open' : ''}><summary>⏱ Einwirkzeiten nach Wirkungsspektrum <small>(${rows.length})</small></summary>${body}<p class="ez-note">${plain ? '' : 'Bei Konzentraten gilt die Zeit für die jeweils angegebene Konzentration. '}Aus der aktuellen Produktinformation (PIF) übernommen, inkl. ergänzender Prüfergebnisse – verbindlich ist die aktuelle PIF.</p></details>`;
+}
 function productDocUrl(product, kind) {
   const docs = PRODUCT_DOCS[product.id];
   return (docs && docs[kind]) || null;
@@ -5039,6 +5105,7 @@ function bind() {
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
   $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
   if (state.dashboardArrangeMode) bindTileDrag();
+  document.querySelector('.ez-box')?.addEventListener('toggle', e => { state.ezOpen = e.target.open; });
   $('[data-action="acq-toggle-arrange"]')?.addEventListener('click', () => { state.acqArrangeMode = !state.acqArrangeMode; render(); });
   if (state.acqArrangeMode && state.screen === 'akquise' && state.acq.step === 'branche') bindTileDrag();
   $('#excel')?.addEventListener('change', importExcel);
