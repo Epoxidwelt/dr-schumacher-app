@@ -441,6 +441,8 @@ const state = {
   ezOpen: false,
   fitOpen: false,
   aktionOpen: null,
+  wsSel: [],
+  wsCat: 'all',
   aktionStars: JSON.parse(localStorage.getItem('aktionStars') || '[]'),
   acqBrancheOrder: JSON.parse(localStorage.getItem('acqBrancheOrder') || 'null'),
   acqArrangeMode: false,
@@ -591,6 +593,7 @@ function icon(name) {
     smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>',
     kol:'<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c0-4 3.1-7 7-7s7 3 7 7"/><path d="m18.5 2 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z"/></svg>',
     konzept:'<svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6M4 12h16"/></svg>',
+    wirkspektrum:'<svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4Z"/></svg>',
     ideenschmiede:'<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.3V17h6v-1.2c0-.9.4-1.7 1-2.3A6 6 0 0 0 12 3Z"/></svg>'
   };
   return icons[name] || '';
@@ -680,6 +683,7 @@ function render() {
   if (state.screen === 'konzepte') html = header(true) + konzepteScreen() + bottomNav('home');
   if (state.screen === 'ideenschmiede') html = header(true) + ideenschmiedeScreen() + bottomNav('home');
   if (state.screen === 'aktionen') html = header(true) + aktionenScreen() + bottomNav('home');
+  if (state.screen === 'wirkspektrum') html = header(true) + wirkspektrumScreen() + bottomNav('home');
   if (state.screen === 'akquise') html = header(true) + acqScreen() + bottomNav('home');
   if (state.screen === 'konzept') html = header(true) + konzeptScreen() + bottomNav('home');
   if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
@@ -764,7 +768,7 @@ function coreCategoryGrid() {
 // "Anordnen"-Modus selbst zurechtlegen (lokal auf dem eigenen Gerät gespeichert). Diese Liste
 // ist nur der Ausgangszustand; neu hinzukommende Kacheln werden an bestehende Reihenfolgen
 // automatisch hinten angehängt.
-const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
+const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','wirkspektrum','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
 function orderedToolCards(toolCards) {
   const order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder : DASHBOARD_TOOL_KEYS_DEFAULT;
   const byKey = new Map(toolCards.map(c => [c[0], c]));
@@ -867,6 +871,7 @@ function menuScreen() {
     ['meinekontakte','Meine Kontakte','Ihre freigegebenen Kunden und zuletzt angelegten Kontakte'],
     ['smartmailing','Smart Mailing','Viele Kunden gezielt und persönlich per E-Mail informieren'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
+    ['wirkspektrum','Wirkspektrum-Finder','Produkte nach Wirkspektrum filtern – z. B. fungizid + viruzid'],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
     ['offer','Kundenübersicht','Markierte Produkte als Angebot oder PDF'],
@@ -1230,7 +1235,7 @@ function detailScreen() {
       <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
-      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${einwirkzeitenHtml(p)}${dispenserFitHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
+      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${wirkspektrumChipsHtml(p)}${einwirkzeitenHtml(p)}${dispenserFitHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
       <div class="price-card-detail"><span>Gebinde auswählen${p.sizes.length>1?' · anklicken markiert die Variante als Favorit':''}</span><div class="size-selector">${p.sizes.map(size => {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
@@ -4907,6 +4912,96 @@ const EINWIRKZEITEN = {
   "ultrasol-oxy-wipes": [["Bakterizid, levurozid","5 Min.",0],["Tuberkulozid","5 Min.",0],["Mykobakterizid","5 Min.",0],["Fungizid","5 Min.",0],["Viruzid","5 Min.",0],["Begrenzt viruzid PLUS","5 Min.",0],["Sporizid gegen C. diff. (Clostridioides difficile)","5 Min.",0],["Sporizid","15 Min.",0],["Bakterizid","1 Min.",1],["Levurozid (Candida albicans)","1 Min.",1]],
   "ultrasol-oxy-wipes-xl": [["Bakterizid, levurozid","5 Min.",0],["Tuberkulozid","5 Min.",0],["Mykobakterizid","5 Min.",0],["Fungizid","5 Min.",0],["Viruzid","5 Min.",0],["Begrenzt viruzid PLUS","5 Min.",0],["Sporizid gegen C. diff. (Clostridioides difficile)","5 Min.",0],["Sporizid","15 Min.",0],["Bakterizid","1 Min.",1],["Levurozid (Candida albicans)","1 Min.",1]]
 };
+// Wirkspektrum je Produkt (gegen was das Produkt wirkt), aus den aktuellen Produktinformationen
+// (PIF) von schumacher-online.com: Wirkspektrum-Kopfzeile und Tabelle "Wirkungsspektrum und
+// Einwirkzeiten". Produkte ohne Eintrag (z. B. Pflege, Spender) haben keine Wirkspektrum-Angabe.
+const SPEKTRUM_TAGS = [
+  ['bakterizid','Bakterizid'], ['levurozid','Levurozid'], ['fungizid','Fungizid'], ['tuberkulozid','Tuberkulozid'],
+  ['mykobakterizid','Mykobakterizid'], ['begrenzt','Begrenzt viruzid'], ['plus','Begrenzt viruzid PLUS'], ['viruzid','Viruzid'],
+  ['sporizid','Sporizid'], ['cdiff','C. diff. (Clostridioides)'], ['noro','Noroviren'], ['adeno','Adenoviren'], ['corona','Coronaviren']
+];
+const WIRKSPEKTRUM = {
+  "aseptoderm": ["bakterizid", "levurozid", "tuberkulozid", "begrenzt"],
+  "aseptoderm-gefärbt": ["bakterizid", "levurozid", "tuberkulozid", "begrenzt"],
+  "aseptoman-duo": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "noro"],
+  "aseptoman-forte": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid", "noro", "adeno"],
+  "aseptoman-med": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "noro", "adeno", "corona"],
+  "aseptoman-parfümfrei": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "noro", "corona"],
+  "aseptoman-plus": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "noro", "adeno"],
+  "aseptoman-viral": ["bakterizid", "levurozid", "tuberkulozid", "begrenzt", "plus", "viruzid", "noro", "adeno"],
+  "biguanid-fläche-nr": ["bakterizid", "levurozid", "begrenzt"],
+  "cleanisept": ["bakterizid", "levurozid", "begrenzt", "noro"],
+  "cleanisept-wipes": ["bakterizid", "levurozid", "begrenzt"],
+  "cleanisept-wipes-forte": ["bakterizid", "levurozid", "fungizid", "begrenzt", "plus", "viruzid", "noro", "adeno"],
+  "cleanisept-wipes-forte-maxi": ["bakterizid", "levurozid", "fungizid", "begrenzt", "plus", "viruzid", "noro", "adeno"],
+  "cleanisept-wipes-maxi": ["bakterizid", "levurozid", "begrenzt"],
+  "decontaman-pre-cap": ["bakterizid", "levurozid"],
+  "decontaman-pre-wash": ["bakterizid", "levurozid", "begrenzt"],
+  "decontaman-pre-wipes": ["bakterizid", "levurozid"],
+  "desco-bohrerbad": ["bakterizid", "levurozid", "tuberkulozid", "begrenzt"],
+  "descoderm": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "noro"],
+  "descoderm-pads": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt"],
+  "descoprent": ["bakterizid", "levurozid", "begrenzt"],
+  "descosept-pur": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus"],
+  "descosept-pur-wipes-rtu": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "noro", "adeno"],
+  "descosept-sensitive": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "noro", "adeno", "corona"],
+  "descosept-sensitive-wipes": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "noro", "adeno", "corona"],
+  "descosept-sensitive-wipes-xl": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "noro", "adeno", "corona"],
+  "descosept-spezial": ["bakterizid", "levurozid", "begrenzt"],
+  "descosept-spezial-wipes": ["bakterizid", "levurozid", "begrenzt"],
+  "descosuc": ["bakterizid", "levurozid", "begrenzt", "noro", "adeno"],
+  "descoton-extra": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid"],
+  "desinfektant": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid"],
+  "optisal-n": ["bakterizid", "levurozid", "tuberkulozid", "begrenzt"],
+  "optisal-plus": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "begrenzt", "plus", "noro", "adeno"],
+  "optisept": ["bakterizid", "levurozid", "tuberkulozid", "begrenzt", "plus", "viruzid", "noro", "adeno"],
+  "perfektan-active": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid", "sporizid", "cdiff"],
+  "perfektan-endo": ["bakterizid", "levurozid", "tuberkulozid", "begrenzt"],
+  "perfektan-enzyme": ["bakterizid", "levurozid", "begrenzt"],
+  "perfektan-neu": ["bakterizid", "levurozid", "tuberkulozid", "mykobakterizid", "begrenzt"],
+  "perfektan-tb": ["bakterizid", "levurozid", "tuberkulozid", "begrenzt"],
+  "thermoshield": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid"],
+  "ultrasol-active": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid", "sporizid", "cdiff", "noro", "adeno"],
+  "ultrasol-oxy": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid", "sporizid", "cdiff"],
+  "ultrasol-oxy-wipes": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid", "sporizid", "cdiff"],
+  "ultrasol-oxy-wipes-xl": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid", "sporizid", "cdiff"]
+};
+function spektrumClose(keys) {
+  const s = new Set(keys);
+  if (s.has('viruzid')) { s.add('plus'); s.add('begrenzt'); }
+  if (s.has('plus')) s.add('begrenzt');
+  return s;
+}
+// Alle Wirkspektren des Produkts (inkl. der Stufen darunter: viruzid ⊃ begrenzt viruzid PLUS ⊃ begrenzt viruzid)
+function productSpektrum(p) {
+  const keys = [...(WIRKSPEKTRUM[p.id] || [])];
+  (p.spectrum || []).forEach(sp => {
+    if (sp === 'viruzid') keys.push('viruzid'); else if (sp === 'begrenzt viruzid PLUS') keys.push('plus'); else if (sp === 'begrenzt viruzid') keys.push('begrenzt'); else if (sp === 'sporizid') keys.push('sporizid');
+  });
+  return spektrumClose(keys);
+}
+function wirkspektrumChipsHtml(p, selected) {
+  const all = productSpektrum(p);
+  if (!all.size) return '';
+  const sel = selected || [];
+  const shown = SPEKTRUM_TAGS.filter(([k]) => all.has(k) && !(k === 'begrenzt' && (all.has('plus') || all.has('viruzid'))) && !(k === 'plus' && all.has('viruzid')));
+  return `<div class="ws-row"><strong>Wirkt gegen</strong><div class="ws-chips">${shown.map(([k, l]) => `<span class="ws-chip ${sel.includes(k) ? 'on' : ''}">${escapeHtml(l)}</span>`).join('')}</div></div>`;
+}
+function wirkspektrumScreen() {
+  const sel = state.wsSel;
+  const cats = [['all','Alle Bereiche'], ['surface','Fläche'], ['hands','Hände & Haut'], ['instruments','Instrumente']];
+  const results = sel.length ? PRODUCTS.filter(p => (state.wsCat === 'all' || p.category === state.wsCat) && sel.every(k => productSpektrum(p).has(k))) : [];
+  return `<main class="page advisor-page">
+    <div class="section-heading"><div><span class="eyebrow">Produktfinder</span><h1>Wirkspektrum-Finder</h1><p>Wirkspektren antippen – es erscheinen nur Produkte, die <strong>alle</strong> gewählten Spektren abdecken.</p></div></div>
+    <section class="advisor-card">
+      <div class="ws-grid">${SPEKTRUM_TAGS.map(([k, l]) => `<button type="button" class="ws-toggle ${sel.includes(k) ? 'on' : ''}" data-ws-tag="${k}">${sel.includes(k) ? '✓ ' : ''}${escapeHtml(l)}</button>`).join('')}</div>
+      <div class="filter-row">${cats.map(([k, l]) => `<button type="button" class="filter-chip ${state.wsCat === k ? 'active' : ''}" data-ws-cat="${k}">${l}</button>`).join('')}${sel.length ? `<button type="button" class="filter-chip" data-action="ws-clear">Auswahl löschen</button>` : ''}</div>
+      <p class="muted-copy" style="margin:4px 0 0">Viruzid schließt begrenzt viruzid PLUS und begrenzt viruzid mit ein. Grundlage sind die aktuellen Produktinformationen (PIF); Produkte ohne Wirkspektrum-Angabe (z. B. Pflege, Spender) erscheinen hier nicht.</p>
+    </section>
+    <div class="section-heading" style="margin-top:18px"><div><h2>${sel.length ? results.length + ' Produkt' + (results.length === 1 ? '' : 'e') : 'Noch keine Auswahl'}</h2></div></div>
+    ${!sel.length ? '<div class="empty-state"><h2>Wirkspektrum wählen</h2><p>Zum Beispiel „Fungizid“ und „Viruzid“ antippen.</p></div>' : results.length ? `<div class="product-list">${results.map(pr => `<div class="ws-result">${productCard(pr)}${wirkspektrumChipsHtml(pr, sel)}</div>`).join('')}</div>` : '<div class="empty-state"><h2>Kein Produkt deckt alles ab</h2><p>Bitte eine Auswahl abwählen oder den Bereich auf „Alle Bereiche“ stellen.</p></div>'}
+  </main>`;
+}
 function ezSeconds(t) {
   const m = String(t).match(/([\d,]+)\s*(Sek|Min)/);
   if (!m) return 0;
@@ -5194,7 +5289,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){acqReset(); state.screen='akquise'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){acqReset(); state.screen='akquise'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
@@ -5224,6 +5319,9 @@ function bind() {
   $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
   if (state.dashboardArrangeMode) bindTileDrag();
   document.querySelectorAll('.ez-box').forEach(box => box.addEventListener('toggle', e => { state[box.dataset.ez === 'fit' ? 'fitOpen' : 'ezOpen'] = e.target.open; }));
+  document.querySelectorAll('[data-ws-tag]').forEach(b => b.onclick = () => { const k = b.dataset.wsTag; state.wsSel = state.wsSel.includes(k) ? state.wsSel.filter(x => x !== k) : [...state.wsSel, k]; render(); });
+  document.querySelectorAll('[data-ws-cat]').forEach(b => b.onclick = () => { state.wsCat = b.dataset.wsCat; render(); });
+  $('[data-action="ws-clear"]')?.addEventListener('click', () => { state.wsSel = []; render(); });
   document.querySelectorAll('[data-aktion-star]').forEach(b => b.onclick = () => { aktionSetStar(b.dataset.aktionStar, !state.aktionStars.includes(b.dataset.aktionStar)); render(); });
   document.querySelectorAll('[data-aktion-gesprochen]').forEach(b => b.onclick = () => { const [id, v] = b.dataset.aktionGesprochen.split(':'); aktionSetStar(id, v === 'ja'); render(); });
   document.querySelectorAll('[data-aktion-open]').forEach(b => b.onclick = () => { state.aktionOpen = b.dataset.aktionOpen; render(); });

@@ -382,3 +382,8 @@
 .aktion-detail{background:linear-gradient(180deg,#fff1e6,#fff 140px);border-color:#ffd2b3}.aktion-star{display:block;width:100%;text-align:left;border:2px solid #ee0979;background:#fff;color:#ee0979;border-radius:14px;padding:12px 14px;font-weight:800;font-size:15px;cursor:pointer;margin-bottom:14px}.aktion-star.on{background:#ee0979;color:#fff}
 .aktion-ask{border:2px solid #ffd2b3;background:#fff7f1;border-radius:16px;padding:12px 14px;margin-bottom:12px;text-align:left}.aktion-ask strong{display:block;color:#b3125c}.aktion-ask small{display:block;color:#6b4a3a;margin:3px 0 8px}
 .aktion-top{width:100%;margin:0 0 16px}
+
+.category-card.wirkspektrum{background:linear-gradient(140deg,#0f8b8d,#2fbf9b)}
+.ws-row{margin:0 0 12px}.ws-row>strong{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#7a8da0;margin-bottom:6px}.ws-chips{display:flex;flex-wrap:wrap;gap:6px}.ws-chip{border-radius:99px;padding:5px 11px;font-size:13px;font-weight:800;background:#e5f6f1;color:#0b6e63}.ws-chip.on{background:#0f8b8d;color:#fff}
+.ws-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:12px}.ws-toggle{border:2px solid #cfe9e2;background:#f3fbf8;color:#0b6e63;border-radius:14px;padding:12px 10px;font-weight:800;font-size:15px;cursor:pointer;text-align:center}.ws-toggle.on{background:#0f8b8d;border-color:#0f8b8d;color:#fff}
+.ws-result{margin-bottom:12px}.ws-result .ws-row{margin:6px 6px 0;padding:0 8px}
