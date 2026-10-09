@@ -1215,7 +1215,7 @@ function productCard(product, variantSize) {
   const favorite = hasVariant ? state.favorites.some(f => f.id === product.id && f.size === refSize) : state.favorites.some(f => f.id === product.id);
   return `<article class="product-row" data-product="${product.id}">
     <div class="product-image" style="--product-color:${product.color}">${product.photo?`<img src="${product.photo}" alt="${escapeHtml(product.name)}">`:`<span>${product.category==='hands'?'✋':product.category==='surface'?'▦':product.category==='instruments'?'✂':'▣'}</span>`}</div>
-    <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}${product.biozid ? biozidBadge() : ''}</div><p>Art.-Nr. ${resolveArtNr(product, refSize)} · ${refSize}</p></div>
+    <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}${haccpBadge(product)}${product.biozid ? biozidBadge() : ''}</div><p>Art.-Nr. ${resolveArtNr(product, refSize)} · ${refSize}</p></div>
     <div class="row-price">${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':(price!=null?`<strong>${money(price)}</strong><small>${perUnit || state.priceList}</small>`:'<strong class="hidden-price">–</strong>')}</div>
     <button class="favorite-button ${favorite?'active':''}" data-favorite="${product.id}" ${hasVariant?`data-favorite-size="${escapeHtml(refSize)}"`:''} aria-label="Favorit">${icon('star')}</button>
     <span class="chevron">›</span>
@@ -1232,7 +1232,7 @@ function detailScreen() {
   return `<main class="page detail-page">
     <section class="detail-hero">
       <div class="detail-image" style="--product-color:${p.color}">${(() => { const img = (p.sizePhotos && p.sizePhotos[state.size]) || p.photo; return img ? `<img src="${img}" alt="${escapeHtml(p.name)}">` : `<div class="bottle"><span>${p.name.split(' ')[0]}</span></div>`; })()}</div>
-      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
+      <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${haccpBadge(p)}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
       <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${wirkspektrumChipsHtml(p)}${einwirkzeitenHtml(p)}${dispenserFitHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
@@ -5044,6 +5044,13 @@ const WIRKSPEKTRUM = {
   "ultrasol-oxy-wipes": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid", "sporizid", "cdiff"],
   "ultrasol-oxy-wipes-xl": ["bakterizid", "levurozid", "fungizid", "tuberkulozid", "mykobakterizid", "begrenzt", "plus", "viruzid", "sporizid", "cdiff"]
 };
+// HACCP-konform / für den Lebensmittelbereich im Rahmen eines HACCP-Konzeptes geeignet: laut aktueller
+// Produktinformation (HACCP-Siegel bzw. Aussage dort) oder – bei den Händehygiene-Produkten – laut
+// GHK-Broschüre ("Alle Produkte sind geeignet für den Einsatz im Lebensmittelbereich im Rahmen eines
+// HACCP-Konzeptes"). Produkte ohne Eintrag: keine entsprechende Angabe gefunden.
+const HACCP_PRODUCTS = ['aseptoman-duo','aseptoman-forte','aseptoman-med','aseptoman-plus','aseptoman-parfümfrei','aseptoman-viral','aseptoman-gel','cleanisept','cleanisept-wipes','cleanisept-wipes-maxi','descoderm','descolind-comfort','descolind-comfort-wash','descolind-expert','descolind-expert-protect-cream','descolind-expert-wash','descolind-pure','descolind-pure-intensive-cream','descolind-pure-wash','descosept-pur','descosept-sensitive','descosept-sensitive-wipes','descosept-sensitive-wipes-xl','descosept-spezial','descosept-spezial-wipes','optisal-plus','ultrasol-active','ultrasol-oxy','ultrasol-oxy-wipes','ultrasol-oxy-wipes-xl'];
+function isHaccp(p) { return HACCP_PRODUCTS.includes(p.id); }
+function haccpBadge(p) { return isHaccp(p) ? '<span class="badge haccp">HACCP</span>' : ''; }
 function spektrumClose(keys) {
   const s = new Set(keys);
   if (s.has('viruzid')) { s.add('plus'); s.add('begrenzt'); }
@@ -5060,21 +5067,21 @@ function productSpektrum(p) {
 }
 function wirkspektrumChipsHtml(p, selected) {
   const all = productSpektrum(p);
-  if (!all.size) return '';
+  if (!all.size && !isHaccp(p)) return '';
   const sel = selected || [];
   const shown = SPEKTRUM_TAGS.filter(([k]) => all.has(k) && !(k === 'begrenzt' && (all.has('plus') || all.has('viruzid'))) && !(k === 'plus' && all.has('viruzid')));
-  return `<div class="ws-row"><strong>Wirkt gegen</strong><div class="ws-chips">${shown.map(([k, l]) => `<span class="ws-chip ${sel.includes(k) ? 'on' : ''}">${escapeHtml(l)}</span>`).join('')}</div></div>`;
+  return `<div class="ws-row"><strong>${shown.length ? 'Wirkt gegen' : 'Eigenschaften'}</strong><div class="ws-chips">${shown.map(([k, l]) => `<span class="ws-chip ${sel.includes(k) ? 'on' : ''}">${escapeHtml(l)}</span>`).join('')}${isHaccp(p) ? `<span class="ws-chip haccp ${sel.includes('haccp') ? 'on' : ''}">HACCP-konform</span>` : ''}</div></div>`;
 }
 function wirkspektrumScreen() {
   const sel = state.wsSel;
   const cats = [['all','Alle Bereiche'], ['surface','Fläche'], ['hands','Hände & Haut'], ['instruments','Instrumente']];
-  const results = sel.length ? PRODUCTS.filter(p => (state.wsCat === 'all' || p.category === state.wsCat) && sel.every(k => productSpektrum(p).has(k))) : [];
+  const results = sel.length ? PRODUCTS.filter(p => (state.wsCat === 'all' || p.category === state.wsCat) && sel.every(k => k === 'haccp' ? isHaccp(p) : productSpektrum(p).has(k))) : [];
   return `<main class="page advisor-page">
     <div class="section-heading"><div><span class="eyebrow">Produktfinder</span><h1>Wirkspektrum-Finder</h1><p>Wirkspektren antippen – es erscheinen nur Produkte, die <strong>alle</strong> gewählten Spektren abdecken.</p></div></div>
     <section class="advisor-card">
-      <div class="ws-grid">${SPEKTRUM_TAGS.map(([k, l]) => `<button type="button" class="ws-toggle ${sel.includes(k) ? 'on' : ''}" data-ws-tag="${k}">${sel.includes(k) ? '✓ ' : ''}${escapeHtml(l)}</button>`).join('')}</div>
+      <div class="ws-grid">${SPEKTRUM_TAGS.map(([k, l]) => `<button type="button" class="ws-toggle ${sel.includes(k) ? 'on' : ''}" data-ws-tag="${k}">${sel.includes(k) ? '✓ ' : ''}${escapeHtml(l)}</button>`).join('')}<button type="button" class="ws-toggle haccp ${sel.includes('haccp') ? 'on' : ''}" data-ws-tag="haccp">${sel.includes('haccp') ? '✓ ' : ''}HACCP-konform</button></div>
       <div class="filter-row">${cats.map(([k, l]) => `<button type="button" class="filter-chip ${state.wsCat === k ? 'active' : ''}" data-ws-cat="${k}">${l}</button>`).join('')}${sel.length ? `<button type="button" class="filter-chip" data-action="ws-clear">Auswahl löschen</button>` : ''}</div>
-      <p class="muted-copy" style="margin:4px 0 0">Viruzid schließt begrenzt viruzid PLUS und begrenzt viruzid mit ein. Grundlage sind die aktuellen Produktinformationen (PIF); Produkte ohne Wirkspektrum-Angabe (z. B. Pflege, Spender) erscheinen hier nicht.</p>
+      <p class="muted-copy" style="margin:4px 0 0">Viruzid schließt begrenzt viruzid PLUS und begrenzt viruzid mit ein. Grundlage sind die aktuellen Produktinformationen (PIF). „HACCP-konform“ = für den Lebensmittelbereich im Rahmen eines HACCP-Konzeptes geeignet. Ohne Wirkspektrum-Auswahl erscheinen auch Pflegeprodukte; Produkte ohne Wirkspektrum-Angabe fehlen sonst.</p>
     </section>
     <div class="section-heading" style="margin-top:18px"><div><h2>${sel.length ? results.length + ' Produkt' + (results.length === 1 ? '' : 'e') : 'Noch keine Auswahl'}</h2></div></div>
     ${!sel.length ? '<div class="empty-state"><h2>Wirkspektrum wählen</h2><p>Zum Beispiel „Fungizid“ und „Viruzid“ antippen.</p></div>' : results.length ? `<div class="product-list">${results.map(pr => `<div class="ws-result">${productCard(pr)}${wirkspektrumChipsHtml(pr, sel)}</div>`).join('')}</div>` : '<div class="empty-state"><h2>Kein Produkt deckt alles ab</h2><p>Bitte eine Auswahl abwählen oder den Bereich auf „Alle Bereiche“ stellen.</p></div>'}
