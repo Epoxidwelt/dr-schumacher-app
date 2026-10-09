@@ -451,7 +451,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null},
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]'),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1726,7 +1726,7 @@ function acqReset() {
     infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false},
     terminVorschlagen:null, termine:['','',''],
     previewTo:'', previewSubject:'', previewBody:'', previewTouched:false,
-    sentOk:false, editingId:null
+    sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false
   };
 }
 function acqBesprocheneIds() { return [...new Set(state.favorites.map(f => f.id))]; }
@@ -1903,6 +1903,7 @@ function acqLoadForEdit(id) {
   state.acq.previewBody = saved.body || '';
   state.acq.previewTouched = true;
   state.acq.editingId = saved.id;
+  state.acq.fromHistory = true;
   state.acq.step = 'vorschau';
 }
 function acqDelete(id) {
@@ -2074,12 +2075,87 @@ function acqScreen() {
   }
   return acqVorschauScreen();
 }
+// Abschluss der Kaltakquise: aus den erfassten Daten (Firma, Adresse, Kontaktperson, Produkte, Muster,
+// Aktion, Termin) einen Neukunden-Kontakt anlegen, einen CRM-Eintrag erzeugen und die Daten an den
+// Innendienst melden — ohne die Angaben noch einmal einzutippen.
+function acqPersonName() { const a = state.acq; return [a.vorname, a.nachname].filter(Boolean).join(' ').trim(); }
+function acqEnsureContact() {
+  const a = state.acq;
+  const existing = a.contactId ? state.one.contacts.find(c => c.id === a.contactId) : null;
+  if (existing) return existing;
+  const ids = acqBesprocheneIds();
+  const prods = ids.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+  const id = 'k' + Date.now().toString(36);
+  const contact = {
+    id, externeNr:'', kundenNr:'', bezirk:'', preisliste:'UVP', comm:'bestand', active:true, override:null, abc:null,
+    nextFollowUp:null, kundenstatus:'kontakt', herkunft:'kaltakquise',
+    name:a.firma.trim() || acqPersonName() || 'Kaltakquise-Kontakt', branche:a.branche, anrede:'',
+    ansprechpartnerVorname:a.vorname.trim(), ansprechpartnerNachname:a.nachname.trim(),
+    plz:a.plz.trim(), ort:a.ort.trim(), strasse:a.strasse.trim(), hausnummer:a.hausnummer.trim(), email:a.email.trim(), telefon:a.telefon.trim(),
+    notiz:'', produktbereiche:[...new Set(prods.map(p => p.category))], produkte:prods.map(p => p.name).join(', '),
+    musterWanted:false, musterListe:[], wettbewerber:'', feedback:'', samples:'Keine', result:'Offen', vertragBis:null
+  };
+  state.one.contacts.push(contact);
+  onePersistContacts();
+  oneAudit('Kaltakquise-Kontakt angelegt', contact.name + (state.repName ? ' — angelegt von ' + state.repName : ''));
+  a.contactId = id;
+  return contact;
+}
+function acqBuildCrmReport() {
+  const a = state.acq;
+  const prods = acqBesprocheneIds().map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
+  const termine = a.terminVorschlagen === 'ja' ? a.termine.filter(x => x && x.trim()) : [];
+  const muster = a.musterHinterlassen === 'ja' ? a.musterEintraege.map(m => `${acqProductName(m.id)} (${m.anzahl} Stück)`) : [];
+  const notiz = [
+    `Gespräch geführt: ${a.gespraech === 'ja' ? 'ja' : 'nein'}`,
+    a.produkteBesprochen === 'ja' ? `Interesse an besprochenen Produkten: ${a.interesse === 'ja' ? 'ja (' + a.interesseIds.map(acqProductName).join(', ') + ')' : 'nein'}` : '',
+    a.infoGewuenscht === 'ja' ? `Weitere Informationen gewünscht zu: ${a.infoIds.map(acqProductName).join(', ')}` : '',
+    termine.length ? `Terminvorschläge: ${termine.map(acqFormatTermin).join('; ')}` : ''
+  ].filter(Boolean).join(' · ');
+  return {
+    date: new Date().toISOString().slice(0,10), firma: a.firma || acqPersonName() || '-', branche: a.branche,
+    anrede:'', vorname:a.vorname, nachname:a.nachname, strasse:a.strasse, hausnummer:a.hausnummer, plz:a.plz, ort:a.ort,
+    telefon:a.telefon, email:a.email, herkunft:'kaltakquise',
+    produktbereicheText: [...new Set(prods.map(p => ({surface:'Fläche', hands:'Hände & Haut', instruments:'Instrumente', application:'Applikation'}[p.category] || p.category)))].join(', '),
+    produkteText: prods.map(p => p.name).join(', '), notiz, wettbewerber:'', vertragBis:'', feedback:'',
+    samples: muster.length ? muster.join(', ') : 'Keine', result:'Offen',
+    followUp: termine.length ? termine[0].slice(0,10) : '', nextSteps: termine.length ? 'Termin wahrnehmen' : 'Termin vereinbaren',
+    owner: state.repName || '-', musterWanted:false, musterListe:[]
+  };
+}
+function acqSendCrm() {
+  const a = state.acq;
+  acqEnsureContact();
+  const report = acqBuildCrmReport();
+  const text = buildCrmSummary(report);
+  state.savedReports = [{...report, savedAt: new Date().toISOString()}, ...state.savedReports].slice(0,25);
+  localStorage.setItem('savedVisitReports', JSON.stringify(state.savedReports));
+  a.crmDone = true;
+  openMailto(`CRM-Eintrag: ${report.firma}`, text, myOwnEmail());
+}
+function acqSendInnendienst() {
+  const a = state.acq;
+  const contact = acqEnsureContact();
+  const {subject, body} = buildNewCustomerInnendienstEmail(contact);
+  a.innendienstDone = true;
+  openMailto(subject, body, innendienstEmail());
+}
+function acqAbschlussHtml() {
+  const a = state.acq;
+  if (a.fromHistory) return '';
+  const row = (action, label, sub, done, email) => `<div class="acq-abschluss-row"><button type="button" class="${done ? 'secondary-button' : 'primary-button'} compact" data-action="${action}"><span>${done ? '✓ ' : ''}${label}</span></button><small>${sub}${email ? ' · an ' + escapeHtml(email) : ''}</small></div>`;
+  return `<section class="advisor-card" style="margin-top:16px"><h2 style="margin-top:0">Abschluss: Daten übernehmen</h2><p class="muted-copy">Die erfassten Angaben (Firma, Adresse, Kontaktperson, Produkte, Muster, Aktion, Termin) werden übernommen – kein erneutes Eintippen.</p>
+    ${row('acq-crm', 'CRM-Eintrag erstellen', 'Gesprächsnotiz mit allen Daten', a.crmDone, myOwnEmail())}
+    ${row('acq-innendienst', 'Neukunde an den Innendienst senden', 'legt den Kontakt an und meldet ihn zur Aufnahme ins System', a.innendienstDone, innendienstEmail())}
+  </section>`;
+}
 function acqVorschauScreen() {
   const a = state.acq;
   if (a.sentOk) {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>E-Mail-Programm geöffnet</h1><p>Ihr E-Mail-Programm wurde mit der vorbereiteten Nachricht geöffnet — der eigentliche Versand erfolgt dort durch Sie. Der Kontakt wurde zusätzlich gespeichert.</p></div></div>
-      <section class="advisor-card"><button type="button" class="primary-button compact" data-action="acq-restart"><span>Weitere Kaltakquise erfassen</span></button></section>
+      ${acqAbschlussHtml()}
+      <section class="advisor-card" style="margin-top:16px"><button type="button" class="primary-button compact" data-action="acq-restart"><span>Weitere Kaltakquise erfassen</span></button></section>
       ${acqHistoryListHtml()}
     </main>`;
   }
@@ -2095,6 +2171,7 @@ function acqVorschauScreen() {
       </div>
       ${!a.previewTo.trim() ? `<p class="muted-copy" style="margin-top:8px">Für den Versand wird eine Empfänger-E-Mail-Adresse benötigt.</p>` : ''}
     </section>
+    ${acqAbschlussHtml()}
     ${acqHistoryListHtml()}
   </main>`;
 }
@@ -2309,7 +2386,7 @@ function newCustomerFormFieldsHtml(d){
   ];
   const nc = state.newCustomer;
   return `<div class="new-customer-form">
-    ${state.summaryKaltakquise ? `<div class="wide location-actions">
+    ${true ? `<div class="wide location-actions">
       <button type="button" class="secondary-button compact" data-action="neukunde-locate" ${nc.locating?'disabled':''}>${icon('pin')}<span>${nc.locating?'Standort wird ermittelt…':'Aktuellen Standort übernehmen'}</span></button>
     </div>${nc.locateError ? `<div class="wide"><p class="region-login-error">${escapeHtml(nc.locateError)}</p></div>` : ''}` : ''}
     <div class="wide"><label>Anrede</label><div class="price-toggle-row" style="margin-top:6px">
@@ -4639,6 +4716,7 @@ function buildCrmSummary(report = state.visitReport) {
     const parts = [
       `${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : 'Neukunde'} vom ${date}`,
       `Firma: ${report.firma || '-'}`,
+      ...(report.branche ? [`Branche: ${report.branche}`] : []),
       `${anredeLabel}: ${ansprechpartner || '-'}`,
       `Adresse: ${adresse || '-'}`,
       `Telefon: ${report.telefon || '-'}`,
@@ -5393,6 +5471,8 @@ function bind() {
   $('[data-action="acq-vorschau"]')?.addEventListener('click', () => { acqEnterVorschau(); render(); });
   $('[data-action="acq-back"]')?.addEventListener('click', () => { acqBack(); render(); });
   $('[data-action="acq-restart"]')?.addEventListener('click', () => { acqReset(); render(); });
+  $('[data-action="acq-crm"]')?.addEventListener('click', () => { acqSendCrm(); render(); });
+  $('[data-action="acq-innendienst"]')?.addEventListener('click', () => { acqSendInnendienst(); render(); });
   $('#acqPreviewTo')?.addEventListener('input', e => { state.acq.previewTo = e.target.value; state.acq.previewTouched = true; const btn = $('[data-action="acq-senden"]'); if (btn) btn.disabled = !e.target.value.trim(); });
   $('#acqPreviewSubject')?.addEventListener('input', e => { state.acq.previewSubject = e.target.value; state.acq.previewTouched = true; });
   $('#acqPreviewBody')?.addEventListener('input', e => { state.acq.previewBody = e.target.value; state.acq.previewTouched = true; });
@@ -6951,17 +7031,12 @@ function buildSmartMailingBody(mailing, contact){
   const abschlussBlock = O.mailingBlocks.abschluss.find(b => b.ctaKey === mailing.cta);
   const abschluss = abschlussBlock ? abschlussBlock.text : '';
   const vorteile = mailing.vorteile || [];
-  const vorteileText = vorteile.length === 0 ? ''
-    : vorteile.length === 1 ? vorteile[0]
-    : vorteile.slice(0,-1).join(', ') + ' sowie ' + vorteile[vorteile.length-1];
-  const summaryLower = product && product.summary ? product.summary.charAt(0).toLowerCase() + product.summary.slice(1) : 'eine passende Lösung';
-  const produktSatz = product
-    ? `Mit ${product.name} steht Ihnen ${summaryLower} zur Verfügung${vorteileText ? ', die sich besonders durch ' + vorteileText + ' auszeichnet' : ''}.`
-    : '';
+  const produktSatz = product ? `▸ ${product.name.toUpperCase()}\n${(product.summary || '').trim().replace(/\.?$/, '.')}` : '';
   const u = state.one.users.find(x => x.id === mailing.createdBy) || oneCurrentUser();
   const lines = [greeting, '', einstieg];
   if ((mailing.personalNote||'').trim()) lines.push('', mailing.personalNote.trim());
   if (produktSatz) lines.push('', produktSatz);
+  if (product && vorteile.length) lines.push('', 'Ihre Vorteile auf einen Blick:', '', ...vorteile.map(v => `  ✓ ${v}`));
   if (abschluss) lines.push('', abschluss);
   lines.push('', 'Beste Grüße', '');
   if (u){
@@ -7488,6 +7563,10 @@ function oneContactFormHtml(){
         <input id="oneScanInput" type="file" accept="image/*" capture="environment" style="display:none">
         <small class="muted">${state.messeScanStatus ? escapeHtml(state.messeScanStatus) : 'Füllt Name, Adresse und E-Mail automatisch aus – danach bitte prüfen.'}</small>
       </div>
+      <div class="one-scan-row">
+        <button class="one-btn" data-one-act="nc-locate" ${state.one.ncBusy ? 'disabled' : ''}>${icon('pin')}<span>${state.one.ncBusy ? 'Standort wird ermittelt…' : 'Aktuellen Standort übernehmen'}</span></button>
+        <small class="muted">${state.one.ncError ? escapeHtml(state.one.ncError) : 'Trägt Straße, Hausnummer, PLZ und Ort automatisch ein.'}</small>
+      </div>
       <div class="one-filters">
         ${fields.map(([k,label]) => `<div class="one-field"><label for="oneNC-${k}">${label}</label><input type="text" id="oneNC-${k}" data-one-nc="${k}" value="${escapeHtml(d[k])}"></div>`).join('')}
         <div class="one-field"><label for="oneNC-preisliste">Preisliste</label><select class="f" id="oneNC-preisliste" data-one-nc="preisliste">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(p=>`<option ${d.preisliste===p?'selected':''}>${p}</option>`).join('')}</select></div>
@@ -7518,6 +7597,10 @@ function oneMineContactFormHtml(){
         <button class="one-btn" data-one-act="scan-contact-card">${icon('camera')}<span>Visitenkarte fotografieren</span></button>
         <input id="oneScanInput" type="file" accept="image/*" capture="environment" style="display:none">
         <small class="muted">${state.messeScanStatus ? escapeHtml(state.messeScanStatus) : 'Füllt Name, Adresse und E-Mail automatisch aus – danach bitte prüfen.'}</small>
+      </div>
+      <div class="one-scan-row">
+        <button class="one-btn" data-one-act="nc-locate" ${state.one.ncBusy ? 'disabled' : ''}>${icon('pin')}<span>${state.one.ncBusy ? 'Standort wird ermittelt…' : 'Aktuellen Standort übernehmen'}</span></button>
+        <small class="muted">${state.one.ncError ? escapeHtml(state.one.ncError) : 'Trägt Straße, Hausnummer, PLZ und Ort automatisch ein.'}</small>
       </div>
       <div class="one-filters">
         ${fields.map(([k,label]) => `<div class="one-field"><label for="oneNC-${k}">${label}</label><input type="text" id="oneNC-${k}" data-one-nc="${k}" value="${escapeHtml(d[k])}"></div>`).join('')}
@@ -8962,6 +9045,18 @@ function bindOne(){
     if (a === 'mailwizard-done'){ O.mailWizard = null; O.mailingTab = 'sent'; render(); return; }
 
     // ===================== Aktionen (Admin) =====================
+    if (a === 'nc-locate'){
+      O.ncBusy = true; O.ncError = ''; render();
+      (async () => {
+        try {
+          const pos = await getMyLocation();
+          const addr = await reverseGeocode(pos.lat, pos.lng);
+          Object.assign(O.newContact, { strasse: addr.strasse, hausnummer: addr.hausnummer, plz: addr.plz, ort: addr.ort });
+        } catch (e) { O.ncError = e.message || 'Standort konnte nicht ermittelt werden.'; }
+        O.ncBusy = false; render();
+      })();
+      return;
+    }
     if (a === 'aktion-new'){
       const id = 'ak' + Date.now().toString(36);
       O.aktionen.unshift({ id, titel:'Neue Aktion', teaser:'', text:'', leistungen:[], partner:'', zielgruppen:[], laufzeit:'dauer', gueltigAb:'', gueltigBis:'', anfrageAn:OUTGOING_SENDER_EMAIL, status:'entwurf', freigabe:{alle:false, teams:[], users:[]}, createdAt:new Date().toISOString() });
