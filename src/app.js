@@ -1813,6 +1813,8 @@ function buildAcqEmail() {
         body.push('');
       });
       body.push('Gerne kläre ich mit Ihnen, wie das Produkt zu Ihren Anforderungen passt.');
+      const kueche = haccpKuecheLines(a.interesseIds.map(id => PRODUCTS.find(pp => pp.id === id)), a.branche);
+      if (kueche.length) body.push('', ...kueche.slice(0, -1));
       subject = `Ihr Interesse an ${interesseListe.join(', ')}`;
     } else if (keinInteresse) {
       body.push('', `vielen Dank für Ihre offene Rückmeldung zu ${besprochen.join(', ')}. Aktuell besteht daran kein Interesse.`);
@@ -3905,6 +3907,7 @@ function buildCustomerSummaryEmail(){
     }
     lines.push('');
   });
+  lines.push(...haccpKuecheLines(entries.map(e => e.product), branche));
   const aktionenGesprochen = aktionenStarred();
   if (aktionenGesprochen.length) {
     lines.push('Außerdem haben wir über folgendes Thema gesprochen:', '');
@@ -3991,6 +3994,7 @@ function buildKaltakquiseNachfassEmail(){
       lines.push('');
     });
   }
+  if (!keinInteresse) lines.push(...haccpKuecheLines(entries.map(e => e.product), currentSummaryBranche()));
   if (!keinInteresse && aktionenStarred().length) {
     lines.push('Außerdem hatten wir über folgendes Thema gesprochen:', '');
     aktionenStarred().forEach(ak => lines.push(...aktionMailLines(ak)));
@@ -5050,6 +5054,20 @@ const WIRKSPEKTRUM = {
 // HACCP-Konzeptes"). Produkte ohne Eintrag: keine entsprechende Angabe gefunden.
 const HACCP_PRODUCTS = ['aseptoman-duo','aseptoman-forte','aseptoman-med','aseptoman-plus','aseptoman-parfümfrei','aseptoman-viral','aseptoman-gel','cleanisept','cleanisept-wipes','cleanisept-wipes-maxi','descoderm','descolind-comfort','descolind-comfort-wash','descolind-expert','descolind-expert-protect-cream','descolind-expert-wash','descolind-pure','descolind-pure-intensive-cream','descolind-pure-wash','descosept-pur','descosept-sensitive','descosept-sensitive-wipes','descosept-sensitive-wipes-xl','descosept-spezial','descosept-spezial-wipes','optisal-plus','ultrasol-active','ultrasol-oxy','ultrasol-oxy-wipes','ultrasol-oxy-wipes-xl'];
 function isHaccp(p) { return HACCP_PRODUCTS.includes(p.id); }
+// Kunden-E-Mails: HACCP-konforme Produkte sind oft auch in einer vorhandenen Küche einsetzbar –
+// ein starkes Argument für ein schlankes Portfolio. Entfällt bei Zahnarzt-/Tierarztpraxis.
+function haccpKuecheLines(products, branche) {
+  const hp = (products || []).filter(Boolean).filter(isHaccp);
+  if (!hp.length || brancheExclusionTags(branche).length) return [];
+  const names = hp.length <= 4 ? hp.map(p => p.name).join(', ') : `${hp.length} der besprochenen Produkte`;
+  return [
+    'Ein Portfolio für Pflege und Küche:',
+    '',
+    `  ✓ ${names}: HACCP-konform und damit auch im Lebensmittelbereich einsetzbar`,
+    '  ✓ Gibt es in Ihrer Einrichtung eine Küche, lässt sie sich mit demselben Sortiment abdecken – das hält Ihr Portfolio schlank',
+    ''
+  ];
+}
 function haccpBadge(p) { return isHaccp(p) ? '<span class="badge haccp">HACCP</span>' : ''; }
 function spektrumClose(keys) {
   const s = new Set(keys);
@@ -7044,6 +7062,7 @@ function buildSmartMailingBody(mailing, contact){
   if ((mailing.personalNote||'').trim()) lines.push('', mailing.personalNote.trim());
   if (produktSatz) lines.push('', produktSatz);
   if (product && vorteile.length) lines.push('', 'Ihre Vorteile auf einen Blick:', '', ...vorteile.map(v => `  ✓ ${v}`));
+  if (product) { const k = haccpKuecheLines([product], contact.branche); if (k.length) lines.push('', ...k.slice(0, -1)); }
   if (abschluss) lines.push('', abschluss);
   lines.push('', 'Beste Grüße', '');
   if (u){
