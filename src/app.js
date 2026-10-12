@@ -9340,6 +9340,30 @@ function bindOne(){
 
 acqRestoreDraft();
 render();
+// Selbst-Update: GitHub Pages liefert index.html bis zu 10 Min. aus dem Browser-Cache — dann würde ein
+// Gerät noch die alte Version zeigen. Beim Start (und beim Zurückkehren auf die Startseite) wird die
+// aktuelle Version ohne Cache abgefragt und bei Abweichung mit frischer URL neu geladen.
+(function selfUpdateCheck() {
+  const cur = (document.querySelector('script[src*="app.js"]') || {}).src || '';
+  const m = /[?&]v=([\w-]+)/.exec(cur);
+  if (!m || !window.fetch || location.protocol === 'file:') return;
+  const check = async () => {
+    try {
+      const r = await fetch('index.html?nocache=' + Date.now(), {cache:'no-store'});
+      if (!r.ok) return;
+      const n = /src\/app\.js\?v=([\w-]+)/.exec(await r.text());
+      if (!n || n[1] === m[1]) return;
+      if (sessionStorage.getItem('selfUpdateTo') === n[1]) return;
+      sessionStorage.setItem('selfUpdateTo', n[1]);
+      if (window.caches) { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }
+      location.replace(location.pathname + '?v=' + n[1]);
+    } catch (e) {}
+  };
+  check();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.screen === 'menu' && !state.summaryStep) check();
+  });
+})();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
 syncLivePrices();
 syncLiveFacts();
