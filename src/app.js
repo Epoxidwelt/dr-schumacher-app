@@ -3690,7 +3690,7 @@ function buildNewCustomerInnendienstEmail(contact){
   const lines = [
     'Hallo Team,',
     '',
-    'bitte nachstehenden Kunden ins System eintragen und mir die Kundennummer zusenden. Bitte hier alle Daten übernehmen von Name, Anschrift, Telefonnummer, E-Mail-Adresse, Handelspartner, Kondition:',
+    'bitte nachstehenden Kunden ins System eintragen und mir die Kundennummer zusenden:',
     '',
     `Firma: ${contact.name}`,
     `Ansprechpartner: ${ansprechpartner || '–'}`,
