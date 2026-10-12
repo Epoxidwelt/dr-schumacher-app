@@ -405,3 +405,15 @@
 .acq-open-bar strong{font-weight:700}
 .bottom-nav.acq-return-bar .acq-return-btn{background:#0067b1;color:#fff;border-radius:12px;min-height:48px;font-weight:700;font-size:1rem;width:100%;max-width:560px}
 .bottom-nav.acq-return-bar .acq-return-btn:active{background:#00528f}
+/* Kaltakquise: Frage/Überschrift bleibt oben sichtbar (unter der Kopfleiste) */
+.acq-page{scroll-margin-top:76px}
+.acq-heading{position:sticky;top:76px;z-index:20;margin:0 0 16px;padding:10px 12px;background:#fff;border:1px solid #cfe0f0;border-radius:14px;box-shadow:0 4px 14px rgba(16,36,67,.08)}
+.acq-heading .eyebrow{color:#0b4f96;font-weight:800}
+.acq-heading h1{margin:2px 0 0;color:#0f2342;line-height:1.15}
+@media(max-width:760px){
+  .acq-page{scroll-margin-top:64px}
+  .acq-heading{top:64px;padding:8px 10px;margin-bottom:12px}
+  .acq-heading h1{font-size:1.35rem}
+  .acq-heading p{margin:4px 0 0;font-size:.82rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .acq-heading .secondary-button{padding:8px 12px;min-height:0}
+}

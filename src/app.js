@@ -711,6 +711,9 @@ function render() {
     }
   }
   window.scrollTo(0, viewChanged ? 0 : scrollY);
+  // Kaltakquise: jeder neue Schritt startet sichtbar ganz oben (auch wenn die Seite eingebettet ist und
+  // window.scrollTo allein nicht greift).
+  if (viewChanged && state.screen === 'akquise') { const m = document.querySelector('main.acq-page'); if (m && m.scrollIntoView) m.scrollIntoView({block:'start'}); }
   acqPersistDraft();
 }
 document.addEventListener('input', () => { if (state.screen === 'akquise') acqPersistDraft(); });
@@ -2018,10 +2021,14 @@ function acqYesNoStep(opts) {
   </main>`;
 }
 function acqScreen() {
-  const html = acqScreenInner();
-  if (!acqHasData() || state.acq.step === 'branche' && !state.acq.branche) return html;
-  const bar = `<div class="acq-open-bar no-print"><span>Offen: <strong>${escapeHtml(acqOpenLabel())}</strong></span><button type="button" class="secondary-button compact" data-action="acq-new">Neuer Kunde</button></div>`;
-  return html.replace('<main class="page advisor-page">', '<main class="page advisor-page">' + bar);
+  let html = acqScreenInner()
+    .replace('<main class="page advisor-page">', '<main class="page advisor-page acq-page">')
+    .replace('<div class="section-heading">', '<div class="section-heading acq-heading">');
+  if (acqHasData() && !(state.acq.step === 'branche' && !state.acq.branche)) {
+    const bar = `<div class="acq-open-bar no-print"><span>Offen: <strong>${escapeHtml(acqOpenLabel())}</strong></span><button type="button" class="secondary-button compact" data-action="acq-new">Neuer Kunde</button></div>`;
+    html = html.replace('<main class="page advisor-page acq-page">', '<main class="page advisor-page acq-page">' + bar);
+  }
+  return html;
 }
 function acqScreenInner() {
   const a = state.acq;
