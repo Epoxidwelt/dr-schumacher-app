@@ -450,7 +450,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]').slice(0, 15),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1578,7 +1578,7 @@ function buildIdeaEmail() {
     'Beschreibung:',
     idea.text.trim(),
     '',
-    'Danke und Grüße' + (state.repName ? ', ' + state.repName : '')
+    'Danke und Grüße'
   ];
   return {subject: `Ideenschmiede: ${kategorieLabel} (Dr. Schumacher)`, body: lines.join('\n')};
 }
@@ -1727,7 +1727,7 @@ function acqReset() {
   state.acqArrangeMode = false;
   state.acq = {
     branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
-    myPos:null, locating:false, locateError:'',
+    myPos:null, locating:false, locateError:'', handelspartner:'',
     step:'branche', history:[],
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
     produkteBesprochen:null, produktKategorie:null,
@@ -2060,6 +2060,7 @@ function acqScreenInner() {
           <div><label for="acqHausnummer">Hausnummer</label><input id="acqHausnummer" data-acq-field="hausnummer" type="text" value="${escapeHtml(a.hausnummer)}"></div>
           <div><label for="acqPlz">Postleitzahl</label><input id="acqPlz" data-acq-field="plz" type="text" value="${escapeHtml(a.plz)}"></div>
           <div><label for="acqOrt">Ort</label><input id="acqOrt" data-acq-field="ort" type="text" value="${escapeHtml(a.ort)}"></div>
+          <div class="wide"><label for="acqHandelspartner">Handelspartner (optional, z. B. Dental-Depot)</label><input id="acqHandelspartner" data-acq-field="handelspartner" type="text" value="${escapeHtml(a.handelspartner || '')}" placeholder="Über welchen Händler wird bezogen?"></div>
         </div>
         <button type="button" class="primary-button compact" data-action="acq-advance" data-field="adresse" style="margin-top:14px"><span>Weiter</span></button>
       </section>
@@ -2169,6 +2170,7 @@ function acqEnsureContact() {
     name:a.firma.trim() || acqPersonName() || 'Kaltakquise-Kontakt', branche:a.branche, anrede:'',
     ansprechpartnerVorname:a.vorname.trim(), ansprechpartnerNachname:a.nachname.trim(),
     plz:a.plz.trim(), ort:a.ort.trim(), strasse:a.strasse.trim(), hausnummer:a.hausnummer.trim(), email:a.email.trim(), telefon:a.telefon.trim(),
+    handelspartner:(a.handelspartner || '').trim(),
     notiz:'', produktbereiche:[...new Set(prods.map(p => p.category))], produkte:prods.map(p => p.name).join(', '),
     musterWanted:false, musterListe:[], wettbewerber:'', feedback:'', samples:'Keine', result:'Offen', vertragBis:null
   };
@@ -2187,6 +2189,7 @@ function acqBuildCrmReport() {
     `Gespräch geführt: ${a.gespraech === 'ja' ? 'ja' : 'nein'}`,
     a.produkteBesprochen === 'ja' ? `Interesse an besprochenen Produkten: ${a.interesse === 'ja' ? 'ja (' + a.interesseIds.map(acqProductName).join(', ') + ')' : 'nein'}` : '',
     a.infoGewuenscht === 'ja' ? `Weitere Informationen gewünscht zu: ${a.infoIds.map(acqProductName).join(', ')}` : '',
+    (a.handelspartner || '').trim() ? `Handelspartner: ${a.handelspartner.trim()}` : '',
     termine.length ? `Terminvorschläge: ${termine.map(acqFormatTermin).join('; ')}` : ''
   ].filter(Boolean).join(' · ');
   return {
@@ -2393,7 +2396,7 @@ function startAngebotFlow(){
   state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null; state.summaryInteresseHatte = null;
 }
 function newCustomerDraftDefault(){
-  return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', notiz:'' };
+  return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', handelspartner:'', notiz:'' };
 }
 const NEUKUNDE_BRANCHEN = [
   'Rettungswache / Rettungsdienst', 'Pflegedienst / Pflegeeinrichtung', 'Krankenhaus / Klinik',
@@ -2417,7 +2420,7 @@ function newCustomerSave(){
   const fields = {
     name:d.firma.trim(), branche:d.branche, anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
     plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(),
-    email:d.email.trim(), telefon:d.telefon.trim(), notiz:state.summaryNotiz.trim(),
+    email:d.email.trim(), telefon:d.telefon.trim(), handelspartner:(d.handelspartner || '').trim(), notiz:state.summaryNotiz.trim(),
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
     produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', '),
     musterWanted: !!state.musterWanted, musterListe: computeMusterListe(entries),
@@ -2459,7 +2462,8 @@ function newCustomerFormFieldsHtml(d){
     ['firma','Firma / Einrichtung', required, 'text'], ['vorname','Vorname', false, 'text'], ['nachname','Nachname', required, 'text'],
     ['strasse','Straße', false, 'text'], ['hausnummer','Hausnummer', false, 'tel'],
     ['plz','Postleitzahl', required, 'tel'], ['ort','Ort', false, 'text'], ['telefon','Telefonnummer', false, 'tel'],
-    ['email', required ? 'E-Mail (Pflichtfeld)' : 'E-Mail (optional)', required, 'email']
+    ['email', required ? 'E-Mail (Pflichtfeld)' : 'E-Mail (optional)', required, 'email'],
+    ['handelspartner','Handelspartner (optional, z. B. Dental-Depot)', false, 'text']
   ];
   const nc = state.newCustomer;
   return `<div class="new-customer-form">
@@ -2473,7 +2477,7 @@ function newCustomerFormFieldsHtml(d){
     ${(() => {
       const rows = fields.map(([k,label,fieldRequired,type]) => {
         const numeric = k==='plz' || k==='hausnummer';
-        return `<div class="${k==='firma'||k==='email'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${numeric?'inputmode="numeric" pattern="[0-9]*"':''} ${k==='plz'?'maxlength="5"':''} ${fieldRequired?'required':''} value="${escapeHtml(d[k])}"></div>`;
+        return `<div class="${k==='firma'||k==='email'||k==='handelspartner'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${numeric?'inputmode="numeric" pattern="[0-9]*"':''} ${k==='plz'?'maxlength="5"':''} ${fieldRequired?'required':''} value="${escapeHtml(d[k] || '')}"></div>`;
       });
       const brancheField = `<div class="wide"><label for="nc-branche">Branche</label><select id="nc-branche" data-nc-field="branche"><option value="">Bitte wählen…</option>${NEUKUNDE_BRANCHEN.map(b => `<option value="${escapeHtml(b)}" ${d.branche===b?'selected':''}>${escapeHtml(b)}</option>`).join('')}</select></div>`;
       rows.splice(1, 0, brancheField);
@@ -3693,11 +3697,11 @@ function buildNewCustomerInnendienstEmail(contact){
     `Anschrift: ${[contact.strasse, contact.hausnummer].filter(Boolean).join(' ')}${contact.plz || contact.ort ? ', ' + [contact.plz, contact.ort].filter(Boolean).join(' ') : ''}`,
     `Telefonnummer: ${contact.telefon || '–'}`,
     `E-Mail-Adresse: ${contact.email || '–'}`,
-    `Handelspartner: –`,
+    `Handelspartner: ${(contact.handelspartner || '').trim() || '–'}`,
     `Kondition: ${contact.preisliste || 'UVP'}`,
     `Herkunft: ${contact.herkunft === 'kaltakquise' ? 'Kaltakquise' : '–'}`,
     '',
-    'Danke und Grüße' + (state.repName ? ', ' + state.repName : '')
+    'Danke und Grüße'
   ];
   return { subject: `Neuer Kunde: ${contact.name}`, body: lines.join('\n') };
 }
@@ -3741,7 +3745,7 @@ function buildAngebotInnendienstEmail(){
   if (opts.sdb) extras.push('Sicherheitsdatenblatt');
   if (opts.ba) extras.push('Betriebsanweisung');
   if (extras.length) lines.push(`Bitte zusätzlich mit dem Angebot mitsenden: ${extras.join(', ')}`, '');
-  lines.push('Danke und Grüße' + (state.repName ? ', ' + state.repName : ''));
+  lines.push('Danke und Grüße');
   return { subject: `Angebot ${customerName || 'Kundentermin'} – Dr. Schumacher`, body: lines.join('\n') };
 }
 function sendAngebotInnendienstEmail(){
