@@ -450,8 +450,8 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
-  savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]'),
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
+  savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]').slice(0, 15),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
@@ -493,7 +493,7 @@ const state = {
   factsImportMeta: JSON.parse(localStorage.getItem('factsImportMeta') || '{}'),
   visitReport: JSON.parse(localStorage.getItem('visitReport') || '{}'),
   savedReports: JSON.parse(localStorage.getItem('savedVisitReports') || '[]'),
-  customerHistory: JSON.parse(localStorage.getItem('customerHistory') || '[]'),
+  customerHistory: JSON.parse(localStorage.getItem('customerHistory') || '[]').slice(0, 15),
   globalQuery: '',
   messeName: localStorage.getItem('messeName') || '',
   messeAdresse: localStorage.getItem('messeAdresse') || '',
@@ -633,7 +633,7 @@ const debouncedRender = debounce(render, 150);
 let lastViewKey = null;
 let lastModalStepKey = null;
 function currentViewKey() {
-  return [state.screen, state.category, state.selected].join(':');
+  return [state.screen, state.category, state.selected, state.screen === 'akquise' ? state.acq.step : ''].join(':');
 }
 
 function render() {
@@ -645,6 +645,7 @@ function render() {
     selStart: 'selectionStart' in active ? active.selectionStart : null,
     selEnd: 'selectionEnd' in active ? active.selectionEnd : null
   } : null;
+  if (state.screen !== 'akquise' && state.acq.sentOk) acqFinishReset();
   const scrollY = window.scrollY;
   const viewKey = currentViewKey();
   const viewChanged = viewKey !== lastViewKey;
@@ -1214,7 +1215,7 @@ function productCard(product, variantSize) {
   const favorite = hasVariant ? state.favorites.some(f => f.id === product.id && f.size === refSize) : state.favorites.some(f => f.id === product.id);
   return `<article class="product-row" data-product="${product.id}">
     <div class="product-image" style="--product-color:${product.color}">${product.photo?`<img src="${product.photo}" alt="${escapeHtml(product.name)}">`:`<span>${product.category==='hands'?'✋':product.category==='surface'?'▦':product.category==='instruments'?'✂':'▣'}</span>`}</div>
-    <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}${haccpBadge(product)}${product.biozid ? biozidBadge() : ''}</div><p>Art.-Nr. ${resolveArtNr(product, refSize)} · ${refSize}</p></div>
+    <div class="product-copy"><small>${product.kind}</small><h2>${product.name}</h2><div class="badges">${product.spectrum.map(spectrumBadge).join('')}${haccpBadge(product)}${arzneimittelBadge(product)}${product.biozid ? biozidBadge() : ''}</div><p>Art.-Nr. ${resolveArtNr(product, refSize)} · ${refSize}</p></div>
     <div class="row-price">${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':(price!=null?`<strong>${money(price)}</strong><small>${perUnit || state.priceList}</small>`:'<strong class="hidden-price">–</strong>')}</div>
     <button class="favorite-button ${favorite?'active':''}" data-favorite="${product.id}" ${hasVariant?`data-favorite-size="${escapeHtml(refSize)}"`:''} aria-label="Favorit">${icon('star')}</button>
     <span class="chevron">›</span>
@@ -1234,7 +1235,7 @@ function detailScreen() {
       <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${haccpBadge(p)}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
-      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${wirkspektrumChipsHtml(p)}${einwirkzeitenHtml(p)}${dispenserFitHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
+      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${arzneimittelNoticeHtml(p)}${wirkspektrumChipsHtml(p)}${einwirkzeitenHtml(p)}${dispenserFitHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
       <div class="price-card-detail"><span>Gebinde auswählen${p.sizes.length>1?' · anklicken markiert die Variante als Favorit':''}</span><div class="size-selector">${p.sizes.map(size => {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
@@ -1710,7 +1711,7 @@ function acqProductName(id) { return (PRODUCTS.find(p => p.id === id) || {}).nam
 function acqFormatTermin(value) {
   const d = new Date(value);
   if (isNaN(d.getTime())) return value;
-  return d.toLocaleString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+  return d.toLocaleString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) + ' Uhr';
 }
 function acqReset() {
   state.acqArrangeMode = false;
@@ -1723,10 +1724,19 @@ function acqReset() {
     interesse:null, interesseIds:[],
     musterHinterlassen:null, musterEintraege:[], musterSuche:'',
     infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false},
-    terminVorschlagen:null, termine:['','',''],
+    terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'],
     previewTo:'', previewSubject:'', previewBody:'', previewTouched:false,
     sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false
   };
+}
+// Nach abgeschlossener Kaltakquise (E-Mail übergeben) startet der nächste Kontakt bei 0: Eingaben,
+// besprochene Produkte (★) und „Aktion besprochen“-Markierungen werden geleert. Im Speicher bleibt
+// nur der Verlauf der letzten 15 Kontakte (savedAcq).
+function acqFinishReset() {
+  acqReset();
+  state.favorites = [];
+  state.aktionStars = [];
+  try { persistFavorites(); localStorage.setItem('aktionStars', '[]'); } catch (e) {}
 }
 function acqBesprocheneIds() { return [...new Set(state.favorites.map(f => f.id))]; }
 function acqGo(next) { state.acq.history.push(state.acq.step); state.acq.step = next; }
@@ -1873,6 +1883,8 @@ function buildAcqEmail() {
   body.push('', 'Freundliche Grüße', state.repName || '[Absender]');
   return { subject, body: [anrede, '', ...body].join('\n') };
 }
+// Im Speicher bleiben nur die letzten 15 Kontakte (Kaltakquise-Verlauf und Kundengespräche).
+const ACQ_HISTORY_MAX = 15;
 function acqSaveToHistory() {
   const a = state.acq;
   const now = new Date().toISOString();
@@ -1883,7 +1895,7 @@ function acqSaveToHistory() {
   } else {
     const id = 'acq' + Date.now().toString(36);
     a.editingId = id;
-    state.savedAcq = [{id, ...entry, createdAt: now}, ...state.savedAcq].slice(0, 50);
+    state.savedAcq = [{id, ...entry, createdAt: now}, ...state.savedAcq].slice(0, ACQ_HISTORY_MAX);
   }
   localStorage.setItem('savedAcq', JSON.stringify(state.savedAcq));
 }
@@ -1913,14 +1925,14 @@ function acqDelete(id) {
 }
 function acqHistoryListHtml() {
   if (!state.savedAcq.length) return '';
-  return `<section class="saved-reports no-print"><h2>Meine Kaltakquise-Kontakte</h2>${state.savedAcq.slice(0,10).map(entry => `
+  return `<section class="saved-reports no-print"><h2>Meine Kaltakquise-Kontakte</h2>${state.savedAcq.slice(0, ACQ_HISTORY_MAX).map(entry => `
     <div class="saved-idea-row">
       <button data-acq-edit="${entry.id}"><strong>${escapeHtml(entry.firma || entry.ansprechpartner || 'Ohne Namen')}</strong><small>${escapeHtml(entry.email || 'ohne E-Mail')} · ${escapeHtml((entry.subject||'').slice(0,50))}</small></button>
       <button type="button" class="danger-link" data-acq-delete="${entry.id}" aria-label="Eintrag löschen">✕</button>
     </div>`).join('')}</section>`;
 }
-function acqProductChips(ids, field) {
-  return `<div class="filter-row" style="flex-wrap:wrap">${ids.map(id => `<button type="button" class="filter-chip ${state.acq[field].includes(id)?'active':''}" data-acq-toggle="${field}:${id}">${escapeHtml(acqProductName(id))}</button>`).join('') || '<p class="muted-copy">Keine Produkte ausgewählt.</p>'}</div>`;
+function acqProductChips(ids, field, stacked) {
+  return `<div class="${stacked ? 'acq-stack' : 'filter-row'}" ${stacked ? '' : 'style="flex-wrap:wrap"'}>${ids.map(id => { const on = state.acq[field].includes(id); return `<button type="button" class="filter-chip ${on?'active':''}" data-acq-toggle="${field}:${id}">${stacked && on ? '✓ ' : ''}${escapeHtml(acqProductName(id))}</button>`; }).join('') || '<p class="muted-copy">Keine Produkte ausgewählt.</p>'}</div>`;
 }
 // Besprochene Produkte = Favoriten (★), genau wie im Hauptmenü/Kundenzusammenfassung: Kachel
 // antippen öffnet die echte Produktliste dieser Rubrik, dort markierte Produkte (★) gelten als
@@ -1936,12 +1948,21 @@ function acqProduktBereichPickerHtml() {
 }
 function acqMusterPicker() {
   const a = state.acq;
-  const list = PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind}`, a.musterSuche)).slice(0,40);
   const selectedIds = a.musterEintraege.map(m => m.id);
+  const favIds = acqBesprocheneIds();
+  const matches = p => matchesQuery(`${p.name} ${p.kind}`, a.musterSuche);
+  const favs = favIds.map(id => PRODUCTS.find(p => p.id === id)).filter(p => p && matches(p));
+  const rest = PRODUCTS.filter(p => !favIds.includes(p.id) && matches(p)).slice(0, 40);
+  const chip = p => `<button type="button" class="filter-chip ${selectedIds.includes(p.id)?'active':''}" data-acq-muster-toggle="${p.id}">${escapeHtml(p.name)}${isArzneimittel(p) ? ' ✍️' : ''}</button>`;
+  const hasArznei = a.musterEintraege.some(m => ARZNEIMITTEL_PRODUCTS.includes(m.id));
   return `
     <label class="search-box">${icon('search')}<input id="acqMusterSuche" value="${escapeHtml(a.musterSuche)}" placeholder="Produkt suchen"></label>
-    <div class="filter-row" style="flex-wrap:wrap">${list.map(p => `<button type="button" class="filter-chip ${selectedIds.includes(p.id)?'active':''}" data-acq-muster-toggle="${p.id}">${escapeHtml(p.name)}</button>`).join('') || '<p class="muted-copy">Keine Produkte gefunden.</p>'}</div>
-    ${a.musterEintraege.length ? `<div class="saved-reports" style="margin-top:14px">${a.musterEintraege.map(m => `<div class="saved-idea-row"><span style="flex:1;padding:10px 12px;font-weight:600">${escapeHtml(acqProductName(m.id))}</span><input type="number" min="1" style="width:70px;margin:6px" data-acq-muster-anzahl="${m.id}" value="${m.anzahl}"><button type="button" class="danger-link" data-acq-muster-remove="${m.id}" aria-label="Entfernen">✕</button></div>`).join('')}</div>` : ''}`;
+    ${favs.length ? `<p class="notiz-baustein-label" style="margin-top:14px">★ Favoriten (besprochene Produkte)</p><div class="filter-row" style="flex-wrap:wrap">${favs.map(chip).join('')}</div>` : ''}
+    <p class="notiz-baustein-label" style="margin-top:14px">${favs.length ? 'Weitere Produkte' : 'Produkte'}</p>
+    <div class="filter-row" style="flex-wrap:wrap">${rest.map(chip).join('') || '<p class="muted-copy">Keine Produkte gefunden.</p>'}</div>
+    <p class="muted-copy" style="margin-top:10px">✍️ = Arzneimittel: keine Muster, nur an Ärzte gegen Unterschrift.</p>
+    ${hasArznei ? `<div class="arznei-notice"><strong>Achtung: Arzneimittel ausgewählt</strong><span>Keine Muster – nur an Ärzte gegen Unterschrift ✍️</span></div>` : ''}
+    ${a.musterEintraege.length ? `<div class="saved-reports" style="margin-top:14px">${a.musterEintraege.map(m => `<div class="saved-idea-row"><span style="flex:1;padding:10px 12px;font-weight:600">${escapeHtml(acqProductName(m.id))}${ARZNEIMITTEL_PRODUCTS.includes(m.id) ? ' ✍️' : ''}</span><input type="number" min="1" style="width:70px;margin:6px" data-acq-muster-anzahl="${m.id}" value="${m.anzahl}"><button type="button" class="danger-link" data-acq-muster-remove="${m.id}" aria-label="Entfernen">✕</button></div>`).join('')}</div>` : ''}`;
 }
 function acqYesNoStep(opts) {
   const a = state.acq;
@@ -2022,7 +2043,7 @@ function acqScreen() {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>An welchen Produkten besteht Interesse?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
-        ${acqProductChips(acqBesprocheneIds(), 'interesseIds')}
+        ${acqProductChips(acqBesprocheneIds(), 'interesseIds', true)}
         <button type="button" class="primary-button compact" data-action="acq-goto" data-step="muster" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
@@ -2044,12 +2065,13 @@ function acqScreen() {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Zu welchen Produkten werden Informationen gewünscht?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
-        ${acqProductChips(pool, 'infoIds')}
-        <p class="notiz-baustein-label" style="margin-top:14px">Welche Unterlagen?</p>
-        <div class="filter-row">
-          <button type="button" class="filter-chip ${d.pif?'active':''}" data-acq-infodoc="pif">Produktdatenblatt (PIF)</button>
-          <button type="button" class="filter-chip ${d.sdb?'active':''}" data-acq-infodoc="sdb">Sicherheitsdatenblatt (SDB)</button>
-          <button type="button" class="filter-chip ${d.ba?'active':''}" data-acq-infodoc="ba">Betriebsanweisung (BA)</button>
+        <p class="notiz-baustein-label">Produkte</p>
+        ${acqProductChips(pool, 'infoIds', true)}
+        <p class="notiz-baustein-label" style="margin-top:18px">Welche Unterlagen?</p>
+        <div class="acq-stack">
+          <button type="button" class="filter-chip ${d.pif?'active':''}" data-acq-infodoc="pif">${d.pif?'✓ ':''}Produktdatenblatt (PIF)</button>
+          <button type="button" class="filter-chip ${d.sdb?'active':''}" data-acq-infodoc="sdb">${d.sdb?'✓ ':''}Sicherheitsdatenblatt (SDB)</button>
+          <button type="button" class="filter-chip ${d.ba?'active':''}" data-acq-infodoc="ba">${d.ba?'✓ ':''}Betriebsanweisung (BA)</button>
         </div>
         <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${acqPreTermin()}" style="margin-top:14px"><span>Weiter</span></button>
       </section>
@@ -2069,7 +2091,8 @@ function acqScreen() {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Terminvorschläge</h1><p>Nur ausgefüllte Vorschläge werden in die E-Mail übernommen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
-        ${[0,1,2].map(i => `<label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Vorschlag ${i+1}</span><input type="datetime-local" data-acq-termin="${i}" value="${escapeHtml(a.termine[i]||'')}"></label>`).join('')}
+        ${[0,1,2].map(i => `<div class="acq-termin-row"><span class="notiz-baustein-label">Vorschlag ${i+1}</span><div class="acq-termin-inputs"><input type="date" data-acq-termin-date="${i}" value="${escapeHtml((a.termine[i]||'').split('T')[0])}" aria-label="Datum Vorschlag ${i+1}"><input type="time" data-acq-termin-time="${i}" value="${escapeHtml((a.terminZeiten||[])[i] || '10:00')}" aria-label="Uhrzeit Vorschlag ${i+1}"><span class="acq-uhr">Uhr</span></div></div>`).join('')}
+        <p class="muted-copy" style="margin:0 0 10px">Voreingestellt: 10:00 Uhr – Uhrzeit bei Bedarf anpassen.</p>
         <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:4px"><span>Weiter zur Vorschau</span></button>
       </section>
     </main>`;
@@ -2106,7 +2129,7 @@ function acqBuildCrmReport() {
   const a = state.acq;
   const prods = acqBesprocheneIds().map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
   const termine = a.terminVorschlagen === 'ja' ? a.termine.filter(x => x && x.trim()) : [];
-  const muster = a.musterHinterlassen === 'ja' ? a.musterEintraege.map(m => `${acqProductName(m.id)} (${m.anzahl} Stück)`) : [];
+  const muster = a.musterHinterlassen === 'ja' ? a.musterEintraege.map(m => `${acqProductName(m.id)} (${m.anzahl} Stück)${ARZNEIMITTEL_PRODUCTS.includes(m.id) ? ' – ' + ARZNEIMITTEL_MUSTER_HINWEIS : ''}`) : [];
   const notiz = [
     `Gespräch geführt: ${a.gespraech === 'ja' ? 'ja' : 'nein'}`,
     a.produkteBesprochen === 'ja' ? `Interesse an besprochenen Produkten: ${a.interesse === 'ja' ? 'ja (' + a.interesseIds.map(acqProductName).join(', ') + ')' : 'nein'}` : '',
@@ -3281,6 +3304,7 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">Muster · Produkt ${idx+1} von ${entries.length}</span>
         <h2>${escapeHtml(entry.product.name)}${entry.size ? ` · ${escapeHtml(entry.size)}` : ''}</h2>
+        ${arzneimittelNoticeHtml(entry.product)}
         <div class="muster-tiles">
           <button type="button" class="muster-tile muster-tile-wide ${m && m.status==='dagelassen' ? 'active':''}" data-muster-status="dagelassen"><strong>Bereits dagelassen</strong><small>heute beim Termin übergeben</small></button>
           <button type="button" class="muster-tile muster-tile-wide ${m && m.status==='zusenden' ? 'active':''}" data-muster-status="zusenden"><strong>Noch zusenden</strong><small>wird über den Onlineshop bestellt</small></button>
@@ -4735,8 +4759,7 @@ function buildCrmSummary(report = state.visitReport) {
       `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
       ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
       `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
-      `Nächster Schritt: ${report.nextSteps || report.type || '-'}`,
-      `Zuständiger Mitarbeiter: ${report.owner || '-'}`
+      `Nächster Schritt: ${report.nextSteps || report.type || '-'}`
     ];
     return crmAddAktion(parts.join('\n'));
   }
@@ -5101,6 +5124,13 @@ function haccpKuecheLines(products, branche) {
   ];
 }
 function haccpBadge(p) { return isHaccp(p) ? '<span class="badge haccp">HACCP</span>' : ''; }
+// Arzneimittel (Pflichtangaben nach § 4 HWG, Gesamtkatalog 2026 S. 138/139): keine Muster — Abgabe nur
+// an Ärzte gegen Unterschrift. Alle anderen Händedesinfektionsmittel sind Biozidprodukte.
+const ARZNEIMITTEL_PRODUCTS = ['aseptoman-viral','aseptoman-duo','aseptoman-parfümfrei','descoderm-hautdesinfektion','aseptoderm','aseptoderm-gefärbt'];
+const ARZNEIMITTEL_MUSTER_HINWEIS = 'Arzneimittel – keine Muster, nur an Ärzte gegen Unterschrift ✍️';
+function isArzneimittel(p) { return !!p && ARZNEIMITTEL_PRODUCTS.includes(p.id); }
+function arzneimittelBadge(p) { return isArzneimittel(p) ? '<span class="badge arznei">Arzneimittel · keine Muster</span>' : ''; }
+function arzneimittelNoticeHtml(p) { return isArzneimittel(p) ? `<div class="arznei-notice"><strong>Arzneimittel</strong><span>Keine Muster – nur an Ärzte gegen Unterschrift ✍️</span></div>` : ''; }
 function spektrumClose(keys) {
   const s = new Set(keys);
   if (s.has('viruzid')) { s.add('plus'); s.add('begrenzt'); }
@@ -5271,7 +5301,7 @@ function computeMusterListe(entries) {
   if (!state.musterWanted) return [];
   return entries.map(({product, size}) => {
     const m = state.musterMengen[musterEntryKey(product, size)];
-    return (m && m.status && m.status !== 'skip') ? { name: product.name, size, status: m.status, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt } : null;
+    return (m && m.status && m.status !== 'skip') ? { name: product.name, size, status: m.status, mode: m.mode, ve: m.ve, stueck: m.stueck, gesamt: m.gesamt, arzneimittel: isArzneimittel(product) } : null;
   }).filter(Boolean);
 }
 // Nur wenn die importierte Preisliste eine plausible VE-Größe für den Artikel kennt, können
@@ -5282,7 +5312,8 @@ function veStueckCount(product, size='') {
 }
 function musterLineText(item) {
   const label = item.name + (item.size ? ' · ' + item.size : '');
-  return item.mode === 've' ? `${label} — ${item.ve} VE (${item.gesamt} Stück gesamt)` : `${label} — ${item.gesamt} Stück`;
+  const text = item.mode === 've' ? `${label} — ${item.ve} VE (${item.gesamt} Stück gesamt)` : `${label} — ${item.gesamt} Stück`;
+  return item.arzneimittel ? `${text} (${ARZNEIMITTEL_MUSTER_HINWEIS})` : text;
 }
 // Getrennt nach "bereits dagelassen" (reine Dokumentation, keine Bestellung nötig) und "noch
 // zusenden" (muss der Außendienst über den Onlineshop bestellen) — sonst liest sich die
@@ -5523,11 +5554,24 @@ function bind() {
   document.querySelectorAll('[data-acq-muster-toggle]').forEach(button => button.onclick = () => { acqMusterToggle(button.dataset.acqMusterToggle); render(); });
   document.querySelectorAll('[data-acq-muster-anzahl]').forEach(input => input.addEventListener('input', e => { const entry = state.acq.musterEintraege.find(m => m.id === input.dataset.acqMusterAnzahl); if (entry) entry.anzahl = Math.max(1, parseInt(e.target.value, 10) || 1); }));
   document.querySelectorAll('[data-acq-muster-remove]').forEach(button => button.onclick = () => { state.acq.musterEintraege = state.acq.musterEintraege.filter(m => m.id !== button.dataset.acqMusterRemove); render(); });
-  document.querySelectorAll('[data-acq-termin]').forEach(input => input.addEventListener('input', e => { state.acq.termine[Number(input.dataset.acqTermin)] = e.target.value; }));
+  const acqSyncTermin = i => { const a = state.acq; const t = (a.terminZeiten && a.terminZeiten[i]) || '10:00'; const d = (a.termine[i] || '').split('T')[0]; a.termine[i] = d ? `${d}T${t}` : ''; };
+  document.querySelectorAll('[data-acq-termin-date]').forEach(input => input.addEventListener('input', e => {
+    const i = Number(input.dataset.acqTerminDate);
+    const a = state.acq;
+    if (!a.terminZeiten) a.terminZeiten = ['10:00','10:00','10:00'];
+    a.termine[i] = e.target.value ? `${e.target.value}T${a.terminZeiten[i] || '10:00'}` : '';
+  }));
+  document.querySelectorAll('[data-acq-termin-time]').forEach(input => input.addEventListener('input', e => {
+    const i = Number(input.dataset.acqTerminTime);
+    const a = state.acq;
+    if (!a.terminZeiten) a.terminZeiten = ['10:00','10:00','10:00'];
+    a.terminZeiten[i] = e.target.value || '10:00';
+    acqSyncTermin(i);
+  }));
   $('[data-action="acq-goto"]')?.addEventListener('click', (e) => { acqGo(e.currentTarget.dataset.step); render(); });
   $('[data-action="acq-vorschau"]')?.addEventListener('click', () => { acqEnterVorschau(); render(); });
   $('[data-action="acq-back"]')?.addEventListener('click', () => { acqBack(); render(); });
-  $('[data-action="acq-restart"]')?.addEventListener('click', () => { acqReset(); render(); });
+  $('[data-action="acq-restart"]')?.addEventListener('click', () => { acqFinishReset(); render(); });
   $('[data-action="acq-crm"]')?.addEventListener('click', () => { acqSendCrm(); render(); });
   $('[data-action="acq-innendienst"]')?.addEventListener('click', () => { acqSendInnendienst(); render(); });
   $('#acqPreviewTo')?.addEventListener('input', e => { state.acq.previewTo = e.target.value; state.acq.previewTouched = true; const btn = $('[data-action="acq-senden"]'); if (btn) btn.disabled = !e.target.value.trim(); });
@@ -5878,7 +5922,9 @@ function bind() {
   $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : 'angebotask'; render(); });
   $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : 'angebotask'; render(); });
   $('[data-action="occasion-back-innendienstask"]')?.addEventListener('click', () => { state.summaryStep = 'innendienstask'; render(); });
-  $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; render(); });
+  // Nach der letzten Frage des Ablaufs wird alles auf 0 gesetzt (bisheriger Stand landet – begrenzt auf
+  // die letzten 15 Kontakte – im Verlauf „Letzte Kundengespräche“).
+  $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; resetCustomerData(true); });
   $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => { state.summaryStep = 'angebotOptionen'; render(); });
   $('[data-action="occasion-back-angebotask"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
   $('[data-action="occasion-back-angebotkunde"]')?.addEventListener('click', () => { state.summaryStep = 'angebotKunde'; render(); });
@@ -5893,7 +5939,7 @@ function bind() {
     localStorage.setItem('priceList', state.priceList);
     render();
   }));
-  $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; render(); });
+  $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; resetCustomerData(true); });
   $('[data-action="angebot-pdf-senden"]')?.addEventListener('click', () => { sendAngebotPdfToCustomer(); });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
@@ -6311,7 +6357,7 @@ function snapshotCustomerData() {
     kaltakquise: !!state.summaryKaltakquise,
     resumable
   };
-  state.customerHistory = [snapshot, ...state.customerHistory].slice(0,50);
+  state.customerHistory = [snapshot, ...state.customerHistory].slice(0, ACQ_HISTORY_MAX);
   localStorage.setItem('customerHistory', JSON.stringify(state.customerHistory));
 }
 // Schlanker als snapshotCustomerData(): sichert AUSSCHLIESSLICH einen noch nirgends
@@ -6345,7 +6391,7 @@ function archiveUnsavedNewCustomerDraft() {
     kaltakquise: !!state.summaryKaltakquise,
     resumable: 'neukunde'
   };
-  state.customerHistory = [snapshot, ...state.customerHistory].slice(0,50);
+  state.customerHistory = [snapshot, ...state.customerHistory].slice(0, ACQ_HISTORY_MAX);
   localStorage.setItem('customerHistory', JSON.stringify(state.customerHistory));
 }
 // Setzt Favoriten + Kundenidentität aus einem Verlaufs-Eintrag wieder ein — gemeinsame Basis
@@ -6425,8 +6471,9 @@ function customerHistoryScreen() {
   </main>`;
 }
 
-function resetCustomerData() {
-  if (!confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf, Messe-Erfassung und der Konzept-Gesprächsstand (besprochene Bereiche, eigene Bereiche, Hersteller-Auswahl) werden zurückgesetzt. Preise, bereits gespeicherte Besuchsberichte und branchentypische Hersteller-Vorschläge bleiben erhalten.')) return;
+function resetCustomerData(silent) {
+  const quiet = silent === true;
+  if (!quiet && !confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf, Messe-Erfassung und der Konzept-Gesprächsstand (besprochene Bereiche, eigene Bereiche, Hersteller-Auswahl) werden zurückgesetzt. Preise, bereits gespeicherte Besuchsberichte und branchentypische Hersteller-Vorschläge bleiben erhalten.')) return;
   snapshotCustomerData();
   ['favorites','aktionStars','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryAdditionalContacts','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter','konzeptErledigt','konzeptCustomBereiche','konzeptWettbewerberSelected'].forEach(key => localStorage.removeItem(key));
   state.favorites = [];
@@ -6477,7 +6524,8 @@ function resetCustomerData() {
   state.messeSignatureData = '';
   state.messeDatum = new Date().toISOString().slice(0,10);
   localStorage.setItem('messeDatum', state.messeDatum);
-  alert('Kundendaten wurden zurückgesetzt. Bereit für den nächsten Termin.');
+  if (!quiet) alert('Kundendaten wurden zurückgesetzt. Bereit für den nächsten Termin.');
+  state.summaryStep = null;
   state.screen = 'menu';
   render();
 }

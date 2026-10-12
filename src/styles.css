@@ -389,3 +389,13 @@
 .ws-result{margin-bottom:12px}.ws-result .ws-row{margin:6px 6px 0;padding:0 8px}
 .acq-abschluss-row{display:flex;flex-direction:column;gap:6px;align-items:flex-start;margin-top:12px}.acq-abschluss-row small{color:#7a8da0}
 .badge.haccp{background:#1c7a4a}.ws-chip.haccp{background:#dff3e6;color:#1c7a4a}.ws-chip.haccp.on{background:#1c7a4a;color:#fff}.ws-toggle.haccp{border-color:#bfe3cd;background:#eefaf2;color:#1c7a4a}.ws-toggle.haccp.on{background:#1c7a4a;border-color:#1c7a4a;color:#fff}
+.badge.arznei{background:#7a3b9a}
+.arznei-notice{display:flex;flex-direction:column;gap:2px;margin:10px 0;padding:10px 12px;border:1px solid #d9b8ea;border-radius:10px;background:#f6ecfb;color:#5a2475;font-size:.92rem}
+.arznei-notice strong{font-size:.95rem}
+.acq-stack{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.acq-stack .filter-chip{width:100%;justify-content:flex-start;text-align:left;padding:12px 14px;white-space:normal}
+.acq-termin-row{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.acq-termin-inputs{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.acq-termin-inputs input{flex:1 1 150px;min-width:0}
+.acq-termin-inputs input[type=time]{flex:0 1 120px}
+.acq-uhr{font-weight:600;color:#42576d}
