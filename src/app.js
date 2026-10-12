@@ -2060,7 +2060,7 @@ function acqScreenInner() {
           <div><label for="acqHausnummer">Hausnummer</label><input id="acqHausnummer" data-acq-field="hausnummer" type="text" value="${escapeHtml(a.hausnummer)}"></div>
           <div><label for="acqPlz">Postleitzahl</label><input id="acqPlz" data-acq-field="plz" type="text" value="${escapeHtml(a.plz)}"></div>
           <div><label for="acqOrt">Ort</label><input id="acqOrt" data-acq-field="ort" type="text" value="${escapeHtml(a.ort)}"></div>
-          <div class="wide"><label for="acqHandelspartner">Handelspartner (optional, z. B. Dental-Depot)</label><input id="acqHandelspartner" data-acq-field="handelspartner" type="text" value="${escapeHtml(a.handelspartner || '')}" placeholder="Über welchen Händler wird bezogen?"></div>
+          <div class="wide"><label for="acqHandelspartner">Handelspartner</label><input id="acqHandelspartner" data-acq-field="handelspartner" type="text" value="${escapeHtml(a.handelspartner || '')}"></div>
         </div>
         <button type="button" class="primary-button compact" data-action="acq-advance" data-field="adresse" style="margin-top:14px"><span>Weiter</span></button>
       </section>
@@ -2463,7 +2463,7 @@ function newCustomerFormFieldsHtml(d){
     ['strasse','Straße', false, 'text'], ['hausnummer','Hausnummer', false, 'tel'],
     ['plz','Postleitzahl', required, 'tel'], ['ort','Ort', false, 'text'], ['telefon','Telefonnummer', false, 'tel'],
     ['email', required ? 'E-Mail (Pflichtfeld)' : 'E-Mail (optional)', required, 'email'],
-    ['handelspartner','Handelspartner (optional, z. B. Dental-Depot)', false, 'text']
+    ['handelspartner','Handelspartner', false, 'text']
   ];
   const nc = state.newCustomer;
   return `<div class="new-customer-form">
