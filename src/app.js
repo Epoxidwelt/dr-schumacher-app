@@ -615,6 +615,11 @@ function header(back=false) {
   </header>`;
 }
 
+// Während der Produktauswahl in der Kaltakquise ersetzt diese Leiste die normale Navigation: man
+// bleibt im Ablauf und kommt nur über „Zurück zur Kaltakquise“ (oder das Logo) wieder heraus.
+function acqReturnBar() {
+  return `<nav class="bottom-nav acq-return-bar"><button type="button" class="acq-return-btn" data-action="acq-return">← Zurück zur Kaltakquise</button></nav>`;
+}
 function bottomNav(active='home') {
   return `<nav class="bottom-nav">
     <button data-nav="home" class="${active==='home'?'active':''}">${icon('surface')}<span>Start</span></button>
@@ -663,8 +668,8 @@ function render() {
   if (state.screen === 'region') html = regionScreen();
   if (state.screen === 'one') html = oneRender();
   if (state.screen === 'menu') html = header() + menuScreen() + bottomNav('home');
-  if (state.screen === 'products') html = header(true) + productsScreen() + bottomNav('search');
-  if (state.screen === 'detail') html = header(true) + detailScreen() + bottomNav('search');
+  if (state.screen === 'products') html = header(true) + productsScreen() + (state.previousScreen === 'akquise-produkte' ? acqReturnBar() : bottomNav('search'));
+  if (state.screen === 'detail') html = header(true) + detailScreen() + (state.previousScreen === 'akquise-produkte' ? acqReturnBar() : bottomNav('search'));
   if (state.screen === 'favorites') html = header(true) + favoritesScreen() + bottomNav('favorites');
   if (state.screen === 'settings') html = header(true) + settingsScreen() + bottomNav('settings');
   if (state.screen === 'customer-history') html = header(true) + customerHistoryScreen() + bottomNav('settings');
@@ -706,7 +711,9 @@ function render() {
     }
   }
   window.scrollTo(0, viewChanged ? 0 : scrollY);
+  acqPersistDraft();
 }
+document.addEventListener('input', () => { if (state.screen === 'akquise') acqPersistDraft(); });
 
 
 function profileScreen() {
@@ -884,7 +891,7 @@ function menuScreen() {
     ['kol','KOL – Key Opinion Leader','Referenzkunden je Produkt finden – unabhängig vom eigenen Gebiet'],
     ['konzepte','Konzepte','Branchenkonzepte mit den passenden Produkten je Bereich – z. B. Rettungsdienst oder Pflege'],
     ['ideenschmiede','Ideenschmiede','Verbesserungsvorschläge und neue Produktideen direkt an den Innendienst'],
-    ['akquise','Kaltakquise','Erstkontakt in wenigen Fragen erfassen und passende E-Mail erstellen'],
+    ['akquise','Kaltakquise', acqTileSubtitle()],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
@@ -1729,6 +1736,38 @@ function acqReset() {
     sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false
   };
 }
+// Offener Kaltakquise-Kontakt: Eingaben bleiben erhalten (auch beim Wechsel zur Hauptseite oder
+// nach App-Neustart), bis der Ablauf abgeschlossen oder bewusst mit „Neuer Kunde“ neu gestartet wird.
+function acqHasData() {
+  const a = state.acq;
+  if (!a || a.fromHistory || a.sentOk) return false;
+  return !!(a.branche || a.firma || a.strasse || a.hausnummer || a.plz || a.ort || a.vorname || a.nachname || a.telefon || a.email
+    || a.gespraech || a.produkteBesprochen || a.interesse || a.musterHinterlassen || a.infoGewuenscht || a.terminVorschlagen
+    || (a.step && a.step !== 'branche'));
+}
+function acqPersistDraft() {
+  try {
+    if (!acqHasData()) { localStorage.removeItem('acqDraft'); return; }
+    const {locating, locateError, myPos, ...rest} = state.acq;
+    localStorage.setItem('acqDraft', JSON.stringify(rest));
+  } catch (e) {}
+}
+function acqRestoreDraft() {
+  try {
+    const raw = localStorage.getItem('acqDraft');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    if (!d || typeof d !== 'object' || d.sentOk) return;
+    state.acq = {...state.acq, ...d, locating:false, locateError:'', myPos:null};
+  } catch (e) {}
+}
+function acqOpenLabel() {
+  const a = state.acq;
+  return a.firma.trim() || [a.vorname, a.nachname].filter(Boolean).join(' ').trim() || a.branche || 'Kontakt';
+}
+function acqTileSubtitle() {
+  return acqHasData() ? `Offen: ${acqOpenLabel()} – hier geht es weiter` : 'Erstkontakt in wenigen Fragen erfassen und passende E-Mail erstellen';
+}
 // Nach abgeschlossener Kaltakquise (E-Mail übergeben) startet der nächste Kontakt bei 0: Eingaben,
 // besprochene Produkte (★) und „Aktion besprochen“-Markierungen werden geleert. Im Speicher bleibt
 // nur der Verlauf der letzten 15 Kontakte (savedAcq).
@@ -1909,6 +1948,7 @@ function sendAcqEmail() {
 function acqLoadForEdit(id) {
   const saved = state.savedAcq.find(i => i.id === id);
   if (!saved) return;
+  if (acqHasData() && !confirm('Es gibt einen offenen Kaltakquise-Kontakt. Eingaben verwerfen und diesen Eintrag öffnen?')) return;
   acqReset();
   state.acq.firma = saved.firma || '';
   state.acq.previewTo = saved.email || '';
@@ -1978,6 +2018,12 @@ function acqYesNoStep(opts) {
   </main>`;
 }
 function acqScreen() {
+  const html = acqScreenInner();
+  if (!acqHasData() || state.acq.step === 'branche' && !state.acq.branche) return html;
+  const bar = `<div class="acq-open-bar no-print"><span>Offen: <strong>${escapeHtml(acqOpenLabel())}</strong></span><button type="button" class="secondary-button compact" data-action="acq-new">Neuer Kunde</button></div>`;
+  return html.replace('<main class="page advisor-page">', '<main class="page advisor-page">' + bar);
+}
+function acqScreenInner() {
   const a = state.acq;
   if (a.step === 'branche') {
     return `<main class="page advisor-page">
@@ -5455,7 +5501,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){acqReset(); state.screen='akquise'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
@@ -5572,6 +5618,12 @@ function bind() {
   $('[data-action="acq-vorschau"]')?.addEventListener('click', () => { acqEnterVorschau(); render(); });
   $('[data-action="acq-back"]')?.addEventListener('click', () => { acqBack(); render(); });
   $('[data-action="acq-restart"]')?.addEventListener('click', () => { acqFinishReset(); render(); });
+  $('[data-action="acq-new"]')?.addEventListener('click', () => {
+    if (!confirm('Alle Eingaben dieses Kontakts (inkl. markierter Produkte ★) verwerfen und mit einem neuen Kunden starten?')) return;
+    acqFinishReset();
+    render();
+  });
+  $('[data-action="acq-return"]')?.addEventListener('click', () => { state.previousScreen = null; state.screen = 'akquise'; state.acq.step = 'produkteAuswahl'; render(); });
   $('[data-action="acq-crm"]')?.addEventListener('click', () => { acqSendCrm(); render(); });
   $('[data-action="acq-innendienst"]')?.addEventListener('click', () => { acqSendInnendienst(); render(); });
   $('#acqPreviewTo')?.addEventListener('input', e => { state.acq.previewTo = e.target.value; state.acq.previewTouched = true; const btn = $('[data-action="acq-senden"]'); if (btn) btn.disabled = !e.target.value.trim(); });
@@ -9275,6 +9327,7 @@ function bindOne(){
   });
 }
 
+acqRestoreDraft();
 render();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
 syncLivePrices();
