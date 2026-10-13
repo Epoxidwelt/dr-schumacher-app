@@ -459,3 +459,7 @@
 [data-acq-forward][hidden]{display:none!important}
 .acq-stack.acq-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .acq-stack.acq-grid2 .filter-chip{justify-content:center;text-align:center}
+/* Gleich große Auswahl-Buttons (Wettbewerber, Ergebnis, Follow-up …) */
+.ergebnis-block .notiz-baustein-chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ergebnis-block .notiz-chip{display:flex;align-items:center;justify-content:center;text-align:center;min-height:46px;padding:8px 10px;margin:0;width:100%;box-sizing:border-box}
+.acq-stack.acq-grid2 .filter-chip{min-height:48px}

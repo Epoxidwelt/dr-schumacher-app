@@ -2276,7 +2276,7 @@ function acqScreenInner() {
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Angaben für den CRM-Eintrag</h1><p>Alles optional – nur Ausgefülltes wird übernommen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         <p class="notiz-baustein-label">Aktueller Wettbewerber, wenn bekannt</p>
-        <div class="filter-row" style="flex-wrap:wrap">${ERGEBNIS_WETTBEWERBER_OPTIONS.map(o => chip((a.wettbewerber||[]).includes(o), `data-acq-wb="${escapeHtml(o)}"`, o)).join('')}</div>
+        <div class="acq-stack acq-grid2">${ERGEBNIS_WETTBEWERBER_OPTIONS.map(o => chip((a.wettbewerber||[]).includes(o), `data-acq-wb="${escapeHtml(o)}"`, o)).join('')}</div>
         <label class="modal-field wide" style="display:block;margin-top:10px"><input id="acqWettbewerberText" data-acq-field="wettbewerberText" type="text" value="${escapeHtml(a.wettbewerberText || '')}" placeholder="Anderer Hersteller / Produkt"></label>
         <label class="modal-field wide" style="display:block;margin-top:14px"><span class="notiz-baustein-label">Vertrag beim aktuellen Anbieter läuft bis</span><input id="acqVertragBis" data-acq-field="vertragBis" type="date" value="${escapeHtml(a.vertragBis || '')}"></label>
 
@@ -2288,7 +2288,7 @@ function acqScreenInner() {
         <div class="acq-stack">${ERGEBNIS_RESULT_OPTIONS.map(o => chip(a.result === o, `data-acq-result="${escapeHtml(o)}"`, o)).join('')}</div>
 
         <p class="notiz-baustein-label" style="margin-top:18px">Follow-up</p>
-        <div class="filter-row" style="flex-wrap:wrap">${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => chip(a.followUp === oneAddDays(oneToday(), days), `data-acq-followup="${days}"`, label)).join('')}</div>
+        <div class="acq-stack acq-grid2">${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => chip(a.followUp === followUpQuickDate(days), `data-acq-followup="${days}"`, label)).join('')}</div>
         <label class="modal-field wide" style="display:block;margin-top:10px"><span class="notiz-baustein-label">oder Datum wählen</span><input id="acqFollowUp" data-acq-field="followUp" type="date" value="${escapeHtml(a.followUp || '')}"></label>
         <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:14px"><span>Weiter zur Vorschau</span></button>
       </section>
@@ -3364,7 +3364,16 @@ const ERGEBNIS_FEEDBACK_BAUSTEINE = [
 ];
 const ERGEBNIS_SAMPLES_OPTIONS = ['Keine','Unterlagen gesendet','Muster übergeben','Test vereinbart','Angebot angefordert'];
 const ERGEBNIS_RESULT_OPTIONS = ['Offen','Interesse vorhanden','Testphase','Angebot erforderlich','Kein aktueller Bedarf','Abschluss vorbereitet'];
-const ERGEBNIS_FOLLOWUP_QUICK = [['Morgen',1],['In 1 Woche',7],['In 2 Wochen',14],['In 1 Monat',30]];
+const ERGEBNIS_FOLLOWUP_QUICK = [['Morgen',1],['In 1 Woche',7],['In 2 Wochen',14],['In 1 Monat',30],['In 3 Monaten','m3'],['In 6 Monaten','m6']];
+// Wert = Anzahl Tage oder 'mN' für N Kalendermonate (z. B. 'm3').
+function followUpQuickDate(v) {
+  if (typeof v === 'string' && v[0] === 'm') {
+    const d = new Date(oneToday() + 'T12:00:00');
+    d.setMonth(d.getMonth() + Number(v.slice(1)));
+    return d.toISOString().slice(0, 10);
+  }
+  return oneAddDays(oneToday(), Number(v));
+}
 const ERGEBNIS_WETTBEWERBER_OPTIONS = ['Schülke','Bode','Ecolab','B. Braun'];
 // Baustein-Text beim erneuten Antippen wieder herausnehmen (Toggle statt Duplikat). Wurde der
 // eingefügte Satz zwischenzeitlich manuell verändert, greift kein Fall mehr — dann bleibt der
@@ -3628,7 +3637,7 @@ function occasionPromptModal() {
             <button type="button" class="notiz-chip ${followUpWanted===true?'active':''}" data-followup-wanted="ja">Ja</button>
           </div>
           ${followUpWanted ? `<div class="notiz-baustein-chips" style="margin-top:8px">
-            ${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => `<button type="button" class="notiz-chip ${state.crmFollowUpDate===oneAddDays(oneToday(),days)?'active':''}" data-followup-quick="${days}">${escapeHtml(label)}</button>`).join('')}
+            ${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => `<button type="button" class="notiz-chip ${state.crmFollowUpDate===followUpQuickDate(days)?'active':''}" data-followup-quick="${days}">${escapeHtml(label)}</button>`).join('')}
           </div>
           <label class="modal-field"><span class="ergebnis-sublabel">oder Datum wählen</span><input id="ergebnisFollowUpDate" type="date" value="${escapeHtml(state.crmFollowUpDate || '')}"></label>` : ''}
         </div>
@@ -5797,7 +5806,7 @@ function bind() {
   document.querySelectorAll('[data-acq-wb]').forEach(button => button.onclick = () => { const v = button.dataset.acqWb; const l = state.acq.wettbewerber || []; state.acq.wettbewerber = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; render(); });
   document.querySelectorAll('[data-acq-fb]').forEach(button => button.onclick = () => { const i = Number(button.dataset.acqFb); const l = state.acq.feedbackSel || []; state.acq.feedbackSel = l.includes(i) ? l.filter(x => x !== i) : [...l, i]; render(); });
   document.querySelectorAll('[data-acq-result]').forEach(button => button.onclick = () => { state.acq.result = button.dataset.acqResult; render(); });
-  document.querySelectorAll('[data-acq-followup]').forEach(button => button.onclick = () => { const d = oneAddDays(oneToday(), Number(button.dataset.acqFollowup)); state.acq.followUp = state.acq.followUp === d ? '' : d; render(); });
+  document.querySelectorAll('[data-acq-followup]').forEach(button => button.onclick = () => { const d = followUpQuickDate(button.dataset.acqFollowup); state.acq.followUp = state.acq.followUp === d ? '' : d; render(); });
   document.querySelectorAll('[data-acq-kondition]').forEach(button => button.onclick = () => { state.acq.konditionPL = button.dataset.acqKondition || ''; render(); });
   document.querySelectorAll('[data-acq-infodoc]').forEach(button => button.onclick = () => { const key = button.dataset.acqInfodoc; state.acq.infoDocs[key] = !state.acq.infoDocs[key]; render(); });
   document.querySelectorAll('[data-acq-toggle]').forEach(button => button.onclick = () => { const [field,id] = button.dataset.acqToggle.split(':'); acqToggle(field, id); render(); });
@@ -6133,7 +6142,7 @@ function bind() {
     render();
   }));
   document.querySelectorAll('[data-followup-quick]').forEach(btn => btn.addEventListener('click', () => {
-    state.crmFollowUpDate = oneAddDays(oneToday(), +btn.dataset.followupQuick);
+    state.crmFollowUpDate = followUpQuickDate(btn.dataset.followupQuick);
     render();
   }));
   $('#ergebnisFollowUpDate')?.addEventListener('input', e => {
