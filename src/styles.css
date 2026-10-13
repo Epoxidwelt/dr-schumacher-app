@@ -450,3 +450,12 @@
 .modal-actions .primary-button svg{width:20px;height:20px}
 .acq-seg{display:flex;gap:10px}
 .acq-seg .filter-chip{flex:1 1 0;min-height:48px;justify-content:center;text-align:center}
+/* Kaltakquise: feste Aktionsleiste – „Zurück“ und „Weiter“ immer auf gleicher Höhe */
+.acq-action-bar{position:fixed;left:0;right:0;bottom:0;z-index:45;display:flex;gap:12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);backdrop-filter:blur(14px);border-top:1px solid var(--border,#d6e2ee)}
+.acq-action-bar>button,.acq-action-bar>.acq-bar-spacer{flex:1 1 0;min-width:0}
+.acq-action-bar>.primary-button{flex:1.4 1 0;width:auto;margin:0;min-height:54px}
+.acq-action-bar>.secondary-button{width:auto;margin:0;min-height:54px}
+.acq-page{padding-bottom:112px}
+[data-acq-forward][hidden]{display:none!important}
+.acq-stack.acq-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.acq-stack.acq-grid2 .filter-chip{justify-content:center;text-align:center}

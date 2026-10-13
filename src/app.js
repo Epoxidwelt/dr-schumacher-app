@@ -685,7 +685,7 @@ function render() {
   if (state.screen === 'ideenschmiede') html = header(true) + ideenschmiedeScreen() + bottomNav('home');
   if (state.screen === 'aktionen') html = header(true) + aktionenScreen() + bottomNav('home');
   if (state.screen === 'wirkspektrum') html = header(true) + wirkspektrumScreen() + bottomNav('home');
-  if (state.screen === 'akquise') html = header(true) + acqScreen() + bottomNav('home');
+  if (state.screen === 'akquise') html = header(true) + acqScreen();
   if (state.screen === 'konzept') html = header(true) + konzeptScreen() + bottomNav('home');
   if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
   if (state.summaryStep) html += occasionPromptModal();
@@ -2086,10 +2086,24 @@ function acqScreen() {
   let html = acqScreenInner()
     .replace('<main class="page advisor-page">', '<main class="page advisor-page acq-page">')
     .replace('<div class="section-heading">', '<div class="section-heading acq-heading">')
-    .split('data-action="acq-back">Zurück</button>').join('data-action="acq-back">← Zurück</button>');
+    // „Zurück“ steht nicht mehr oben, sondern in der festen Leiste unten – neben „Weiter“, immer auf gleicher Höhe.
+    .replace('<button class="secondary-button" data-action="acq-back">Zurück</button>', '');
+  // Vorwärts-Button des Schritts (Weiter / Weiter zur Vorschau) in die feste Leiste übernehmen.
+  let nextLabel = '';
+  html = html.replace(/<button type="button" class="primary-button compact" data-action="(acq-advance|acq-goto|acq-vorschau)"([^>]*)><span>([^<]*)<\/span><\/button>/, (m, act, rest, label) => {
+    nextLabel = 'Weiter';
+    return `<button type="button" class="primary-button compact" data-action="${act}"${rest} data-acq-forward="1" hidden><span>${label}</span></button>`;
+  });
   if (acqHasData() && !(state.acq.step === 'branche' && !state.acq.branche)) {
     const bar = `<div class="acq-open-bar no-print"><span>Offen: <strong>${escapeHtml(acqOpenLabel())}</strong></span><button type="button" class="secondary-button compact" data-action="acq-new">Neuer Kunde</button></div>`;
     html = html.replace('<main class="page advisor-page acq-page">', '<main class="page advisor-page acq-page">' + bar);
+  }
+  const sent = state.acq.sentOk && state.acq.step === 'vorschau';
+  if (!sent) {
+    html += `<nav class="acq-action-bar no-print" aria-label="Navigation Kaltakquise">
+      <button type="button" class="secondary-button" data-action="acq-back">← Zurück</button>
+      ${nextLabel ? `<button type="button" class="primary-button" data-action="acq-bar-next">${escapeHtml(nextLabel)} →</button>` : '<span class="acq-bar-spacer"></span>'}
+    </nav>`;
   }
   return html;
 }
@@ -2232,7 +2246,7 @@ function acqScreenInner() {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Konditionen</h1><p>Voreingestellt: keine – ohne Auswahl wird nichts an den Innendienst übermittelt.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
-        <div class="acq-stack">
+        <div class="acq-stack acq-grid2">
           <button type="button" class="filter-chip ${!a.konditionPL?'active':''}" data-acq-kondition="">${!a.konditionPL?'✓ ':''}Keine</button>
           ${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(pl => `<button type="button" class="filter-chip ${a.konditionPL===pl?'active':''}" data-acq-kondition="${pl}">${a.konditionPL===pl?'✓ ':''}${pl}</button>`).join('')}
         </div>
@@ -5807,7 +5821,12 @@ function bind() {
   }));
   $('[data-action="acq-goto"]')?.addEventListener('click', (e) => { acqGo(e.currentTarget.dataset.step); render(); });
   $('[data-action="acq-vorschau"]')?.addEventListener('click', () => { acqEnterVorschau(); render(); });
-  $('[data-action="acq-back"]')?.addEventListener('click', () => { acqBack(); render(); });
+  $('[data-action="acq-back"]')?.addEventListener('click', () => {
+    // Im allerersten Schritt führt „Zurück“ zur Startseite.
+    if (!state.acq.history.length && state.acq.step === 'branche') { state.previousScreen = null; state.screen = 'menu'; render(); return; }
+    acqBack(); render();
+  });
+  $('[data-action="acq-bar-next"]')?.addEventListener('click', () => { const f = document.querySelector('[data-acq-forward]'); if (f && !f.disabled) f.click(); });
   $('[data-action="acq-restart"]')?.addEventListener('click', () => { acqFinishReset(); render(); });
   $('[data-action="acq-new"]')?.addEventListener('click', () => {
     if (!confirm('Alle Eingaben dieses Kontakts verwerfen und mit einem neuen Kunden starten? (Favoriten ★ bleiben erhalten.)')) return;
