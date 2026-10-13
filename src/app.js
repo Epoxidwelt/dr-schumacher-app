@@ -5667,7 +5667,19 @@ function bind() {
       // sonst gehen bereits eingetragene Adressdaten beim erneuten Antippen von "Neukunde"
       // verloren, nur weil man kurz auf diesem Schritt war.
       if (!state.newCustomer) {
-        state.newCustomer = { draft: newCustomerDraftDefault(), contactId: null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
+        // Ist eine Kaltakquise offen, liegen Firma, Adresse, Ansprechpartner, Handelspartner usw. schon
+        // vor — auf Nachfrage werden sie hier übernommen, statt ein leeres Formular zu zeigen.
+        let draft = newCustomerDraftDefault();
+        let contactId = null;
+        const a = state.acq;
+        const hasCustomerData = acqHasData() && !!(a.firma || a.strasse || a.plz || a.ort || a.vorname || a.nachname || a.email || a.telefon || a.handelspartner);
+        if (hasCustomerData && confirm(`Daten aus der offenen Kaltakquise „${acqOpenLabel()}“ übernehmen?\n\nOK = übernehmen, Abbrechen = leeres Formular.`)) {
+          draft = {...draft, firma:a.firma.trim(), branche:a.branche || '', vorname:a.vorname.trim(), nachname:a.nachname.trim(),
+            strasse:a.strasse.trim(), hausnummer:a.hausnummer.trim(), plz:a.plz.trim(), ort:a.ort.trim(),
+            telefon:a.telefon.trim(), email:a.email.trim(), handelspartner:(a.handelspartner || '').trim()};
+          contactId = a.contactId || null;
+        }
+        state.newCustomer = { draft, contactId, produktbereiche: [], myPos:null, locating:false, locateError:'' };
       }
       state.summaryStep = 'neukunde';
       // Über die Kachel "Kundenbesuch" gestartet und hier "Kaltakquise" gewählt → derselbe
