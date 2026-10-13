@@ -1874,9 +1874,22 @@ function acqToggle(field, id) {
   const list = state.acq[field];
   state.acq[field] = list.includes(id) ? list.filter(x => x !== id) : [...list, id];
 }
-function acqMusterToggle(id) {
+// Muster werden mit Gebinde geführt: Schlüssel = Produkt + Gebinde ("id|Gebinde").
+function acqMusterKey(id, size) { return id + '|' + (size || ''); }
+function acqMusterEntryKey(m) { return acqMusterKey(m.id, m.size); }
+function acqMusterLabel(m) { return acqProductName(m.id) + (m.size ? ' · ' + m.size : ''); }
+// Dagelassene Muster im Format der Kundenzusammenfassung (Produkt, Gebinde, Stückzahl).
+function acqMusterListe() {
+  const a = state.acq;
+  if (a.musterHinterlassen !== 'ja') return [];
+  return a.musterEintraege.filter(m => m.id).map(m => ({ name: acqProductName(m.id), size: m.size || '', status: 'dagelassen', mode: 'stueck', stueck: m.anzahl, gesamt: m.anzahl, arzneimittel: ARZNEIMITTEL_PRODUCTS.includes(m.id) }));
+}
+function acqMusterToggle(key) {
+  const [id, size] = key.split('|');
   const entries = state.acq.musterEintraege;
-  state.acq.musterEintraege = entries.some(m => m.id === id) ? entries.filter(m => m.id !== id) : [...entries, {id, anzahl:1}];
+  state.acq.musterEintraege = entries.some(m => acqMusterEntryKey(m) === key)
+    ? entries.filter(m => acqMusterEntryKey(m) !== key)
+    : [...entries, {id, size: size || '', anzahl: 1}];
 }
 // Baut die E-Mail ausschließlich aus bestätigten Angaben (keine erfundenen Gesprächsinhalte
 // oder Termine) — Reihenfolge der Abschluss-Frage folgt der Priorität Termin > Muster >
@@ -1936,7 +1949,7 @@ function buildAcqEmail() {
 
   if (musterListe.length) {
     body.push('', 'bei meinem Besuch habe ich folgende Muster für Sie hinterlassen:', '');
-    musterListe.forEach(m => body.push(`- ${acqProductName(m.id)}${m.anzahl ? ` (${m.anzahl} Stück)` : ''}`));
+    musterListe.forEach(m => body.push(`- ${acqMusterLabel(m)}${m.anzahl ? ` (${m.anzahl} Stück)` : ''}`));
     body.push('', 'Ich freue mich über Ihre Rückmeldung, sobald Sie Gelegenheit hatten, die Muster auszuprobieren.');
     if (!termine.length) subject = 'Ihre Rückmeldung zu den übergebenen Mustern';
   }
@@ -2053,21 +2066,25 @@ function acqProduktBereichPickerHtml() {
 }
 function acqMusterPicker() {
   const a = state.acq;
-  const selectedIds = a.musterEintraege.map(m => m.id);
-  const favIds = acqBesprocheneIds();
+  const selectedKeys = a.musterEintraege.map(acqMusterEntryKey);
   const matches = p => matchesQuery(`${p.name} ${p.kind}`, a.musterSuche);
-  const favs = favIds.map(id => PRODUCTS.find(p => p.id === id)).filter(p => p && matches(p));
-  const rest = PRODUCTS.filter(p => !favIds.includes(p.id) && matches(p)).slice(0, 40);
-  const chip = p => `<button type="button" class="filter-chip ${selectedIds.includes(p.id)?'active':''}" data-acq-muster-toggle="${p.id}">${escapeHtml(p.name)}${isArzneimittel(p) ? ' ✍️' : ''}</button>`;
+  // Favoriten (★) mit ihrem jeweiligen Gebinde: genau diese Produkte werden meist als Muster dagelassen.
+  const seen = new Set();
+  const favEntries = state.favorites.map(f => ({product: PRODUCTS.find(p => p.id === f.id), size: f.size || ''}))
+    .filter(e => e.product && matches(e.product))
+    .filter(e => { const k = acqMusterKey(e.product.id, e.size); if (seen.has(k)) return false; seen.add(k); return true; });
+  const favIds = new Set(state.favorites.map(f => f.id));
+  const rest = PRODUCTS.filter(p => !favIds.has(p.id) && matches(p)).slice(0, 40);
+  const chip = (p, size) => { const key = acqMusterKey(p.id, size); const on = selectedKeys.includes(key); return `<button type="button" class="filter-chip ${on?'active':''}" data-acq-muster-toggle="${escapeHtml(key)}">${on?'✓ ':''}${escapeHtml(p.name)}${size ? ' · ' + escapeHtml(size) : ''}${isArzneimittel(p) ? ' ✍️' : ''}</button>`; };
   const hasArznei = a.musterEintraege.some(m => ARZNEIMITTEL_PRODUCTS.includes(m.id));
   return `
     <label class="search-box">${icon('search')}<input id="acqMusterSuche" value="${escapeHtml(a.musterSuche)}" placeholder="Produkt suchen"></label>
-    ${favs.length ? `<p class="notiz-baustein-label" style="margin-top:14px">★ Favoriten (besprochene Produkte)</p><div class="filter-row" style="flex-wrap:wrap">${favs.map(chip).join('')}</div>` : ''}
-    <p class="notiz-baustein-label" style="margin-top:14px">${favs.length ? 'Weitere Produkte' : 'Produkte'}</p>
-    <div class="filter-row" style="flex-wrap:wrap">${rest.map(chip).join('') || '<p class="muted-copy">Keine Produkte gefunden.</p>'}</div>
+    ${favEntries.length ? `<p class="notiz-baustein-label" style="margin-top:14px">★ Favoriten – welche Gebinde wurden dagelassen?</p><div class="acq-stack">${favEntries.map(e => chip(e.product, e.size)).join('')}</div>` : ''}
+    <p class="notiz-baustein-label" style="margin-top:14px">${favEntries.length ? 'Weitere Produkte' : 'Produkte'}</p>
+    <div class="filter-row" style="flex-wrap:wrap">${rest.map(p => chip(p, p.sizes[0] || '')).join('') || '<p class="muted-copy">Keine Produkte gefunden.</p>'}</div>
     <p class="muted-copy" style="margin-top:10px">✍️ = Arzneimittel: keine Muster, nur an Ärzte gegen Unterschrift.</p>
     ${hasArznei ? `<div class="arznei-notice"><strong>Achtung: Arzneimittel ausgewählt</strong><span>Keine Muster – nur an Ärzte gegen Unterschrift ✍️</span></div>` : ''}
-    ${a.musterEintraege.length ? `<div class="saved-reports" style="margin-top:14px">${a.musterEintraege.map(m => `<div class="saved-idea-row"><span style="flex:1;padding:10px 12px;font-weight:600">${escapeHtml(acqProductName(m.id))}${ARZNEIMITTEL_PRODUCTS.includes(m.id) ? ' ✍️' : ''}</span><input type="number" min="1" style="width:70px;margin:6px" data-acq-muster-anzahl="${m.id}" value="${m.anzahl}"><button type="button" class="danger-link" data-acq-muster-remove="${m.id}" aria-label="Entfernen">✕</button></div>`).join('')}</div>` : ''}`;
+    ${a.musterEintraege.length ? `<p class="notiz-baustein-label" style="margin-top:16px">Dagelassen</p><div class="saved-reports">${a.musterEintraege.map(m => { const key = acqMusterEntryKey(m); const prod = PRODUCTS.find(p => p.id === m.id); const sizes = prod ? prod.sizes : []; return `<div class="acq-muster-row"><div class="acq-muster-name"><strong>${escapeHtml(acqProductName(m.id))}${ARZNEIMITTEL_PRODUCTS.includes(m.id) ? ' ✍️' : ''}</strong>${sizes.length > 1 ? `<select data-acq-muster-size="${escapeHtml(key)}" aria-label="Gebinde">${sizes.map(sz => `<option value="${escapeHtml(sz)}" ${sz===m.size?'selected':''}>${escapeHtml(sz)}</option>`).join('')}</select>` : `<small>${escapeHtml(m.size || '')}</small>`}</div><label class="acq-muster-qty"><input type="number" min="1" data-acq-muster-anzahl="${escapeHtml(key)}" value="${m.anzahl}"><span>Stück</span></label><button type="button" class="danger-link" data-acq-muster-remove="${escapeHtml(key)}" aria-label="Entfernen">✕</button></div>`; }).join('')}</div>` : ''}`;
 }
 function acqYesNoStep(opts) {
   const a = state.acq;
@@ -2316,7 +2333,7 @@ function acqEnsureContact() {
     handelspartner:(a.handelspartner || '').trim(),
     kondition: acqKonditionText(),
     notiz:(a.notiz || '').trim(), produktbereiche:[...new Set(prods.map(p => p.category))], produkte:prods.map(p => p.name).join(', '),
-    musterWanted:false, musterListe:[], wettbewerber: acqWettbewerberText(), feedback: acqFeedbackText(), samples:'Keine', result: a.result || 'Offen', vertragBis: a.vertragBis || null
+    musterWanted: acqMusterListe().length > 0, musterListe: acqMusterListe(), wettbewerber: acqWettbewerberText(), feedback: acqFeedbackText(), samples: acqMusterListe().length ? 'Muster dagelassen' : 'Keine', result: a.result || 'Offen', vertragBis: a.vertragBis || null
   };
   contact.nextFollowUp = a.followUp || null;
   state.one.contacts.push(contact);
@@ -2329,7 +2346,9 @@ function acqBuildCrmReport() {
   const a = state.acq;
   const prods = acqBesprocheneIds().map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
   const termine = a.terminVorschlagen === 'ja' ? a.termine.filter(x => x && x.trim()) : [];
-  const muster = a.musterHinterlassen === 'ja' ? a.musterEintraege.map(m => `${acqProductName(m.id)} (${m.anzahl} Stück)${ARZNEIMITTEL_PRODUCTS.includes(m.id) ? ' – ' + ARZNEIMITTEL_MUSTER_HINWEIS : ''}`) : [];
+  const musterEntries = a.musterHinterlassen === 'ja' ? a.musterEintraege.filter(m => m.id) : [];
+  const muster = musterEntries.map(m => `${acqMusterLabel(m)} (${m.anzahl} Stück)${ARZNEIMITTEL_PRODUCTS.includes(m.id) ? ' – ' + ARZNEIMITTEL_MUSTER_HINWEIS : ''}`);
+  const musterListe = musterEntries.map(m => ({ name: acqProductName(m.id), size: m.size || '', status: 'dagelassen', mode: 'stueck', stueck: m.anzahl, gesamt: m.anzahl, arzneimittel: ARZNEIMITTEL_PRODUCTS.includes(m.id) }));
   const aktionenTitel = aktionenStarred().map(ak => ak.titel).filter(Boolean);
   const docLabels = [a.infoDocs && a.infoDocs.pif ? 'PIF' : '', a.infoDocs && a.infoDocs.sdb ? 'SDB' : '', a.infoDocs && a.infoDocs.ba ? 'BA' : ''].filter(Boolean);
   const angaben = [
@@ -2351,9 +2370,9 @@ function acqBuildCrmReport() {
     produktbereicheText: [...new Set(prods.map(p => ({surface:'Fläche', hands:'Hände & Haut', instruments:'Instrumente', application:'Applikation'}[p.category] || p.category)))].join(', '),
     handelspartner:(a.handelspartner || '').trim(), kondition: acqKonditionText(),
     produkteText: prods.map(p => p.name).join(', '), notiz, wettbewerber: acqWettbewerberText(), vertragBis: a.vertragBis || '', feedback: acqFeedbackText(),
-    samples: muster.length ? muster.join(', ') : 'Keine', result: a.result || 'Offen',
+    samples: muster.length ? 'Muster dagelassen' : 'Keine', result: a.result || 'Offen',
     followUp: a.followUp || (termine.length ? termine[0].slice(0,10) : ''), nextSteps: termine.length ? 'Termin wahrnehmen' : 'Termin vereinbaren',
-    owner: state.repName || '-', musterWanted:false, musterListe:[]
+    owner: state.repName || '-', musterWanted: musterListe.length > 0, musterListe
   };
 }
 function acqSendCrm() {
@@ -4999,9 +5018,9 @@ function buildCrmSummary(report = state.visitReport) {
       `Vertragslaufzeit beim aktuellen Anbieter: ${report.vertragBis ? new Date(report.vertragBis+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
       `Feedback / Bedarf: ${report.feedback || '-'}`,
       `Muster / Unterlagen: ${report.samples || 'Keine'}`,
+      ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
       `Ergebnis: ${report.result || 'Offen'}`,
       `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
-      ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
       `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
       `Nächster Schritt: ${report.nextSteps || report.type || '-'}`
     ];
@@ -5021,8 +5040,8 @@ function buildCrmSummary(report = state.visitReport) {
     `Vertragslaufzeit beim aktuellen Anbieter: ${report.vertragBis ? new Date(report.vertragBis+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
     `Feedback und Bedarf: ${report.feedback || '-'}`,
     `Muster / Unterlagen: ${report.samples || 'Keine'}`,
-    `Ergebnis: ${report.result || 'Offen'}`,
     ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
+    `Ergebnis: ${report.result || 'Offen'}`,
     `Nächste Schritte: ${report.nextSteps || '-'}`,
     `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
     `Verantwortlich: ${report.owner || '-'}`
@@ -5812,8 +5831,9 @@ function bind() {
   document.querySelectorAll('[data-acq-toggle]').forEach(button => button.onclick = () => { const [field,id] = button.dataset.acqToggle.split(':'); acqToggle(field, id); render(); });
   $('#acqMusterSuche')?.addEventListener('input', e => { state.acq.musterSuche = e.target.value; render(); });
   document.querySelectorAll('[data-acq-muster-toggle]').forEach(button => button.onclick = () => { acqMusterToggle(button.dataset.acqMusterToggle); render(); });
-  document.querySelectorAll('[data-acq-muster-anzahl]').forEach(input => input.addEventListener('input', e => { const entry = state.acq.musterEintraege.find(m => m.id === input.dataset.acqMusterAnzahl); if (entry) entry.anzahl = Math.max(1, parseInt(e.target.value, 10) || 1); }));
-  document.querySelectorAll('[data-acq-muster-remove]').forEach(button => button.onclick = () => { state.acq.musterEintraege = state.acq.musterEintraege.filter(m => m.id !== button.dataset.acqMusterRemove); render(); });
+  document.querySelectorAll('[data-acq-muster-size]').forEach(sel => sel.addEventListener('change', e => { const key = sel.dataset.acqMusterSize; const entry = state.acq.musterEintraege.find(m => acqMusterEntryKey(m) === key); if (!entry) return; const newKey = acqMusterKey(entry.id, e.target.value); if (state.acq.musterEintraege.some(m => acqMusterEntryKey(m) === newKey)) { state.acq.musterEintraege = state.acq.musterEintraege.filter(m => m !== entry); } else { entry.size = e.target.value; } render(); }));
+  document.querySelectorAll('[data-acq-muster-anzahl]').forEach(input => input.addEventListener('input', e => { const entry = state.acq.musterEintraege.find(m => acqMusterEntryKey(m) === input.dataset.acqMusterAnzahl); if (entry) entry.anzahl = Math.max(1, parseInt(e.target.value, 10) || 1); }));
+  document.querySelectorAll('[data-acq-muster-remove]').forEach(button => button.onclick = () => { state.acq.musterEintraege = state.acq.musterEintraege.filter(m => acqMusterEntryKey(m) !== button.dataset.acqMusterRemove); render(); });
   const acqSyncTermin = i => { const a = state.acq; const t = (a.terminZeiten && a.terminZeiten[i]) || '10:00'; const d = (a.termine[i] || '').split('T')[0]; a.termine[i] = d ? `${d}T${t}` : ''; };
   document.querySelectorAll('[data-acq-termin-date]').forEach(input => input.addEventListener('input', e => {
     const i = Number(input.dataset.acqTerminDate);
