@@ -1847,7 +1847,7 @@ function acqNextStepFor(field, value) {
   if (field === 'kueche') return 'muster';
   if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length) ? 'info' : acqPreTermin());
   if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : acqPreTermin();
-  if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'crm';
+  if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'notiz';
   return 'vorschau';
 }
 function acqPreTermin() { return aktionenForCurrentUser().length ? 'aktionen' : 'termin'; }
@@ -2207,7 +2207,7 @@ function acqScreenInner() {
       <section class="advisor-card">
         ${[0,1,2].map(i => `<div class="acq-termin-row"><span class="notiz-baustein-label">Vorschlag ${i+1}</span><div class="acq-termin-inputs"><input type="date" data-acq-termin-date="${i}" value="${escapeHtml((a.termine[i]||'').split('T')[0])}" aria-label="Datum Vorschlag ${i+1}"><input type="time" data-acq-termin-time="${i}" value="${escapeHtml((a.terminZeiten||[])[i] || '10:00')}" aria-label="Uhrzeit Vorschlag ${i+1}"><span class="acq-uhr">Uhr</span></div></div>`).join('')}
         <p class="muted-copy" style="margin:0 0 10px">Voreingestellt: 10:00 Uhr – Uhrzeit bei Bedarf anpassen.</p>
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="crm" style="margin-top:4px"><span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="notiz" style="margin-top:4px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
@@ -2233,6 +2233,21 @@ function acqScreenInner() {
       </section>
     </main>`;
   }
+  if (a.step === 'notiz') {
+    const cats = [...new Set(acqBesprocheneIds().map(id => (PRODUCTS.find(p => p.id === id) || {}).category).filter(Boolean))];
+    const groups = [...cats, 'general'].filter(k => (NOTIZ_BAUSTEINE[k] || []).length);
+    const titleOf = k => k === 'general' ? 'Allgemein' : ((PRODUKTBEREICHE.find(pb => pb[0] === k) || [])[1] || k);
+    const cur = a.notiz || '';
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Gesprächsnotiz</h1><p>Alles, was hier steht, kommt in den CRM-Eintrag.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        <label class="modal-field wide" style="display:block"><textarea id="acqNotiz" data-acq-field="notiz" rows="6" placeholder="Bedarf, Einwände, Rückrufwunsch, nächste Schritte …">${escapeHtml(cur)}</textarea></label>
+        ${groups.map(k => `<p class="notiz-baustein-label" style="margin-top:16px">${escapeHtml(titleOf(k))}</p>
+          <div class="acq-stack">${NOTIZ_BAUSTEINE[k].map((t,i) => `<button type="button" class="filter-chip ${cur.includes(t)?'active':''}" data-acq-notiz-cat="${k}" data-acq-notiz-idx="${i}">${cur.includes(t)?'✓ ':''}${escapeHtml(t)}</button>`).join('')}</div>`).join('')}
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="crm" style="margin-top:18px"><span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
   if (a.step === 'crm') {
     const chip = (on, attr, label, plain) => `<button type="button" class="filter-chip ${on?'active':''}" ${attr}>${on && !plain ? '✓ ' : ''}${escapeHtml(label)}</button>`;
     return `<main class="page advisor-page">
@@ -2253,8 +2268,6 @@ function acqScreenInner() {
         <p class="notiz-baustein-label" style="margin-top:18px">Follow-up</p>
         <div class="filter-row" style="flex-wrap:wrap">${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => chip(a.followUp === oneAddDays(oneToday(), days), `data-acq-followup="${days}"`, label)).join('')}</div>
         <label class="modal-field wide" style="display:block;margin-top:10px"><span class="notiz-baustein-label">oder Datum wählen</span><input id="acqFollowUp" data-acq-field="followUp" type="date" value="${escapeHtml(a.followUp || '')}"></label>
-
-        <label class="modal-field wide" style="display:block;margin-top:18px"><span class="notiz-baustein-label">Gesprächsnotiz</span><textarea id="acqNotiz" data-acq-field="notiz" rows="3" placeholder="Bedarf, Einwände, nächste Schritte … (optional)">${escapeHtml(a.notiz || '')}</textarea></label>
         <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:14px"><span>Weiter zur Vorschau</span></button>
       </section>
     </main>`;
@@ -2295,16 +2308,20 @@ function acqBuildCrmReport() {
   const prods = acqBesprocheneIds().map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
   const termine = a.terminVorschlagen === 'ja' ? a.termine.filter(x => x && x.trim()) : [];
   const muster = a.musterHinterlassen === 'ja' ? a.musterEintraege.map(m => `${acqProductName(m.id)} (${m.anzahl} Stück)${ARZNEIMITTEL_PRODUCTS.includes(m.id) ? ' – ' + ARZNEIMITTEL_MUSTER_HINWEIS : ''}`) : [];
-  const notiz = [
-    (a.notiz || '').trim(),
+  const aktionenTitel = aktionenStarred().map(ak => ak.titel).filter(Boolean);
+  const docLabels = [a.infoDocs && a.infoDocs.pif ? 'PIF' : '', a.infoDocs && a.infoDocs.sdb ? 'SDB' : '', a.infoDocs && a.infoDocs.ba ? 'BA' : ''].filter(Boolean);
+  const angaben = [
     `Gespräch geführt: ${a.gespraech === 'ja' ? 'ja' : 'nein'}`,
     a.produkteBesprochen === 'ja' ? `Interesse an besprochenen Produkten: ${a.interesse === 'ja' ? 'ja (' + a.interesseIds.map(acqProductName).join(', ') + ')' : 'nein'}` : '',
-    a.infoGewuenscht === 'ja' ? `Weitere Informationen gewünscht zu: ${a.infoIds.map(acqProductName).join(', ')}` : '',
+    a.infoGewuenscht === 'ja' ? `Weitere Informationen gewünscht zu: ${a.infoIds.map(acqProductName).join(', ')}${docLabels.length ? ' (' + docLabels.join(', ') + ')' : ''}` : '',
+    aktionenTitel.length ? `Aktion besprochen: ${aktionenTitel.join(', ')}` : '',
     (a.handelspartner || '').trim() ? `Handelspartner: ${a.handelspartner.trim()}` : '',
     acqKonditionText() ? `Konditionen: ${acqKonditionText()}` : '',
     (a.kueche === 'ja' && acqKuecheRelevant()) ? `Thema Küche (HACCP-konform) interessant: ${acqKuecheProducts().map(p => p.name).join(', ')}` : '',
     termine.length ? `Terminvorschläge: ${termine.map(acqFormatTermin).join('; ')}` : ''
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean);
+  // Eigene Gesprächsnotiz zuerst, darunter – untereinander – alles, was im Ablauf erfasst wurde.
+  const notiz = [(a.notiz || '').trim(), ...angaben.map(l => '– ' + l)].filter(Boolean).join('\n');
   return {
     date: new Date().toISOString().slice(0,10), firma: a.firma || acqPersonName() || '-', branche: a.branche,
     anrede:'', vorname:a.vorname, nachname:a.nachname, strasse:a.strasse, hausnummer:a.hausnummer, plz:a.plz, ort:a.ort,
@@ -5738,6 +5755,14 @@ function bind() {
     state.screen = 'products';
     state.query = '';
     state.spectrum = 'all';
+    render();
+  }));
+  document.querySelectorAll('[data-acq-notiz-cat]').forEach(btn => btn.addEventListener('click', () => {
+    const text = (NOTIZ_BAUSTEINE[btn.dataset.acqNotizCat] || [])[+btn.dataset.acqNotizIdx];
+    if (!text) return;
+    const cur = (state.acq.notiz || '').trim();
+    // erneutes Antippen nimmt den Baustein wieder heraus (wie in der Kundenzusammenfassung)
+    state.acq.notiz = cur.includes(text) ? cur.replace(text, '').replace(/\s{2,}/g, ' ').trim() : (cur ? cur + ' ' + text : text);
     render();
   }));
   document.querySelectorAll('[data-acq-wb]').forEach(button => button.onclick = () => { const v = button.dataset.acqWb; const l = state.acq.wettbewerber || []; state.acq.wettbewerber = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; render(); });
