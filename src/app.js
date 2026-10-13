@@ -450,7 +450,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]').slice(0, 15),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1727,7 +1727,7 @@ function acqReset() {
   state.acqArrangeMode = false;
   state.acq = {
     branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
-    myPos:null, locating:false, locateError:'', handelspartner:'',
+    myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'',
     step:'branche', history:[],
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
     produkteBesprochen:null, produktKategorie:null,
@@ -1764,6 +1764,11 @@ function acqRestoreDraft() {
     state.acq = {...state.acq, ...d, locating:false, locateError:'', myPos:null};
   } catch (e) {}
 }
+// Konditionen (Preisliste und/oder Freitext) — nur wenn etwas eingegeben wurde, sonst leer.
+function acqKonditionText() {
+  const a = state.acq;
+  return [a.konditionPL, (a.konditionText || '').trim()].filter(Boolean).join(' · ');
+}
 function acqOpenLabel() {
   const a = state.acq;
   return a.firma.trim() || [a.vorname, a.nachname].filter(Boolean).join(' ').trim() || a.branche || 'Kontakt';
@@ -1795,7 +1800,7 @@ function acqNextStepFor(field, value) {
   if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : 'muster';
   if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length) ? 'info' : acqPreTermin());
   if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : acqPreTermin();
-  if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'vorschau';
+  if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'konditionen';
   return 'vorschau';
 }
 function acqPreTermin() { return aktionenForCurrentUser().length ? 'aktionen' : 'termin'; }
@@ -2148,7 +2153,18 @@ function acqScreenInner() {
       <section class="advisor-card">
         ${[0,1,2].map(i => `<div class="acq-termin-row"><span class="notiz-baustein-label">Vorschlag ${i+1}</span><div class="acq-termin-inputs"><input type="date" data-acq-termin-date="${i}" value="${escapeHtml((a.termine[i]||'').split('T')[0])}" aria-label="Datum Vorschlag ${i+1}"><input type="time" data-acq-termin-time="${i}" value="${escapeHtml((a.terminZeiten||[])[i] || '10:00')}" aria-label="Uhrzeit Vorschlag ${i+1}"><span class="acq-uhr">Uhr</span></div></div>`).join('')}
         <p class="muted-copy" style="margin:0 0 10px">Voreingestellt: 10:00 Uhr – Uhrzeit bei Bedarf anpassen.</p>
-        <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:4px"><span>Weiter zur Vorschau</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="konditionen" style="margin-top:4px"><span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
+  if (a.step === 'konditionen') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Konditionen besprochen?</h1><p>Optional – ohne Angabe wird nichts an den Innendienst übermittelt.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        <p class="notiz-baustein-label">Preisliste / Kondition</p>
+        <div class="acq-stack">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(pl => `<button type="button" class="filter-chip ${a.konditionPL===pl?'active':''}" data-acq-kondition="${pl}">${a.konditionPL===pl?'✓ ':''}${pl}</button>`).join('')}</div>
+        <label class="modal-field wide" style="display:block;margin-top:16px"><span class="notiz-baustein-label">Weitere Konditionen (optional)</span><input id="acqKonditionText" data-acq-field="konditionText" type="text" value="${escapeHtml(a.konditionText || '')}" placeholder="z. B. Rabatt, Staffel, Konditionen des Handelspartners"></label>
+        <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:14px"><span>Weiter zur Vorschau</span></button>
       </section>
     </main>`;
   }
@@ -2166,12 +2182,13 @@ function acqEnsureContact() {
   const prods = ids.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean);
   const id = 'k' + Date.now().toString(36);
   const contact = {
-    id, externeNr:'', kundenNr:'', bezirk:'', preisliste:'UVP', comm:'bestand', active:true, override:null, abc:null,
+    id, externeNr:'', kundenNr:'', bezirk:'', preisliste:a.konditionPL || 'UVP', comm:'bestand', active:true, override:null, abc:null,
     nextFollowUp:null, kundenstatus:'kontakt', herkunft:'kaltakquise',
     name:a.firma.trim() || acqPersonName() || 'Kaltakquise-Kontakt', branche:a.branche, anrede:'',
     ansprechpartnerVorname:a.vorname.trim(), ansprechpartnerNachname:a.nachname.trim(),
     plz:a.plz.trim(), ort:a.ort.trim(), strasse:a.strasse.trim(), hausnummer:a.hausnummer.trim(), email:a.email.trim(), telefon:a.telefon.trim(),
     handelspartner:(a.handelspartner || '').trim(),
+    kondition: acqKonditionText(),
     notiz:'', produktbereiche:[...new Set(prods.map(p => p.category))], produkte:prods.map(p => p.name).join(', '),
     musterWanted:false, musterListe:[], wettbewerber:'', feedback:'', samples:'Keine', result:'Offen', vertragBis:null
   };
@@ -2191,6 +2208,7 @@ function acqBuildCrmReport() {
     a.produkteBesprochen === 'ja' ? `Interesse an besprochenen Produkten: ${a.interesse === 'ja' ? 'ja (' + a.interesseIds.map(acqProductName).join(', ') + ')' : 'nein'}` : '',
     a.infoGewuenscht === 'ja' ? `Weitere Informationen gewünscht zu: ${a.infoIds.map(acqProductName).join(', ')}` : '',
     (a.handelspartner || '').trim() ? `Handelspartner: ${a.handelspartner.trim()}` : '',
+    acqKonditionText() ? `Konditionen: ${acqKonditionText()}` : '',
     termine.length ? `Terminvorschläge: ${termine.map(acqFormatTermin).join('; ')}` : ''
   ].filter(Boolean).join(' · ');
   return {
@@ -2397,7 +2415,7 @@ function startAngebotFlow(){
   state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null; state.summaryInteresseHatte = null;
 }
 function newCustomerDraftDefault(){
-  return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', handelspartner:'', notiz:'' };
+  return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', handelspartner:'', kondition:'', notiz:'' };
 }
 const NEUKUNDE_BRANCHEN = [
   'Rettungswache / Rettungsdienst', 'Pflegedienst / Pflegeeinrichtung', 'Krankenhaus / Klinik',
@@ -2421,7 +2439,7 @@ function newCustomerSave(){
   const fields = {
     name:d.firma.trim(), branche:d.branche, anrede:d.anrede, ansprechpartnerVorname:d.vorname.trim(), ansprechpartnerNachname:d.nachname.trim(),
     plz:d.plz.trim(), ort:d.ort.trim(), strasse:d.strasse.trim(), hausnummer:d.hausnummer.trim(),
-    email:d.email.trim(), telefon:d.telefon.trim(), handelspartner:(d.handelspartner || '').trim(), notiz:state.summaryNotiz.trim(),
+    email:d.email.trim(), telefon:d.telefon.trim(), handelspartner:(d.handelspartner || '').trim(), kondition:(d.kondition || '').trim(), notiz:state.summaryNotiz.trim(),
     produktbereiche: Array.from(new Set(entries.map(({product}) => product.category))),
     produkte: entries.map(({product,size}) => product.name + (size ? ` (${size})` : '')).join(', '),
     musterWanted: !!state.musterWanted, musterListe: computeMusterListe(entries),
@@ -2464,7 +2482,8 @@ function newCustomerFormFieldsHtml(d){
     ['strasse','Straße', false, 'text'], ['hausnummer','Hausnummer', false, 'tel'],
     ['plz','Postleitzahl', required, 'tel'], ['ort','Ort', false, 'text'], ['telefon','Telefonnummer', false, 'tel'],
     ['email', required ? 'E-Mail (Pflichtfeld)' : 'E-Mail (optional)', required, 'email'],
-    ['handelspartner','Handelspartner', false, 'text']
+    ['handelspartner','Handelspartner', false, 'text'],
+    ['kondition','Konditionen (optional)', false, 'text']
   ];
   const nc = state.newCustomer;
   return `<div class="new-customer-form">
@@ -2478,7 +2497,7 @@ function newCustomerFormFieldsHtml(d){
     ${(() => {
       const rows = fields.map(([k,label,fieldRequired,type]) => {
         const numeric = k==='plz' || k==='hausnummer';
-        return `<div class="${k==='firma'||k==='email'||k==='handelspartner'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${numeric?'inputmode="numeric" pattern="[0-9]*"':''} ${k==='plz'?'maxlength="5"':''} ${fieldRequired?'required':''} value="${escapeHtml(d[k] || '')}"></div>`;
+        return `<div class="${k==='firma'||k==='email'||k==='handelspartner'||k==='kondition'?'wide':''}"><label for="nc-${k}">${label}</label><input id="nc-${k}" data-nc-field="${k}" type="${type}" ${numeric?'inputmode="numeric" pattern="[0-9]*"':''} ${k==='plz'?'maxlength="5"':''} ${fieldRequired?'required':''} value="${escapeHtml(d[k] || '')}"></div>`;
       });
       const brancheField = `<div class="wide"><label for="nc-branche">Branche</label><select id="nc-branche" data-nc-field="branche"><option value="">Bitte wählen…</option>${NEUKUNDE_BRANCHEN.map(b => `<option value="${escapeHtml(b)}" ${d.branche===b?'selected':''}>${escapeHtml(b)}</option>`).join('')}</select></div>`;
       rows.splice(1, 0, brancheField);
@@ -3699,7 +3718,7 @@ function buildNewCustomerInnendienstEmail(contact){
     `Telefonnummer: ${contact.telefon || '–'}`,
     `E-Mail-Adresse: ${contact.email || '–'}`,
     `Handelspartner: ${(contact.handelspartner || '').trim() || '–'}`,
-    `Kondition: ${contact.preisliste || 'UVP'}`,
+    ...((contact.kondition || '').trim() ? [`Kondition: ${contact.kondition.trim()}`] : []),
     `Herkunft: ${contact.herkunft === 'kaltakquise' ? 'Kaltakquise' : '–'}`,
     '',
     'Danke und Grüße'
@@ -5606,6 +5625,7 @@ function bind() {
     state.spectrum = 'all';
     render();
   }));
+  document.querySelectorAll('[data-acq-kondition]').forEach(button => button.onclick = () => { const v = button.dataset.acqKondition; state.acq.konditionPL = state.acq.konditionPL === v ? '' : v; render(); });
   document.querySelectorAll('[data-acq-infodoc]').forEach(button => button.onclick = () => { const key = button.dataset.acqInfodoc; state.acq.infoDocs[key] = !state.acq.infoDocs[key]; render(); });
   document.querySelectorAll('[data-acq-toggle]').forEach(button => button.onclick = () => { const [field,id] = button.dataset.acqToggle.split(':'); acqToggle(field, id); render(); });
   $('#acqMusterSuche')?.addEventListener('input', e => { state.acq.musterSuche = e.target.value; render(); });
