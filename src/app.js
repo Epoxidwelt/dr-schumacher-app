@@ -647,7 +647,6 @@ function render() {
     selStart: 'selectionStart' in active ? active.selectionStart : null,
     selEnd: 'selectionEnd' in active ? active.selectionEnd : null
   } : null;
-  if (state.screen !== 'akquise' && state.acq.sentOk) acqFinishReset();
   const scrollY = window.scrollY;
   const viewKey = currentViewKey();
   const viewChanged = viewKey !== lastViewKey;
@@ -1741,7 +1740,7 @@ function acqReset() {
 // nach App-Neustart), bis der Ablauf abgeschlossen oder bewusst mit „Neuer Kunde“ neu gestartet wird.
 function acqHasData() {
   const a = state.acq;
-  if (!a || a.fromHistory || a.sentOk) return false;
+  if (!a || a.fromHistory) return false;
   return !!(a.branche || a.firma || a.strasse || a.hausnummer || a.plz || a.ort || a.vorname || a.nachname || a.telefon || a.email
     || a.gespraech || a.produkteBesprochen || a.interesse || a.musterHinterlassen || a.infoGewuenscht || a.terminVorschlagen
     || (a.step && a.step !== 'branche'));
@@ -1758,7 +1757,7 @@ function acqRestoreDraft() {
     const raw = localStorage.getItem('acqDraft');
     if (!raw) return;
     const d = JSON.parse(raw);
-    if (!d || typeof d !== 'object' || d.sentOk) return;
+    if (!d || typeof d !== 'object') return;
     state.acq = {...state.acq, ...d, locating:false, locateError:'', myPos:null};
   } catch (e) {}
 }
@@ -1776,6 +1775,27 @@ function acqWettbewerberText() {
 function acqFeedbackText() {
   const a = state.acq;
   return [...(a.feedbackSel || []).map(i => ERGEBNIS_FEEDBACK_BAUSTEINE[i]).filter(Boolean), (a.feedbackText || '').trim()].filter(Boolean).join(' ');
+}
+// Kundendaten (nicht nur Branche/Schritt) der offenen Kaltakquise – bleiben bis ein neuer Kunde
+// erfasst wird, auch wenn man in Angebot/Kundenzusammenfassung wechselt.
+function acqHasCustomerData() {
+  const a = state.acq;
+  return acqHasData() && !!(a.firma || a.vorname || a.nachname || a.strasse || a.plz || a.ort || a.email || a.telefon || a.handelspartner);
+}
+function acqSpeicherKundeLabel() {
+  const a = state.acq;
+  const person = [a.vorname, a.nachname].filter(Boolean).join(' ').trim();
+  const ort = [a.plz, a.ort].filter(Boolean).join(' ');
+  return [a.firma.trim(), person, ort].filter(Boolean).join(' · ') || acqOpenLabel();
+}
+// Beim Start von Angebot / Kundenzusammenfassung / Kundenbesuch: liegt noch ein Kunde aus der
+// Kaltakquise im Speicher, wird zuerst gefragt, ob mit diesem Kunden fortgefahren werden soll.
+function maybeAskSpeicherKunde() {
+  state.summaryUseAcq = false;
+  state.summaryAfterSpeicher = null;
+  if (!acqHasCustomerData()) return;
+  state.summaryAfterSpeicher = state.summaryStep;
+  state.summaryStep = 'speicherkunde';
 }
 function acqOpenLabel() {
   const a = state.acq;
@@ -2442,6 +2462,7 @@ function startSummaryFlow(){
   state.summaryPendingRecipient = null;
   state.summarySent = false;
   state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null; state.summaryInteresseHatte = null;
+  maybeAskSpeicherKunde();
 }
 // Einstieg über die Kachel "Kundenbesuch": fragt zuerst, ob es sich um einen Bestandskunden
 // oder eine Kaltakquise handelt (state.summaryKundenbesuch markiert diesen Einstiegsweg für den
@@ -2459,6 +2480,7 @@ function startKundenbesuchFlow(){
   state.summaryPendingRecipient = null;
   state.summarySent = false;
   state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null; state.summaryInteresseHatte = null;
+  maybeAskSpeicherKunde();
 }
 // Einstieg über die Kachel "Angebot anfragen": nutzt die im Gespräch bereits mit ★ markierten
 // Produkte und führt direkt in die Angebotsanfrage an den Innendienst — ohne die übrigen
@@ -2478,6 +2500,7 @@ function startAngebotFlow(){
   state.summaryPendingRecipient = null;
   state.summarySent = false;
   state.angebotOptionen = {pif:false, sdb:false, ba:false}; state.angebotPdfHint = null; state.summaryKontaktHatte = null; state.summaryInteresseHatte = null;
+  maybeAskSpeicherKunde();
 }
 function newCustomerDraftDefault(){
   return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', handelspartner:'', kondition:'', notiz:'' };
@@ -3341,6 +3364,22 @@ function occasionPromptModal() {
         <div class="modal-choices">
           <button class="modal-choice" data-purpose-choice="crm">${icon('pm')}<span>CRM-Eintrag erstellen</span></button>
           <button class="modal-choice" data-purpose-choice="kunde">${icon('talk')}<span>Kundenzusammenfassung an den Kunden senden</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'speicherkunde') {
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(520px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Kunde im Speicher</span>
+        <h2>Mit diesem Kunden fortfahren?</h2>
+        <p>Aus der Kaltakquise ist noch gespeichert:</p>
+        <p><strong>${escapeHtml(acqSpeicherKundeLabel())}</strong></p>
+        <p class="muted-copy">Bei „Ja“ werden die Daten übernommen – im nächsten Schritt wählst du weiterhin Bestandskunde oder Neukunde.</p>
+        <div class="modal-choices">
+          <button class="modal-choice" data-action="speicherkunde-ja">${icon('pm')}<span>Ja, Daten übernehmen</span></button>
+          <button class="modal-choice" data-action="speicherkunde-nein">${icon('pm')}<span>Nein, anderer Kunde</span></button>
         </div>
       </div>
     </div>`;
@@ -5748,6 +5787,21 @@ function bind() {
     render();
   }));
   $('[data-action="occasion-back-purpose"]')?.addEventListener('click', () => { state.summaryStep = 'purpose'; render(); });
+  $('[data-action="speicherkunde-ja"]')?.addEventListener('click', () => {
+    state.summaryUseAcq = true;
+    state.summaryStep = state.summaryAfterSpeicher || 'kundentyp';
+    state.summaryAfterSpeicher = null;
+    render();
+  });
+  $('[data-action="speicherkunde-nein"]')?.addEventListener('click', () => {
+    // Anderer Kunde: die gespeicherten Kaltakquise-Daten werden verworfen (Favoriten bleiben).
+    acqReset();
+    acqPersistDraft();
+    state.summaryUseAcq = false;
+    state.summaryStep = state.summaryAfterSpeicher || 'kundentyp';
+    state.summaryAfterSpeicher = null;
+    render();
+  });
   document.querySelectorAll('[data-kundentyp-choice]').forEach(button => button.addEventListener('click', () => {
     const isNew = button.dataset.kundentypChoice === 'neu';
     state.summaryIsNewCustomer = isNew;
@@ -5763,7 +5817,7 @@ function bind() {
         let contactId = null;
         const a = state.acq;
         const hasCustomerData = acqHasData() && !!(a.firma || a.strasse || a.plz || a.ort || a.vorname || a.nachname || a.email || a.telefon || a.handelspartner);
-        if (hasCustomerData && confirm(`Daten aus der offenen Kaltakquise „${acqOpenLabel()}“ übernehmen?\n\nOK = übernehmen, Abbrechen = leeres Formular.`)) {
+        if (hasCustomerData && state.summaryUseAcq) {
           draft = {...draft, firma:a.firma.trim(), branche:a.branche || '', vorname:a.vorname.trim(), nachname:a.nachname.trim(),
             strasse:a.strasse.trim(), hausnummer:a.hausnummer.trim(), plz:a.plz.trim(), ort:a.ort.trim(),
             telefon:a.telefon.trim(), email:a.email.trim(), handelspartner:(a.handelspartner || '').trim(), kondition: acqKonditionText()};
@@ -5776,10 +5830,12 @@ function bind() {
       // Ablauf wie beim direkten Kaltakquise-Einstieg (Herkunft, optionale Felder, Standort-Button).
       if (state.summaryKundenbesuch) state.summaryKaltakquise = true;
     } else if (state.summaryPurpose === 'angebot') {
+      if (state.summaryUseAcq && !state.summaryCustomer.trim()) { state.summaryCustomer = acqPersonName() || state.acq.firma.trim(); localStorage.setItem('summaryCustomer', state.summaryCustomer); }
       // Angebotsanfrage-Kachel, Bestandskunde: KD-Nr. ist schon bekannt, kein voller
       // CRM-Ablauf nötig — direkt zu Name+KD-Nr. und dann zu den Angebot-Optionen.
       state.summaryStep = 'angebotKunde';
     } else {
+      if (state.summaryUseAcq && !state.summaryCustomer.trim()) { state.summaryCustomer = acqPersonName() || state.acq.firma.trim(); localStorage.setItem('summaryCustomer', state.summaryCustomer); }
       // Bestandskunde durchläuft jetzt denselben Ablauf wie Neukunde: erst Ansprechpartner
       // (hier per Anrede+Name statt Adressformular, da schon bekannt), dann Produktbereiche,
       // Muster, Gesprächsnotiz und Rückmeldung & Ergebnis — exakt dieselben Abfragen.
@@ -6689,6 +6745,9 @@ function resetCustomerData(silent) {
   state.messeSignatureData = '';
   state.messeDatum = new Date().toISOString().slice(0,10);
   localStorage.setItem('messeDatum', state.messeDatum);
+  // Manuelles „Speicher löschen – neuer Kunde“ räumt auch den Kaltakquise-Kontakt ab; das automatische
+  // Zurücksetzen am Ende eines Ablaufs lässt ihn bestehen, bis ein neuer Kunde erfasst wird.
+  if (!quiet) { acqReset(); acqPersistDraft(); }
   if (!quiet) alert('Kundendaten wurden zurückgesetzt. Bereit für den nächsten Termin.');
   state.summaryStep = null;
   state.screen = 'menu';
