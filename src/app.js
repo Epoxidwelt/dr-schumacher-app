@@ -1804,14 +1804,13 @@ function acqOpenLabel() {
 function acqTileSubtitle() {
   return acqHasData() ? `Offen: ${acqOpenLabel()} – hier geht es weiter` : 'Erstkontakt in wenigen Fragen erfassen und passende E-Mail erstellen';
 }
-// Nach abgeschlossener Kaltakquise (E-Mail übergeben) startet der nächste Kontakt bei 0: Eingaben,
-// besprochene Produkte (★) und „Aktion besprochen“-Markierungen werden geleert. Im Speicher bleibt
-// nur der Verlauf der letzten 15 Kontakte (savedAcq).
+// Neuer Kaltakquise-Kontakt: Eingaben und „Aktion besprochen“-Markierungen werden geleert. Die
+// Favoriten (★) bleiben bewusst stehen – es sind meist dieselben Produkte, die immer wieder besprochen
+// werden. Im Speicher bleibt außerdem der Verlauf der letzten 15 Kontakte (savedAcq).
 function acqFinishReset() {
   acqReset();
-  state.favorites = [];
   state.aktionStars = [];
-  try { persistFavorites(); localStorage.setItem('aktionStars', '[]'); } catch (e) {}
+  try { localStorage.setItem('aktionStars', '[]'); } catch (e) {}
 }
 function acqBesprocheneIds() { return [...new Set(state.favorites.map(f => f.id))]; }
 // Sind vor der Kaltakquise bereits Produkte markiert (★), wurden sie im Gespräch besprochen: Die Frage
@@ -5136,7 +5135,7 @@ function settingsScreen() {
       ${rep.unknown.length ? `<details><summary>${rep.unknown.length} Artikelnummern, die die App nicht kennt</summary><div>${rep.unknown.map(escapeHtml).join('<br>')}</div></details>` : '<div class="report-ok">Jede Artikelnummer der Liste ist einem Produkt zugeordnet.</div>'}
       <div class="permission-note"><strong>So bleibt es aktuell</strong><span>Neue Preisliste in die Google-Tabelle einpflegen oder hier als Datei hochladen – der Abgleich läuft ausschließlich über die Artikelnummer. Was oben unter „unbekannt" auftaucht, sind neue Artikel, die noch als Produkt angelegt werden müssen.</span></div></section>` : ''}
     ${can('prices')?`<section class="settings-card"><button data-action="sync-facts"><span><strong>Verkaufsargumente jetzt aktualisieren</strong><small>Lädt Produktvorteile aus einer separaten Google-Tabelle (Zuordnung über Art.-Nr.)</small></span><b>⟳</b></button><div id="factsImportStatus" class="import-status"><strong>${state.liveFacts && Object.keys(state.liveFacts).length ? 'Live aus Google Sheets' : 'Werkseinstellung'}</strong><br>${factsMetaText}</div>${!FACTS_SHEET_CSV_URL?'<div class="permission-note"><strong>Tabelle noch nicht verknüpft</strong><span>Spalten „Art. Nr.", „Vorteil 1" bis „Vorteil 5" veröffentlichen und die Export-URL im Code hinterlegen.</span></div>':''}</section>`:''}
-    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Sterne (${state.favorites.length}), Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht- und Messe-Entwurf zurücksetzen</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
+    <section class="settings-card"><button data-action="reset-customer"><span><strong>Speicher löschen – neuer Kunde</strong><small>Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht- und Messe-Entwurf zurücksetzen – Favoriten (${state.favorites.length}) bleiben erhalten</small></span><b>×</b></button><button data-action="customer-history"><span><strong>Letzte Kundengespräche</strong><small>Die letzten ${state.customerHistory.length} zurückgesetzten Auswahllisten ansehen</small></span><b>›</b></button><div class="permission-note"><strong>Für den nächsten Termin</strong><span>Preise und bereits gespeicherte Besuchsberichte bleiben erhalten – nur die Daten des aktuellen Kundengesprächs werden gelöscht. Der bisherige Stand wird vorher automatisch in „Letzte Kundengespräche" gesichert.</span></div></section>
     <section class="settings-card"><button data-action="export-backup"><span><strong>Gerätesicherung erstellen</strong><small>Preise, Favoriten, Berichte und Einstellungen als JSON sichern</small></span><b>↓</b></button><label class="file-row"><span><strong>Gerätesicherung wiederherstellen</strong><small>Eine zuvor exportierte .json-Datei lokal einlesen</small></span><b>Datei auswählen</b><input id="backupImport" type="file" accept="application/json,.json"></label><div class="permission-note"><strong>Lokale Datensicherung</strong><span>Die Sicherungsdatei wird nur heruntergeladen beziehungsweise auf diesem Gerät eingelesen. Es findet kein Cloud-Upload statt.</span></div></section>
     <section class="settings-card"><a href="preisvorlage.csv" download><span><strong>Excel-Vorlage herunterladen</strong><small>Vorlage für UVP und PL1 bis PL5</small></span><b>↓</b></a><a href="${OFFICIAL.home}" target="_blank"><span><strong>Dr.-Schumacher-Website</strong><small>Öffnet die offizielle Website</small></span><b>↗</b></a></section>
     <p class="version">Interner Produktberater · Version 2.2</p>
@@ -5771,7 +5770,7 @@ function bind() {
   $('[data-action="acq-back"]')?.addEventListener('click', () => { acqBack(); render(); });
   $('[data-action="acq-restart"]')?.addEventListener('click', () => { acqFinishReset(); render(); });
   $('[data-action="acq-new"]')?.addEventListener('click', () => {
-    if (!confirm('Alle Eingaben dieses Kontakts (inkl. markierter Produkte ★) verwerfen und mit einem neuen Kunden starten?')) return;
+    if (!confirm('Alle Eingaben dieses Kontakts verwerfen und mit einem neuen Kunden starten? (Favoriten ★ bleiben erhalten.)')) return;
     acqFinishReset();
     render();
   });
@@ -6678,7 +6677,7 @@ function restoreHistorySnapshotIdentity(snap) {
 // (inkl. Sicherung des bisherigen Stands im Kundenverlauf).
 function clearFavoritesOnly() {
   if (!state.favorites.length) return;
-  resetCustomerData();
+  resetCustomerData(false, true);
 }
 
 function customerHistoryScreen() {
@@ -6704,12 +6703,13 @@ function customerHistoryScreen() {
   </main>`;
 }
 
-function resetCustomerData(silent) {
+function resetCustomerData(silent, clearFavorites) {
   const quiet = silent === true;
-  if (!quiet && !confirm('Daten des aktuellen Kundengesprächs löschen? Sterne, Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf, Messe-Erfassung und der Konzept-Gesprächsstand (besprochene Bereiche, eigene Bereiche, Hersteller-Auswahl) werden zurückgesetzt. Preise, bereits gespeicherte Besuchsberichte und branchentypische Hersteller-Vorschläge bleiben erhalten.')) return;
+  const dropFavorites = clearFavorites === true;
+  if (!quiet && !confirm('Daten des aktuellen Kundengesprächs löschen? Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf, Messe-Erfassung und der Konzept-Gesprächsstand (besprochene Bereiche, eigene Bereiche, Hersteller-Auswahl) werden zurückgesetzt. Favoriten (★), Preise, bereits gespeicherte Besuchsberichte und branchentypische Hersteller-Vorschläge bleiben erhalten.')) return;
   snapshotCustomerData();
-  ['favorites','aktionStars','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryAdditionalContacts','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter','konzeptErledigt','konzeptCustomBereiche','konzeptWettbewerberSelected'].forEach(key => localStorage.removeItem(key));
-  state.favorites = [];
+  [...(dropFavorites ? ['favorites'] : []),'aktionStars','summaryCustomer','summaryKundenNr','summaryNotiz','summarySalutation','summaryAdditionalContacts','summaryOccasion','summaryIncludePrices','quoteCustomer','quoteContact','quoteNote','quoteValidUntil','quoteItems','visitReport','messeName','messeAdresse','messeAnsprechpartner','messeEinrichtungstyp','messeGespraechsinhalt','messeMuster','messeKontaktaufnahme','messeBemusterung','messeNewsletter','konzeptErledigt','konzeptCustomBereiche','konzeptWettbewerberSelected'].forEach(key => localStorage.removeItem(key));
+  if (dropFavorites) state.favorites = [];
   state.aktionStars = [];
   state.summaryCustomer = '';
   state.summaryKundenNr = '';
