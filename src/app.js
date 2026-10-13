@@ -450,7 +450,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]').slice(0, 15),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1727,7 +1727,7 @@ function acqReset() {
   state.acqArrangeMode = false;
   state.acq = {
     branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
-    myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'',
+    myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null,
     step:'branche', history:[],
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
     produkteBesprochen:null, produktKategorie:null,
@@ -1789,6 +1789,18 @@ function acqBesprocheneIds() { return [...new Set(state.favorites.map(f => f.id)
 // Sind vor der Kaltakquise bereits Produkte markiert (★), wurden sie im Gespräch besprochen: Die Frage
 // „Produkte besprochen?“ entfällt, die markierten Produkte sind übernommen und können direkt
 // bestätigt oder ergänzt werden.
+// Thema Küche: nur sinnvoll, wenn im Gespräch HACCP-konforme Produkte (besprochen oder von Interesse)
+// im Spiel sind und die Branche überhaupt eine Küche haben kann (nicht Tier-/Zahnmedizin).
+function acqKuecheProducts() {
+  const a = state.acq;
+  if (a.gespraech !== 'ja' || a.produkteBesprochen !== 'ja') return [];
+  const ids = [...new Set([...acqBesprocheneIds(), ...a.interesseIds])];
+  return ids.map(id => PRODUCTS.find(p => p.id === id)).filter(p => p && isHaccp(p));
+}
+function acqKuecheRelevant() {
+  return acqKuecheProducts().length > 0 && brancheExclusionTags(state.acq.branche).length === 0;
+}
+function acqAfterInteresse() { return acqKuecheRelevant() ? 'kueche' : 'muster'; }
 function acqEnterProdukte() {
   if (acqBesprocheneIds().length) { state.acq.produkteBesprochen = 'ja'; acqGo('produkteAuswahl'); }
   else acqGo('produkte');
@@ -1804,7 +1816,8 @@ function acqNextStepFor(field, value) {
   const a = state.acq;
   if (field === 'gespraech') return value === 'ja' ? 'kontaktperson' : 'muster';
   if (field === 'produkteBesprochen') return value === 'ja' ? 'produkteAuswahl' : 'muster';
-  if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : 'muster';
+  if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : acqAfterInteresse();
+  if (field === 'kueche') return 'muster';
   if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length) ? 'info' : acqPreTermin());
   if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : acqPreTermin();
   if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'konditionen';
@@ -1876,13 +1889,16 @@ function buildAcqEmail() {
         body.push('');
       });
       body.push('Gerne kläre ich mit Ihnen, wie das Produkt zu Ihren Anforderungen passt.');
-      const kueche = haccpKuecheLines(a.interesseIds.map(id => PRODUCTS.find(pp => pp.id === id)), a.branche);
-      if (kueche.length) body.push('', ...kueche.slice(0, -1));
       subject = `Ihr Interesse an ${interesseListe.join(', ')}`;
     } else if (keinInteresse) {
       body.push('', `vielen Dank für Ihre offene Rückmeldung zu ${besprochen.join(', ')}. Aktuell besteht daran kein Interesse.`);
       subject = 'Rückmeldung zu unserem Austausch';
     }
+  }
+
+  if (a.kueche === 'ja' && acqKuecheRelevant()) {
+    const kl = haccpKuecheLines(acqKuecheProducts(), a.branche);
+    if (kl.length) body.push('', ...kl.slice(0, -1));
   }
 
   if (musterListe.length) {
@@ -2112,9 +2128,13 @@ function acqScreenInner() {
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>An welchen Produkten besteht Interesse?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${acqProductChips(acqBesprocheneIds(), 'interesseIds', true)}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="muster" style="margin-top:14px"><span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${acqAfterInteresse()}" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
+  }
+  if (a.step === 'kueche') {
+    const names = acqKuecheProducts().map(p => p.name).join(', ');
+    return acqYesNoStep({eyebrow:'Kaltakquise', field:'kueche', question:'Ist das Thema Küche interessant?', sub:`${escapeHtml(names)} – HACCP-konform und damit auch im Lebensmittelbereich/in der Küche einsetzbar.`});
   }
   if (a.step === 'muster') return acqYesNoStep({eyebrow:'Kaltakquise', field:'musterHinterlassen', question:'Muster hinterlassen?'});
   if (a.step === 'musterAuswahl') {
@@ -2217,6 +2237,7 @@ function acqBuildCrmReport() {
     a.infoGewuenscht === 'ja' ? `Weitere Informationen gewünscht zu: ${a.infoIds.map(acqProductName).join(', ')}` : '',
     (a.handelspartner || '').trim() ? `Handelspartner: ${a.handelspartner.trim()}` : '',
     acqKonditionText() ? `Konditionen: ${acqKonditionText()}` : '',
+    (a.kueche === 'ja' && acqKuecheRelevant()) ? `Thema Küche (HACCP-konform) interessant: ${acqKuecheProducts().map(p => p.name).join(', ')}` : '',
     termine.length ? `Terminvorschläge: ${termine.map(acqFormatTermin).join('; ')}` : ''
   ].filter(Boolean).join(' · ');
   return {
