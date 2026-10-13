@@ -2353,19 +2353,19 @@ function acqSendInnendienst() {
 function acqAbschlussHtml() {
   const a = state.acq;
   if (a.fromHistory) return '';
-  const row = (action, label, sub, done, email) => `<div class="acq-abschluss-row"><button type="button" class="${done ? 'secondary-button' : 'primary-button'} compact" data-action="${action}"><span>${done ? '✓ ' : ''}${label}</span></button><small>${sub}${email ? ' · an ' + escapeHtml(email) : ''}</small></div>`;
-  return `<section class="advisor-card" style="margin-top:16px"><h2 style="margin-top:0">Abschluss: Daten übernehmen</h2><p class="muted-copy">Die erfassten Angaben (Firma, Adresse, Kontaktperson, Produkte, Muster, Aktion, Termin) werden übernommen – kein erneutes Eintippen.</p>
-    ${row('acq-crm', 'CRM-Eintrag erstellen', 'Gesprächsnotiz mit allen Daten', a.crmDone, myOwnEmail())}
-    ${row('acq-innendienst', 'Neukunde an den Innendienst senden', 'legt den Kontakt an und meldet ihn zur Aufnahme ins System', a.innendienstDone, innendienstEmail())}
+  const action = (act, label, sub, done, email) => `<button type="button" class="acq-action ${done ? 'done' : ''}" data-action="${act}"><span class="acq-action-main"><strong>${done ? '✓ ' : ''}${label}</strong><small>${sub}${email ? ' · an ' + escapeHtml(email) : ''}</small></span><b aria-hidden="true">›</b></button>`;
+  return `<section class="advisor-card acq-abschluss" style="margin-top:16px"><h2 style="margin-top:0">Abschluss</h2><p class="muted-copy">Alle erfassten Angaben werden übernommen – kein erneutes Eintippen.</p>
+    ${action('acq-crm', 'CRM-Eintrag erstellen', 'Gesprächsnotiz mit allen Daten', a.crmDone, myOwnEmail())}
+    ${action('acq-innendienst', 'Neukunde an den Innendienst senden', 'legt den Kontakt an und meldet ihn zur Aufnahme', a.innendienstDone, innendienstEmail())}
   </section>`;
 }
 function acqVorschauScreen() {
   const a = state.acq;
   if (a.sentOk) {
     return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>E-Mail-Programm geöffnet</h1><p>Ihr E-Mail-Programm wurde mit der vorbereiteten Nachricht geöffnet — der eigentliche Versand erfolgt dort durch Sie. Der Kontakt wurde zusätzlich gespeichert.</p></div></div>
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>E-Mail-Programm geöffnet</h1><p>Versand erfolgt dort durch Sie. Kontakt ist gespeichert.</p></div></div>
       ${acqAbschlussHtml()}
-      <section class="advisor-card" style="margin-top:16px"><button type="button" class="primary-button compact" data-action="acq-restart"><span>Weitere Kaltakquise erfassen</span></button></section>
+      <section class="acq-restart-wrap"><button type="button" class="acq-action neutral" data-action="acq-restart"><span class="acq-action-main"><strong>Weitere Kaltakquise erfassen</strong><small>Startet einen neuen Kunden – Favoriten bleiben erhalten</small></span><b aria-hidden="true">›</b></button></section>
       ${acqHistoryListHtml()}
     </main>`;
   }
@@ -2375,9 +2375,9 @@ function acqVorschauScreen() {
       <label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Empfänger-E-Mail</span><input id="acqPreviewTo" type="email" placeholder="kunde@beispiel.de" value="${escapeHtml(a.previewTo)}"></label>
       <label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Betreff</span><input id="acqPreviewSubject" type="text" value="${escapeHtml(a.previewSubject)}"></label>
       <label class="modal-field wide" style="display:block"><span class="notiz-baustein-label">Text</span><textarea id="acqPreviewBody" rows="14">${escapeHtml(a.previewBody)}</textarea></label>
-      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-        <button type="button" class="secondary-button compact" data-action="acq-copy">${icon('copy')}<span>Text kopieren</span></button>
-        <button type="button" class="primary-button compact" data-action="acq-senden" ${a.previewTo.trim() ? '' : 'disabled'}>${icon('talk')}<span>${a.editingId?'Aktualisiert an E-Mail-Programm übergeben':'An E-Mail-Programm übergeben'}</span></button>
+      <div class="acq-send-actions">
+        <button type="button" class="primary-button" data-action="acq-senden" ${a.previewTo.trim() ? '' : 'disabled'}>${icon('talk')}<span>${a.editingId?'Aktualisiert an E-Mail-Programm übergeben':'An E-Mail-Programm übergeben'}</span></button>
+        <button type="button" class="secondary-button" data-action="acq-copy">${icon('copy')}<span>Text kopieren</span></button>
       </div>
       ${!a.previewTo.trim() ? `<p class="muted-copy" style="margin-top:8px">Für den Versand wird eine Empfänger-E-Mail-Adresse benötigt.</p>` : ''}
     </section>
