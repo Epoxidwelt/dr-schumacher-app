@@ -2023,7 +2023,8 @@ function acqYesNoStep(opts) {
 function acqScreen() {
   let html = acqScreenInner()
     .replace('<main class="page advisor-page">', '<main class="page advisor-page acq-page">')
-    .replace('<div class="section-heading">', '<div class="section-heading acq-heading">');
+    .replace('<div class="section-heading">', '<div class="section-heading acq-heading">')
+    .split('data-action="acq-back">Zurück</button>').join('data-action="acq-back">← Zurück</button>');
   if (acqHasData() && !(state.acq.step === 'branche' && !state.acq.branche)) {
     const bar = `<div class="acq-open-bar no-print"><span>Offen: <strong>${escapeHtml(acqOpenLabel())}</strong></span><button type="button" class="secondary-button compact" data-action="acq-new">Neuer Kunde</button></div>`;
     html = html.replace('<main class="page advisor-page acq-page">', '<main class="page advisor-page acq-page">' + bar);
