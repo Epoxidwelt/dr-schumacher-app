@@ -1786,6 +1786,13 @@ function acqFinishReset() {
   try { persistFavorites(); localStorage.setItem('aktionStars', '[]'); } catch (e) {}
 }
 function acqBesprocheneIds() { return [...new Set(state.favorites.map(f => f.id))]; }
+// Sind vor der Kaltakquise bereits Produkte markiert (★), wurden sie im Gespräch besprochen: Die Frage
+// „Produkte besprochen?“ entfällt, die markierten Produkte sind übernommen und können direkt
+// bestätigt oder ergänzt werden.
+function acqEnterProdukte() {
+  if (acqBesprocheneIds().length) { state.acq.produkteBesprochen = 'ja'; acqGo('produkteAuswahl'); }
+  else acqGo('produkte');
+}
 function acqGo(next) { state.acq.history.push(state.acq.step); state.acq.step = next; }
 function acqBack() {
   const a = state.acq;
@@ -1990,6 +1997,7 @@ function acqProduktBereichPickerHtml() {
   const countByCat = {};
   entries.forEach(p => { countByCat[p.category] = (countByCat[p.category]||0) + 1; });
   return `
+    ${entries.length ? `<p class="muted-copy"><strong>✓ ${entries.length} markierte Produkte (★) übernommen</strong> – bei Bedarf unten weitere ergänzen.</p>` : ''}
     <p>Kachel antippen und dort die passenden Produkte markieren (★) — genau wie im Hauptmenü.</p>
     <div class="category-grid">${PRODUKTBEREICHE.map(([key,title,sub]) => { const count = countByCat[key] || 0; return `<button type="button" class="category-card ${key} ${count?'on':''}" data-acq-produktbereich-open="${key}"><span class="category-icon">${icon(key)}</span><span><strong>${title}</strong><small>${count ? count + ' ausgewählt' : sub}</small></span><b>${count ? '✓' : '›'}</b></button>`; }).join('')}</div>
     ${entries.length ? `<div class="produkte-picked">${entries.map(p => `<span>${escapeHtml(p.name)}</span>`).join('')}</div>` : '<p class="muted-copy">Noch keine Produkte markiert.</p>'}`;
@@ -2088,7 +2096,7 @@ function acqScreenInner() {
       </section>
     </main>`;
   }
-  if (a.step === 'produkte') return acqYesNoStep({eyebrow:'Kaltakquise', field:'produkteBesprochen', question:'Produkte besprochen?'});
+  if (a.step === 'produkte') return acqYesNoStep({eyebrow:'Kaltakquise', field:'produkteBesprochen', question:'Produkte besprochen?', sub: acqBesprocheneIds().length ? `${acqBesprocheneIds().length} markierte Produkte (★) vorhanden – mit „Ja“ werden sie übernommen.` : ''});
   if (a.step === 'produkteAuswahl') {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Produkte wurden besprochen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
@@ -5613,7 +5621,7 @@ function bind() {
   $('[data-action="acq-advance"]')?.addEventListener('click', (e) => {
     const field = e.currentTarget.dataset.field;
     if (field === 'adresse') acqGo('gespraech');
-    else if (field === 'kontaktperson') acqGo('produkte');
+    else if (field === 'kontaktperson') acqEnterProdukte();
     else acqAdvance(field);
     render();
   });
