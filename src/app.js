@@ -1842,13 +1842,13 @@ function acqBack() {
 }
 function acqNextStepFor(field, value) {
   const a = state.acq;
-  if (field === 'gespraech') return value === 'ja' ? 'kontaktperson' : 'muster';
+  if (field === 'gespraech') return value === 'ja' ? 'kontaktperson' : 'haendler';
   if (field === 'produkteBesprochen') return value === 'ja' ? 'produkteAuswahl' : 'muster';
   if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : acqAfterInteresse();
   if (field === 'kueche') return 'muster';
   if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length) ? 'info' : acqPreTermin());
   if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : acqPreTermin();
-  if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'konditionen';
+  if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'crm';
   return 'vorschau';
 }
 function acqPreTermin() { return aktionenForCurrentUser().length ? 'aktionen' : 'termin'; }
@@ -2118,7 +2118,6 @@ function acqScreenInner() {
           <div><label for="acqHausnummer">Hausnummer</label><input id="acqHausnummer" data-acq-field="hausnummer" type="text" value="${escapeHtml(a.hausnummer)}"></div>
           <div><label for="acqPlz">Postleitzahl</label><input id="acqPlz" data-acq-field="plz" type="text" value="${escapeHtml(a.plz)}"></div>
           <div><label for="acqOrt">Ort</label><input id="acqOrt" data-acq-field="ort" type="text" value="${escapeHtml(a.ort)}"></div>
-          <div class="wide"><label for="acqHandelspartner">Handelspartner</label><input id="acqHandelspartner" data-acq-field="handelspartner" type="text" value="${escapeHtml(a.handelspartner || '')}"></div>
         </div>
         <button type="button" class="primary-button compact" data-action="acq-advance" data-field="adresse" style="margin-top:14px"><span>Weiter</span></button>
       </section>
@@ -2209,18 +2208,29 @@ function acqScreenInner() {
       <section class="advisor-card">
         ${[0,1,2].map(i => `<div class="acq-termin-row"><span class="notiz-baustein-label">Vorschlag ${i+1}</span><div class="acq-termin-inputs"><input type="date" data-acq-termin-date="${i}" value="${escapeHtml((a.termine[i]||'').split('T')[0])}" aria-label="Datum Vorschlag ${i+1}"><input type="time" data-acq-termin-time="${i}" value="${escapeHtml((a.terminZeiten||[])[i] || '10:00')}" aria-label="Uhrzeit Vorschlag ${i+1}"><span class="acq-uhr">Uhr</span></div></div>`).join('')}
         <p class="muted-copy" style="margin:0 0 10px">Voreingestellt: 10:00 Uhr – Uhrzeit bei Bedarf anpassen.</p>
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="konditionen" style="margin-top:4px"><span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="crm" style="margin-top:4px"><span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
+  if (a.step === 'haendler') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Handelspartner</h1><p>Über welchen Händler wird bezogen? Optional – wird an den Innendienst übermittelt.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        <label class="modal-field wide" style="display:block"><input id="acqHandelspartner" data-acq-field="handelspartner" type="text" value="${escapeHtml(a.handelspartner || '')}" placeholder="Name des Handelspartners"></label>
+        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="haendler" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
   if (a.step === 'konditionen') {
     return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Konditionen besprochen?</h1><p>Optional – ohne Angabe wird nichts an den Innendienst übermittelt.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Konditionen</h1><p>Voreingestellt: keine – ohne Auswahl wird nichts an den Innendienst übermittelt.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
-        <p class="notiz-baustein-label">Preisliste / Kondition</p>
-        <div class="acq-stack">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(pl => `<button type="button" class="filter-chip ${a.konditionPL===pl?'active':''}" data-acq-kondition="${pl}">${a.konditionPL===pl?'✓ ':''}${pl}</button>`).join('')}</div>
-        <label class="modal-field wide" style="display:block;margin-top:16px"><span class="notiz-baustein-label">Weitere Konditionen (optional)</span><input id="acqKonditionText" data-acq-field="konditionText" type="text" value="${escapeHtml(a.konditionText || '')}" placeholder="z. B. Rabatt, Staffel, Konditionen des Handelspartners"></label>
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="crm" style="margin-top:14px"><span>Weiter</span></button>
+        <div class="acq-stack">
+          <button type="button" class="filter-chip ${!a.konditionPL?'active':''}" data-acq-kondition="">${!a.konditionPL?'✓ ':''}Keine</button>
+          ${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(pl => `<button type="button" class="filter-chip ${a.konditionPL===pl?'active':''}" data-acq-kondition="${pl}">${a.konditionPL===pl?'✓ ':''}${pl}</button>`).join('')}
+        </div>
+        <label class="modal-field wide" style="display:block;margin-top:16px"><span class="notiz-baustein-label">Weitere Konditionen (optional)</span><input id="acqKonditionText" data-acq-field="konditionText" type="text" value="${escapeHtml(a.konditionText || '')}" placeholder="z. B. Rabatt, Staffel"></label>
+        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="konditionen" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
@@ -5717,7 +5727,9 @@ function bind() {
   $('[data-action="acq-advance"]')?.addEventListener('click', (e) => {
     const field = e.currentTarget.dataset.field;
     if (field === 'adresse') acqGo('gespraech');
-    else if (field === 'kontaktperson') acqEnterProdukte();
+    else if (field === 'kontaktperson') acqGo('haendler');
+    else if (field === 'haendler') acqGo('konditionen');
+    else if (field === 'konditionen') { if (state.acq.gespraech === 'ja') acqEnterProdukte(); else acqGo('muster'); }
     else acqAdvance(field);
     render();
   });
@@ -5733,7 +5745,7 @@ function bind() {
   document.querySelectorAll('[data-acq-fb]').forEach(button => button.onclick = () => { const i = Number(button.dataset.acqFb); const l = state.acq.feedbackSel || []; state.acq.feedbackSel = l.includes(i) ? l.filter(x => x !== i) : [...l, i]; render(); });
   document.querySelectorAll('[data-acq-result]').forEach(button => button.onclick = () => { state.acq.result = button.dataset.acqResult; render(); });
   document.querySelectorAll('[data-acq-followup]').forEach(button => button.onclick = () => { const d = oneAddDays(oneToday(), Number(button.dataset.acqFollowup)); state.acq.followUp = state.acq.followUp === d ? '' : d; render(); });
-  document.querySelectorAll('[data-acq-kondition]').forEach(button => button.onclick = () => { const v = button.dataset.acqKondition; state.acq.konditionPL = state.acq.konditionPL === v ? '' : v; render(); });
+  document.querySelectorAll('[data-acq-kondition]').forEach(button => button.onclick = () => { state.acq.konditionPL = button.dataset.acqKondition || ''; render(); });
   document.querySelectorAll('[data-acq-infodoc]').forEach(button => button.onclick = () => { const key = button.dataset.acqInfodoc; state.acq.infoDocs[key] = !state.acq.infoDocs[key]; render(); });
   document.querySelectorAll('[data-acq-toggle]').forEach(button => button.onclick = () => { const [field,id] = button.dataset.acqToggle.split(':'); acqToggle(field, id); render(); });
   $('#acqMusterSuche')?.addEventListener('input', e => { state.acq.musterSuche = e.target.value; render(); });
