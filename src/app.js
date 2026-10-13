@@ -450,7 +450,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]').slice(0, 15),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1728,6 +1728,7 @@ function acqReset() {
   state.acq = {
     branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
     myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null,
+    wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', 
     step:'branche', history:[],
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
     produkteBesprochen:null, produktKategorie:null,
@@ -1768,6 +1769,16 @@ function acqRestoreDraft() {
 function acqKonditionText() {
   const a = state.acq;
   return [a.konditionPL, (a.konditionText || '').trim()].filter(Boolean).join(' · ');
+}
+// CRM-Angaben aus dem Flow (Wettbewerber, Vertragslaufzeit, Feedback, Ergebnis, Follow-up, Notiz) —
+// werden im Vorfeld abgefragt und gehen unverändert in CRM-Eintrag und Innendienst-Kontakt.
+function acqWettbewerberText() {
+  const a = state.acq;
+  return [...(a.wettbewerber || []), (a.wettbewerberText || '').trim()].filter(Boolean).join(', ');
+}
+function acqFeedbackText() {
+  const a = state.acq;
+  return [...(a.feedbackSel || []).map(i => ERGEBNIS_FEEDBACK_BAUSTEINE[i]).filter(Boolean), (a.feedbackText || '').trim()].filter(Boolean).join(' ');
 }
 function acqOpenLabel() {
   const a = state.acq;
@@ -2192,6 +2203,32 @@ function acqScreenInner() {
         <p class="notiz-baustein-label">Preisliste / Kondition</p>
         <div class="acq-stack">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(pl => `<button type="button" class="filter-chip ${a.konditionPL===pl?'active':''}" data-acq-kondition="${pl}">${a.konditionPL===pl?'✓ ':''}${pl}</button>`).join('')}</div>
         <label class="modal-field wide" style="display:block;margin-top:16px"><span class="notiz-baustein-label">Weitere Konditionen (optional)</span><input id="acqKonditionText" data-acq-field="konditionText" type="text" value="${escapeHtml(a.konditionText || '')}" placeholder="z. B. Rabatt, Staffel, Konditionen des Handelspartners"></label>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="crm" style="margin-top:14px"><span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
+  if (a.step === 'crm') {
+    const chip = (on, attr, label, plain) => `<button type="button" class="filter-chip ${on?'active':''}" ${attr}>${on && !plain ? '✓ ' : ''}${escapeHtml(label)}</button>`;
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Angaben für den CRM-Eintrag</h1><p>Alles optional – nur Ausgefülltes wird übernommen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        <p class="notiz-baustein-label">Aktueller Wettbewerber, wenn bekannt</p>
+        <div class="filter-row" style="flex-wrap:wrap">${ERGEBNIS_WETTBEWERBER_OPTIONS.map(o => chip((a.wettbewerber||[]).includes(o), `data-acq-wb="${escapeHtml(o)}"`, o)).join('')}</div>
+        <label class="modal-field wide" style="display:block;margin-top:10px"><input id="acqWettbewerberText" data-acq-field="wettbewerberText" type="text" value="${escapeHtml(a.wettbewerberText || '')}" placeholder="Anderer Hersteller / Produkt"></label>
+        <label class="modal-field wide" style="display:block;margin-top:14px"><span class="notiz-baustein-label">Vertrag beim aktuellen Anbieter läuft bis</span><input id="acqVertragBis" data-acq-field="vertragBis" type="date" value="${escapeHtml(a.vertragBis || '')}"></label>
+
+        <p class="notiz-baustein-label" style="margin-top:18px">Feedback / Bedarf</p>
+        <div class="acq-stack">${ERGEBNIS_FEEDBACK_BAUSTEINE.map((t,i) => chip((a.feedbackSel||[]).includes(i), `data-acq-fb="${i}"`, t)).join('')}</div>
+        <label class="modal-field wide" style="display:block;margin-top:10px"><input id="acqFeedbackText" data-acq-field="feedbackText" type="text" value="${escapeHtml(a.feedbackText || '')}" placeholder="Eigener Text (optional)"></label>
+
+        <p class="notiz-baustein-label" style="margin-top:18px">Ergebnis</p>
+        <div class="acq-stack">${ERGEBNIS_RESULT_OPTIONS.map(o => chip(a.result === o, `data-acq-result="${escapeHtml(o)}"`, o)).join('')}</div>
+
+        <p class="notiz-baustein-label" style="margin-top:18px">Follow-up</p>
+        <div class="filter-row" style="flex-wrap:wrap">${ERGEBNIS_FOLLOWUP_QUICK.map(([label,days]) => chip(a.followUp === oneAddDays(oneToday(), days), `data-acq-followup="${days}"`, label)).join('')}</div>
+        <label class="modal-field wide" style="display:block;margin-top:10px"><span class="notiz-baustein-label">oder Datum wählen</span><input id="acqFollowUp" data-acq-field="followUp" type="date" value="${escapeHtml(a.followUp || '')}"></label>
+
+        <label class="modal-field wide" style="display:block;margin-top:18px"><span class="notiz-baustein-label">Gesprächsnotiz</span><textarea id="acqNotiz" data-acq-field="notiz" rows="3" placeholder="Bedarf, Einwände, nächste Schritte … (optional)">${escapeHtml(a.notiz || '')}</textarea></label>
         <button type="button" class="primary-button compact" data-action="acq-vorschau" style="margin-top:14px"><span>Weiter zur Vorschau</span></button>
       </section>
     </main>`;
@@ -2217,9 +2254,10 @@ function acqEnsureContact() {
     plz:a.plz.trim(), ort:a.ort.trim(), strasse:a.strasse.trim(), hausnummer:a.hausnummer.trim(), email:a.email.trim(), telefon:a.telefon.trim(),
     handelspartner:(a.handelspartner || '').trim(),
     kondition: acqKonditionText(),
-    notiz:'', produktbereiche:[...new Set(prods.map(p => p.category))], produkte:prods.map(p => p.name).join(', '),
-    musterWanted:false, musterListe:[], wettbewerber:'', feedback:'', samples:'Keine', result:'Offen', vertragBis:null
+    notiz:(a.notiz || '').trim(), produktbereiche:[...new Set(prods.map(p => p.category))], produkte:prods.map(p => p.name).join(', '),
+    musterWanted:false, musterListe:[], wettbewerber: acqWettbewerberText(), feedback: acqFeedbackText(), samples:'Keine', result: a.result || 'Offen', vertragBis: a.vertragBis || null
   };
+  contact.nextFollowUp = a.followUp || null;
   state.one.contacts.push(contact);
   onePersistContacts();
   oneAudit('Kaltakquise-Kontakt angelegt', contact.name + (state.repName ? ' — angelegt von ' + state.repName : ''));
@@ -2232,6 +2270,7 @@ function acqBuildCrmReport() {
   const termine = a.terminVorschlagen === 'ja' ? a.termine.filter(x => x && x.trim()) : [];
   const muster = a.musterHinterlassen === 'ja' ? a.musterEintraege.map(m => `${acqProductName(m.id)} (${m.anzahl} Stück)${ARZNEIMITTEL_PRODUCTS.includes(m.id) ? ' – ' + ARZNEIMITTEL_MUSTER_HINWEIS : ''}`) : [];
   const notiz = [
+    (a.notiz || '').trim(),
     `Gespräch geführt: ${a.gespraech === 'ja' ? 'ja' : 'nein'}`,
     a.produkteBesprochen === 'ja' ? `Interesse an besprochenen Produkten: ${a.interesse === 'ja' ? 'ja (' + a.interesseIds.map(acqProductName).join(', ') + ')' : 'nein'}` : '',
     a.infoGewuenscht === 'ja' ? `Weitere Informationen gewünscht zu: ${a.infoIds.map(acqProductName).join(', ')}` : '',
@@ -2245,9 +2284,9 @@ function acqBuildCrmReport() {
     anrede:'', vorname:a.vorname, nachname:a.nachname, strasse:a.strasse, hausnummer:a.hausnummer, plz:a.plz, ort:a.ort,
     telefon:a.telefon, email:a.email, herkunft:'kaltakquise',
     produktbereicheText: [...new Set(prods.map(p => ({surface:'Fläche', hands:'Hände & Haut', instruments:'Instrumente', application:'Applikation'}[p.category] || p.category)))].join(', '),
-    produkteText: prods.map(p => p.name).join(', '), notiz, wettbewerber:'', vertragBis:'', feedback:'',
-    samples: muster.length ? muster.join(', ') : 'Keine', result:'Offen',
-    followUp: termine.length ? termine[0].slice(0,10) : '', nextSteps: termine.length ? 'Termin wahrnehmen' : 'Termin vereinbaren',
+    produkteText: prods.map(p => p.name).join(', '), notiz, wettbewerber: acqWettbewerberText(), vertragBis: a.vertragBis || '', feedback: acqFeedbackText(),
+    samples: muster.length ? muster.join(', ') : 'Keine', result: a.result || 'Offen',
+    followUp: a.followUp || (termine.length ? termine[0].slice(0,10) : ''), nextSteps: termine.length ? 'Termin wahrnehmen' : 'Termin vereinbaren',
     owner: state.repName || '-', musterWanted:false, musterListe:[]
   };
 }
@@ -5654,6 +5693,10 @@ function bind() {
     state.spectrum = 'all';
     render();
   }));
+  document.querySelectorAll('[data-acq-wb]').forEach(button => button.onclick = () => { const v = button.dataset.acqWb; const l = state.acq.wettbewerber || []; state.acq.wettbewerber = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; render(); });
+  document.querySelectorAll('[data-acq-fb]').forEach(button => button.onclick = () => { const i = Number(button.dataset.acqFb); const l = state.acq.feedbackSel || []; state.acq.feedbackSel = l.includes(i) ? l.filter(x => x !== i) : [...l, i]; render(); });
+  document.querySelectorAll('[data-acq-result]').forEach(button => button.onclick = () => { state.acq.result = button.dataset.acqResult; render(); });
+  document.querySelectorAll('[data-acq-followup]').forEach(button => button.onclick = () => { const d = oneAddDays(oneToday(), Number(button.dataset.acqFollowup)); state.acq.followUp = state.acq.followUp === d ? '' : d; render(); });
   document.querySelectorAll('[data-acq-kondition]').forEach(button => button.onclick = () => { const v = button.dataset.acqKondition; state.acq.konditionPL = state.acq.konditionPL === v ? '' : v; render(); });
   document.querySelectorAll('[data-acq-infodoc]').forEach(button => button.onclick = () => { const key = button.dataset.acqInfodoc; state.acq.infoDocs[key] = !state.acq.infoDocs[key]; render(); });
   document.querySelectorAll('[data-acq-toggle]').forEach(button => button.onclick = () => { const [field,id] = button.dataset.acqToggle.split(':'); acqToggle(field, id); render(); });
@@ -5726,7 +5769,7 @@ function bind() {
         if (hasCustomerData && confirm(`Daten aus der offenen Kaltakquise „${acqOpenLabel()}“ übernehmen?\n\nOK = übernehmen, Abbrechen = leeres Formular.`)) {
           draft = {...draft, firma:a.firma.trim(), branche:a.branche || '', vorname:a.vorname.trim(), nachname:a.nachname.trim(),
             strasse:a.strasse.trim(), hausnummer:a.hausnummer.trim(), plz:a.plz.trim(), ort:a.ort.trim(),
-            telefon:a.telefon.trim(), email:a.email.trim(), handelspartner:(a.handelspartner || '').trim()};
+            telefon:a.telefon.trim(), email:a.email.trim(), handelspartner:(a.handelspartner || '').trim(), kondition: acqKonditionText()};
           contactId = a.contactId || null;
         }
         state.newCustomer = { draft, contactId, produktbereiche: [], myPos:null, locating:false, locateError:'' };
