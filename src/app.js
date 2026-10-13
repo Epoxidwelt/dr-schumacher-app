@@ -873,7 +873,7 @@ function menuScreen() {
     ['instruments','Instrumente','Aufbereitung & Desinfektion'],
     ['application','Applikation','Spendersysteme & Zubehör'],
     ['aroundme','Rund um mich','Kunden in der Nähe finden oder nach Kliniken, Praxen usw. suchen'],
-    ['kundenbesuch','Kundenbesuch','Bestandskunde oder Kaltakquise erfassen und in den bestehenden Ablauf übergeben'],
+    ['kundenbesuch','Kundenbesuch', acqHasData() ? `Kaltakquise offen: ${acqOpenLabel()} – hier geht es weiter` : 'Bestandskunde oder Kaltakquise – ein gemeinsamer Ablauf'],
     ['meinekontakte','Meine Kontakte','Ihre freigegebenen Kunden und zuletzt angelegten Kontakte'],
     ['smartmailing','Smart Mailing','Viele Kunden gezielt und persönlich per E-Mail informieren'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
@@ -890,7 +890,6 @@ function menuScreen() {
     ['kol','KOL – Key Opinion Leader','Referenzkunden je Produkt finden – unabhängig vom eigenen Gebiet'],
     ['konzepte','Konzepte','Branchenkonzepte mit den passenden Produkten je Bereich – z. B. Rettungsdienst oder Pflege'],
     ['ideenschmiede','Ideenschmiede','Verbesserungsvorschläge und neue Produktideen direkt an den Innendienst'],
-    ['akquise','Kaltakquise', acqTileSubtitle()],
     ['downloads','Downloads','Aktuelle Unterlagen online'],
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
@@ -3415,9 +3414,9 @@ function occasionPromptModal() {
     return `<div class="modal-overlay">
       <div class="modal-card">
         ${modalCloseBtn()}
-        <span class="eyebrow">Schritt ${stepNum.kundentyp}${isAngebot ? ' von ' + total : ''}</span>
+        <span class="eyebrow">${state.summaryKundenbesuch ? 'Kundenbesuch' : 'Schritt ' + stepNum.kundentyp + (isAngebot ? ' von ' + total : '')}</span>
         <h2>Bestandskunde oder ${neuLabel}?</h2>
-        <p>${state.summaryKundenbesuch ? 'Bei einer Kaltakquise fragen wir im nächsten Schritt kurz die Adresse ab.' : 'Bei einem Neukunden fragen wir im nächsten Schritt kurz die Adresse ab.'}</p>
+        <p>${state.summaryKundenbesuch ? 'Bei einer Kaltakquise führt dich der Ablauf Schritt für Schritt durch Branche, Adresse, Gespräch, Produkte und CRM-Angaben.' : 'Bei einem Neukunden fragen wir im nächsten Schritt kurz die Adresse ab.'}</p>
         <div class="modal-choices">
           <button class="modal-choice" data-kundentyp-choice="bestand">${icon('pm')}<span>Bestandskunde</span></button>
           <button class="modal-choice" data-kundentyp-choice="neu">${icon('pm')}<span>${neuLabel}</span></button>
@@ -5840,6 +5839,19 @@ function bind() {
   });
   document.querySelectorAll('[data-kundentyp-choice]').forEach(button => button.addEventListener('click', () => {
     const isNew = button.dataset.kundentypChoice === 'neu';
+    if (isNew && state.summaryKundenbesuch) {
+      // Kundenbesuch → „Kaltakquise“: derselbe geführte Ablauf wie bisher die eigene Kaltakquise-Kachel
+      // (Branche, Adresse, Gespräch, Produkte, CRM-Angaben …). Ein offener Kontakt wird fortgesetzt.
+      archiveUnsavedNewCustomerDraft();
+      state.summaryStep = null; state.summaryPurpose = null; state.summaryIsNewCustomer = null;
+      state.summaryKaltakquise = false; state.summaryKundenbesuch = false; state.newCustomer = null;
+      state.summaryPendingRecipient = null; state.summaryAfterSpeicher = null;
+      if (!acqHasData()) acqReset();
+      state.previousScreen = null;
+      state.screen = 'akquise';
+      render();
+      return;
+    }
     state.summaryIsNewCustomer = isNew;
     if (isNew){
       // Existiert bereits ein Entwurf (z. B. weil man aus der Adressmaske per "Zurück" hierher
