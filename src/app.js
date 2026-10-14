@@ -453,6 +453,7 @@ const state = {
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
   summaryNotiz: localStorage.getItem('summaryNotiz') || '',
+  docLinks: (() => { try { return {pif:false, sdb:false, ba:false, ...JSON.parse(localStorage.getItem('docLinks') || '{}')}; } catch (e) { return {pif:false, sdb:false, ba:false}; } })(),
   // Weitere Ansprechpartner beim Bestandskunden (z. B. zweiter Kontakt in derselben
   // Einrichtung) — werden sowohl im CRM-Eintrag aufgeführt als auch als CC in die
   // Kundenzusammenfassung aufgenommen, sofern eine E-Mail-Adresse hinterlegt ist.
@@ -1850,7 +1851,7 @@ function acqNextStepFor(field, value) {
   if (field === 'produkteBesprochen') return value === 'ja' ? 'produkteAuswahl' : 'muster';
   if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : acqAfterInteresse();
   if (field === 'kueche') return 'muster';
-  if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length) ? 'info' : acqPreTermin());
+  if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length || (a.musterEintraege && a.musterEintraege.length)) ? 'info' : acqPreTermin());
   if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : acqPreTermin();
   if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'notiz';
   return 'vorschau';
@@ -1868,6 +1869,10 @@ function acqEnterVorschau() {
 }
 function acqAdvance(field) {
   const next = acqNextStepFor(field, state.acq[field]);
+  if (next === 'infoAuswahl' && !state.acq.infoIds.length) {
+    // Alle Produkte des Gesprächs (besprochen, Interesse, Muster) vorauswählen – ein Klick weniger.
+    state.acq.infoIds = [...new Set([...acqBesprocheneIds(), ...state.acq.interesseIds, ...(state.acq.musterEintraege || []).map(m => m.id)])];
+  }
   if (next === 'vorschau') acqEnterVorschau(); else acqGo(next);
 }
 function acqToggle(field, id) {
@@ -2207,13 +2212,13 @@ function acqScreenInner() {
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Muster wurden hinterlassen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${acqMusterPicker()}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${(acqBesprocheneIds().length||a.interesseIds.length)?'info':acqPreTermin()}" style="margin-top:14px"><span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${(acqBesprocheneIds().length||a.interesseIds.length||a.musterEintraege.length)?'info':acqPreTermin()}" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
-  if (a.step === 'info') return acqYesNoStep({eyebrow:'Kaltakquise', field:'infoGewuenscht', question:'Weitere Informationen gewünscht?'});
+  if (a.step === 'info') return acqYesNoStep({eyebrow:'Kaltakquise', field:'infoGewuenscht', question:'Unterlagen als Link mitsenden?', sub:'Produktinformation, Sicherheitsdatenblatt, Betriebsanweisung – für Muster, Interesse oder weitere Infos.'});
   if (a.step === 'infoAuswahl') {
-    const pool = [...new Set([...acqBesprocheneIds(), ...a.interesseIds])];
+    const pool = [...new Set([...acqBesprocheneIds(), ...a.interesseIds, ...(a.musterEintraege || []).map(m => m.id)])];
     const d = a.infoDocs;
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Zu welchen Produkten werden Informationen gewünscht?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
@@ -2369,6 +2374,7 @@ function acqBuildCrmReport() {
     telefon:a.telefon, email:a.email, herkunft:'kaltakquise',
     produktbereicheText: [...new Set(prods.map(p => ({surface:'Fläche', hands:'Hände & Haut', instruments:'Instrumente', application:'Applikation'}[p.category] || p.category)))].join(', '),
     handelspartner:(a.handelspartner || '').trim(), kondition: acqKonditionText(),
+    unterlagen: (a.infoGewuenscht === 'ja' && a.infoIds.length) ? docLabels.join(', ') : '',
     produkteText: prods.map(p => p.name).join(', '), notiz, wettbewerber: acqWettbewerberText(), vertragBis: a.vertragBis || '', feedback: acqFeedbackText(),
     samples: muster.length ? 'Muster dagelassen' : 'Keine', result: a.result || 'Offen',
     followUp: a.followUp || (termine.length ? termine[0].slice(0,10) : ''), nextSteps: termine.length ? 'Termin wahrnehmen' : 'Termin vereinbaren',
@@ -3642,6 +3648,11 @@ function occasionPromptModal() {
           <label class="modal-field"><textarea id="ergebnisFeedback" rows="2" placeholder="Eigener Text (optional)">${escapeHtml(state.crmFeedback || '')}</textarea></label>
         </div>
         <div class="ergebnis-block">
+          <span class="notiz-baustein-label">Unterlagen als Link in der Kunden-E-Mail mitsenden</span>
+          <div class="notiz-baustein-chips">${DOC_LINK_LABELS.map(([k,l]) => `<button type="button" class="notiz-chip ${state.docLinks[k]?'active':''}" data-doclink="${k}">${state.docLinks[k]?'✓ ':''}${escapeHtml(l)}</button>`).join('')}</div>
+          <small class="ergebnis-sublabel">Gilt für alle markierten Produkte (★).</small>
+        </div>
+        <div class="ergebnis-block">
           <span class="notiz-baustein-label">Muster / Unterlagen</span>
           <div class="notiz-baustein-chips">${ERGEBNIS_SAMPLES_OPTIONS.map(o => `<button type="button" class="notiz-chip ${samples===o?'active':''}" data-samples-choice="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}</div>
         </div>
@@ -4147,6 +4158,27 @@ function currentSummaryBranche() {
   const contact = state.one.contacts.find(c => (c.kundenNr || '').trim().toLowerCase() === kundenNr);
   return (contact && contact.branche) || '';
 }
+// Unterlagen (Produktinformation / Sicherheitsdatenblatt / Betriebsanweisung) als Link in Kunden-E-Mails.
+// Gilt für alle markierten Produkte; fehlt ein Dokument beim Hersteller, steht ein Nachreichen-Hinweis.
+const DOC_LINK_LABELS = [['pif','Produktinformation (PIF)'],['sdb','Sicherheitsdatenblatt (SDB)'],['ba','Betriebsanweisung (BA)']];
+function docLinksSelected() { return DOC_LINK_LABELS.filter(([k]) => state.docLinks && state.docLinks[k]); }
+function docLinksLabelText() { return docLinksSelected().map(([k,l]) => l).join(', '); }
+function docLinkLines(products) {
+  const sel = docLinksSelected();
+  const list = [...new Map((products || []).filter(Boolean).map(p => [p.id, p])).values()];
+  if (!sel.length || !list.length) return [];
+  const lines = ['Unterlagen zum Download:', ''];
+  list.forEach(p => {
+    lines.push(`▸ ${p.name}`);
+    sel.forEach(([k, label]) => { const u = productDocUrl(p, k); lines.push(`  – ${label}: ${u || 'reiche ich Ihnen gerne nach'}`); });
+    lines.push('');
+  });
+  return lines;
+}
+function setDocLink(key, on) {
+  state.docLinks = {...state.docLinks, [key]: !!on};
+  try { localStorage.setItem('docLinks', JSON.stringify(state.docLinks)); } catch (e) {}
+}
 function buildCustomerSummaryEmail(){
   const entries=favoriteEntries();
   const branche = currentSummaryBranche();
@@ -4189,6 +4221,7 @@ function buildCustomerSummaryEmail(){
     lines.push('');
   });
   lines.push(...haccpKuecheLines(entries.map(e => e.product), branche));
+  lines.push(...docLinkLines(entries.map(e => e.product)));
   const aktionenGesprochen = aktionenStarred();
   if (aktionenGesprochen.length) {
     lines.push('Außerdem haben wir über folgendes Thema gesprochen:', '');
@@ -4276,6 +4309,7 @@ function buildKaltakquiseNachfassEmail(){
     });
   }
   if (!keinInteresse) lines.push(...haccpKuecheLines(entries.map(e => e.product), currentSummaryBranche()));
+  if (!keinInteresse) lines.push(...docLinkLines(entries.map(e => e.product)));
   if (!keinInteresse && aktionenStarred().length) {
     lines.push('Außerdem hatten wir über folgendes Thema gesprochen:', '');
     aktionenStarred().forEach(ak => lines.push(...aktionMailLines(ak)));
@@ -5019,6 +5053,7 @@ function buildCrmSummary(report = state.visitReport) {
       `Feedback / Bedarf: ${report.feedback || '-'}`,
       `Muster / Unterlagen: ${report.samples || 'Keine'}`,
       ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
+      ...(report.unterlagen ? [`Unterlagen als Link mitgesendet: ${report.unterlagen}`] : []),
       `Ergebnis: ${report.result || 'Offen'}`,
       `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
       `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
@@ -5041,6 +5076,7 @@ function buildCrmSummary(report = state.visitReport) {
     `Feedback und Bedarf: ${report.feedback || '-'}`,
     `Muster / Unterlagen: ${report.samples || 'Keine'}`,
     ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
+    ...(report.unterlagen ? [`Unterlagen als Link mitgesendet: ${report.unterlagen}`] : []),
     `Ergebnis: ${report.result || 'Offen'}`,
     `Nächste Schritte: ${report.nextSteps || '-'}`,
     `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
@@ -5064,7 +5100,7 @@ function buildQuickCrmEntry(){
       telefon: c.telefon || '', email: c.email || '',
       produktbereicheText: (c.produktbereiche||[]).map(produktbereichLabel).join(', '),
       produkteText: c.produkte || '',
-      notiz: c.notiz || '', herkunft: c.herkunft || '', handelspartner: c.handelspartner || '', kondition: c.kondition || '',
+      notiz: c.notiz || '', herkunft: c.herkunft || '', handelspartner: c.handelspartner || '', kondition: c.kondition || '', unterlagen: docLinksLabelText(),
       musterWanted: !!c.musterWanted, musterListe: c.musterListe || [],
       wettbewerber: c.wettbewerber || '',
       feedback: c.feedback || '', samples: c.samples || 'Keine', result: c.result || 'Offen', followUp: c.nextFollowUp || '', vertragBis: c.vertragBis || '',
@@ -5085,7 +5121,7 @@ function buildQuickCrmEntry(){
     type: state.summaryOccasion.trim() || 'Produktvorstellung',
     products,
     wettbewerber: [...(state.crmWettbewerber || []), (state.crmWettbewerberCustomText || '').trim()].filter(Boolean).join(', '),
-    feedback: (state.crmFeedback || '').trim(), samples: state.crmSamples || 'Keine', result: state.crmResult || 'Offen',
+    feedback: (state.crmFeedback || '').trim(), samples: state.crmSamples || 'Keine', result: state.crmResult || 'Offen', unterlagen: docLinksLabelText(),
     followUp: (state.crmFollowUpWanted && state.crmFollowUpDate) ? state.crmFollowUpDate : '',
     vertragBis: (state.crmVertragBisWanted && state.crmVertragBisDate) ? state.crmVertragBisDate : '',
     owner: state.repName || '-'
@@ -6161,6 +6197,7 @@ function bind() {
     if (!state.crmFollowUpWanted) state.crmFollowUpDate = '';
     render();
   }));
+  document.querySelectorAll('[data-doclink]').forEach(btn => btn.addEventListener('click', () => { setDocLink(btn.dataset.doclink, !state.docLinks[btn.dataset.doclink]); render(); }));
   document.querySelectorAll('[data-followup-quick]').forEach(btn => btn.addEventListener('click', () => {
     state.crmFollowUpDate = followUpQuickDate(btn.dataset.followupQuick);
     render();
@@ -6815,6 +6852,7 @@ function resetCustomerData(silent, clearFavorites) {
   state.summaryCustomer = '';
   state.summaryKundenNr = '';
   state.summaryNotiz = '';
+  state.docLinks = {pif:false, sdb:false, ba:false}; try { localStorage.removeItem('docLinks'); } catch (e) {}
   state.summarySalutation = 'Herr';
   state.summaryAdditionalContacts = [];
   state.summaryBranche = '';
