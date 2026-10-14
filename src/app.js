@@ -2271,7 +2271,7 @@ function acqScreenInner() {
   if (a.step === 'aktionen') {
     const list = aktionenForCurrentUser();
     return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Aktion besprochen?</h1><p>Besprochene Aktion antippen = Ja, es geht automatisch weiter. Sonst „Weiter“.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Aktion besprochen?</h1><p>Besprochene Aktion antippen = Ja, es geht sofort weiter. Sonst „Weiter“.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${aktionPickCardsHtml(list)}
         <button type="button" class="primary-button compact" data-action="acq-goto" data-step="termin" style="margin-top:14px"><span>Weiter</span></button>
@@ -3559,7 +3559,7 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.aktionen} von ${total}</span>
         <h2>Aktion besprochen?</h2>
-        <p>Besprochene Aktion antippen = Ja (wird in die E-Mail an den Kunden übernommen), es geht automatisch weiter. Sonst „Weiter“.</p>
+        <p>Besprochene Aktion antippen = Ja (wird in die E-Mail an den Kunden übernommen), es geht sofort weiter. Sonst „Weiter“.</p>
         ${aktionPickCardsHtml(list)}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="aktionen-back">Zurück</button>
@@ -5822,7 +5822,7 @@ function bind() {
   document.querySelectorAll('[data-ws-cat]').forEach(b => b.onclick = () => { state.wsCat = b.dataset.wsCat; render(); });
   $('[data-action="ws-clear"]')?.addEventListener('click', () => { state.wsSel = []; render(); });
   document.querySelectorAll('[data-aktion-star]').forEach(b => b.onclick = () => { aktionSetStar(b.dataset.aktionStar, !state.aktionStars.includes(b.dataset.aktionStar)); render(); });
-  document.querySelectorAll('[data-aktion-toggle]').forEach(b => b.onclick = () => { const id = b.dataset.aktionToggle; aktionSetStar(id, !state.aktionStars.includes(id)); render(); aktionScheduleAdvance(); });
+  document.querySelectorAll('[data-aktion-toggle]').forEach(b => b.onclick = () => { const id = b.dataset.aktionToggle; aktionSetStar(id, true); if (!aktionAdvanceNow()) render(); });
   document.querySelectorAll('[data-aktion-gesprochen]').forEach(b => b.onclick = () => { const [id, v] = b.dataset.aktionGesprochen.split(':'); aktionSetStar(id, v === 'ja'); render(); });
   document.querySelectorAll('[data-aktion-open]').forEach(b => b.onclick = () => { state.aktionOpen = b.dataset.aktionOpen; render(); });
   $('[data-action="aktion-close"]')?.addEventListener('click', () => { state.aktionOpen = null; render(); });
@@ -7214,18 +7214,13 @@ function aktionStarredTitles() { return aktionenStarred().map(a => a.titel); }
 function aktionPickCardsHtml(list) {
   return `<div class="aktion-picks">${list.map(a => { const on = state.aktionStars.includes(a.id); return `<button type="button" class="aktion-pick ${on?'on':''}" data-aktion-toggle="${a.id}" aria-pressed="${on}"><span class="aktion-check">${on?'★':'☆'}</span><span class="aktion-pick-text"><strong>${escapeHtml(a.titel)}</strong><small>${escapeHtml(a.teaser)}</small></span></button>`; }).join('')}</div>`;
 }
-// Beim Betreten der Frage ist keine Aktion markiert; erst das Antippen gilt als „Ja“ und geht
-// nach kurzer Bestätigung (weitere Aktion kann noch angetippt werden) automatisch weiter.
+// Beim Betreten der Frage ist keine Aktion markiert; das Antippen einer Aktion gilt als „Ja“ und
+// geht sofort weiter – ohne zusätzlichen „Weiter“-Klick.
 function aktionClearMarks() { aktionenForCurrentUser().forEach(a => aktionSetStar(a.id, false)); }
-let aktionAdvanceTimer = null;
-function aktionScheduleAdvance() {
-  clearTimeout(aktionAdvanceTimer);
-  const list = aktionenForCurrentUser();
-  if (!list.some(a => state.aktionStars.includes(a.id))) return;
-  aktionAdvanceTimer = setTimeout(() => {
-    if (state.screen === 'akquise' && state.acq.step === 'aktionen') { acqGo('termin'); render(); }
-    else if (state.summaryStep === 'aktionen') { state.summaryStep = 'musterfrage'; render(); }
-  }, 700);
+function aktionAdvanceNow() {
+  if (state.screen === 'akquise' && state.acq.step === 'aktionen') { acqGo('termin'); render(); return true; }
+  if (state.summaryStep === 'aktionen') { state.summaryStep = 'musterfrage'; render(); return true; }
+  return false;
 }
 function aktionSetStar(id, on) {
   state.aktionStars = on ? [...new Set([...state.aktionStars, id])] : state.aktionStars.filter(x => x !== id);
