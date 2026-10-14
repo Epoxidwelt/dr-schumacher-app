@@ -2269,15 +2269,11 @@ function acqScreenInner() {
   }
   if (a.step === 'aktionen') {
     const list = aktionenForCurrentUser();
-    const anyOn = list.some(x => state.aktionStars.includes(x.id)) || list.length === 1;
     return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Aktion besprochen?</h1><p>${list.length > 1 ? 'Besprochene Aktion(en) antippen, dann „Ja“. Mit „Nein“ geht es ohne Aktion weiter.' : 'Mit „Ja“ wird das Thema mit ★ markiert und in die E-Mail übernommen.'}</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Aktion besprochen?</h1><p>Besprochene Aktion antippen = Ja (★). Wurde keine besprochen, einfach weiter.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${aktionPickCardsHtml(list)}
-        <div class="answer-grid wizard" style="margin-top:14px">
-          <button type="button" class="answer-button" data-acq-aktion-answer="ja" ${anyOn ? '' : 'disabled'}>Ja</button>
-          <button type="button" class="answer-button" data-acq-aktion-answer="nein">Nein</button>
-        </div>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="termin" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
@@ -3557,18 +3553,16 @@ function occasionPromptModal() {
   }
   if (state.summaryStep === 'aktionen') {
     const list = aktionenForCurrentUser();
-    const anyOn = list.some(x => state.aktionStars.includes(x.id)) || list.length === 1;
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(520px,100%)">
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.aktionen} von ${total}</span>
         <h2>Aktion besprochen?</h2>
-        <p>${list.length > 1 ? 'Besprochene Aktion(en) antippen, dann „Ja“ – sie werden mit ★ markiert und in die E-Mail an den Kunden übernommen.' : 'Mit „Ja“ wird das Thema mit ★ markiert und in die E-Mail an den Kunden übernommen.'}</p>
+        <p>Besprochene Aktion antippen = Ja (★, wird in die E-Mail an den Kunden übernommen). Wurde keine besprochen, einfach weiter.</p>
         ${aktionPickCardsHtml(list)}
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="aktionen-back">Zurück</button>
-          <button class="secondary-button compact" data-action="aktionen-nein">Nein</button>
-          <button class="primary-button compact" data-action="aktionen-ja" ${anyOn ? '' : 'disabled'}>Ja</button>
+          <button class="primary-button compact" data-action="aktionen-weiter">Weiter</button>
         </div>
       </div>
     </div>`;
@@ -5828,10 +5822,6 @@ function bind() {
   $('[data-action="ws-clear"]')?.addEventListener('click', () => { state.wsSel = []; render(); });
   document.querySelectorAll('[data-aktion-star]').forEach(b => b.onclick = () => { aktionSetStar(b.dataset.aktionStar, !state.aktionStars.includes(b.dataset.aktionStar)); render(); });
   document.querySelectorAll('[data-aktion-toggle]').forEach(b => b.onclick = () => { const id = b.dataset.aktionToggle; aktionSetStar(id, !state.aktionStars.includes(id)); render(); });
-  document.querySelectorAll('[data-acq-aktion-answer]').forEach(b => b.onclick = () => {
-    if (!aktionAnswer(aktionenForCurrentUser(), b.dataset.acqAktionAnswer === 'ja')) return;
-    acqGo('termin'); render();
-  });
   document.querySelectorAll('[data-aktion-gesprochen]').forEach(b => b.onclick = () => { const [id, v] = b.dataset.aktionGesprochen.split(':'); aktionSetStar(id, v === 'ja'); render(); });
   document.querySelectorAll('[data-aktion-open]').forEach(b => b.onclick = () => { state.aktionOpen = b.dataset.aktionOpen; render(); });
   $('[data-action="aktion-close"]')?.addEventListener('click', () => { state.aktionOpen = null; render(); });
@@ -6041,8 +6031,7 @@ function bind() {
   $('[data-action="occasion-back-neukunde"]')?.addEventListener('click', () => { state.summaryStep = 'neukunde'; render(); });
   $('[data-action="occasion-back-produktbereiche"]')?.addEventListener('click', () => { state.summaryStep = aktionenForCurrentUser().length && state.summaryPurpose !== 'angebot' ? 'aktionen' : 'produktbereiche'; render(); });
   $('[data-action="aktionen-back"]')?.addEventListener('click', () => { state.summaryStep = 'produktbereiche'; render(); });
-  $('[data-action="aktionen-ja"]')?.addEventListener('click', () => { if (!aktionAnswer(aktionenForCurrentUser(), true)) return; state.summaryStep = 'musterfrage'; render(); });
-  $('[data-action="aktionen-nein"]')?.addEventListener('click', () => { aktionAnswer(aktionenForCurrentUser(), false); state.summaryStep = 'musterfrage'; render(); });
+  $('[data-action="aktionen-weiter"]')?.addEventListener('click', () => { state.summaryStep = 'musterfrage'; render(); });
   document.querySelectorAll('[data-nc-field]').forEach(input => input.addEventListener('input', e => {
     const field = e.target.dataset.ncField;
     let val = e.target.value;
@@ -7220,17 +7209,9 @@ function aktionZeitraumText(a) {
 // Kaltakquise-E-Mail und CRM-Eintrag aufgegriffen.
 function aktionenStarred() { return aktionenForCurrentUser().filter(a => state.aktionStars.includes(a.id)); }
 function aktionStarredTitles() { return aktionenStarred().map(a => a.titel); }
-// Auswahl der besprochenen Aktionen: Karten antippen = markieren (★), danach mit Ja/Nein weiter.
+// Auswahl der besprochenen Aktionen: Karte antippen = Ja (★ markiert), sonst einfach „Weiter“.
 function aktionPickCardsHtml(list) {
   return `<div class="aktion-picks">${list.map(a => { const on = state.aktionStars.includes(a.id); return `<button type="button" class="aktion-pick ${on?'on':''}" data-aktion-toggle="${a.id}" aria-pressed="${on}"><span class="aktion-check">${on?'★':'☆'}</span><span class="aktion-pick-text"><strong>${escapeHtml(a.titel)}</strong><small>${escapeHtml(a.teaser)}</small></span></button>`; }).join('')}</div>`;
-}
-// „Ja“: nur mit mindestens einer markierten Aktion (bei genau einer Aktion wird sie direkt markiert).
-function aktionAnswer(list, yes) {
-  if (!yes) { list.forEach(a => aktionSetStar(a.id, false)); return true; }
-  if (!list.some(a => state.aktionStars.includes(a.id))) {
-    if (list.length === 1) aktionSetStar(list[0].id, true); else return false;
-  }
-  return true;
 }
 function aktionSetStar(id, on) {
   state.aktionStars = on ? [...new Set([...state.aktionStars, id])] : state.aktionStars.filter(x => x !== id);
