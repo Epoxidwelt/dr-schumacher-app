@@ -447,7 +447,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'', wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'', position:'', apName:'', wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]').slice(0, 15),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1729,7 +1729,7 @@ function acqReset() {
   state.acqArrangeMode = false;
   state.acq = {
     branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
-    myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'',
+    myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'', position:'', apName:'',
     wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', 
     step:'branche', history:[],
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
@@ -1803,6 +1803,26 @@ function maybeAskSpeicherKunde() {
   state.summaryAfterSpeicher = state.summaryStep;
   state.summaryStep = 'speicherkunde';
 }
+// Zuständige Position / Funktion je Branche – im Rettungsdienst z. B. Desinfektor oder Wachleitung,
+// in der Klinik die Hygienefachkraft. Die wichtigsten stehen oben.
+function acqPositionOptions(branche) {
+  const b = (branche || '').toLowerCase();
+  const gemein = ['Einkauf / Beschaffung', 'Geschäftsführung / Inhaber'];
+  if (b.includes('tier')) return ['Praxisinhaber / Tierarzt', 'Praxismanager/in', 'Leitende/r TFA', 'Hygienebeauftragte/r', ...gemein];
+  if (b.includes('augen')) return ['Praxisinhaber / Chefarzt', 'Hygienebeauftragte/r', 'OP-Leitung', 'Praxismanager/in', ...gemein];
+  if (b.includes('reha')) return ['Hygienefachkraft', 'Pflegedienstleitung', 'Hygienebeauftragter Arzt', 'Verwaltungsleitung', ...gemein];
+  if (b.includes('rettung')) return ['Desinfektor', 'Leiter der Wache', 'Rettungsdienstleitung', 'Hygienebeauftragte/r', 'Notfallsanitäter / Lehrrettungsassistent', ...gemein];
+  if (b.includes('krankenhaus') || b.includes('klinik')) return ['Hygienefachkraft', 'Krankenhaushygieniker', 'Hygienebeauftragter Arzt', 'Pflegedienstleitung', 'Apotheke', 'Einkauf / Materialwirtschaft', 'Geschäftsführung'];
+  if (b.includes('pflege')) return ['Pflegedienstleitung (PDL)', 'Hygienebeauftragte/r', 'Einrichtungsleitung', 'Qualitätsmanagement', ...gemein];
+  if (b.includes('zahn')) return ['Praxisinhaber / Zahnarzt', 'Praxismanager/in', 'Hygienebeauftragte/r', 'Prophylaxe / ZMF', ...gemein];
+  if (b.includes('arzt')) return ['Praxisinhaber / Arzt', 'Praxismanager/in', 'Hygienebeauftragte/r (MFA)', 'QM-Beauftragte/r', ...gemein];
+  return ['Hygienebeauftragte/r', 'Leitung', ...gemein];
+}
+function acqPositionChipsHtml() {
+  const a = state.acq;
+  const opts = acqPositionOptions(a.branche);
+  return `<div class="acq-stack">${opts.map(o => `<button type="button" class="filter-chip ${a.position===o?'active':''}" data-acq-position="${escapeHtml(o)}">${a.position===o?'✓ ':''}${escapeHtml(o)}</button>`).join('')}</div>`;
+}
 function acqOpenLabel() {
   const a = state.acq;
   return a.firma.trim() || [a.vorname, a.nachname].filter(Boolean).join(' ').trim() || a.branche || 'Kontakt';
@@ -1847,7 +1867,7 @@ function acqBack() {
 }
 function acqNextStepFor(field, value) {
   const a = state.acq;
-  if (field === 'gespraech') return value === 'ja' ? 'kontaktperson' : 'haendler';
+  if (field === 'gespraech') return value === 'ja' ? 'kontaktperson' : 'zustaendig';
   if (field === 'produkteBesprochen') return value === 'ja' ? 'produkteAuswahl' : 'muster';
   if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : acqAfterInteresse();
   if (field === 'kueche') return 'muster';
@@ -1992,7 +2012,7 @@ function buildAcqEmail() {
   } else if (infoListe.length) {
     body.push('Lassen Sie mich gerne wissen, welche Angaben dafür besonders wichtig für Sie sind.');
   } else if (!gespraech) {
-    body.push('Wer ist bei Ihnen der passende Ansprechpartner für dieses Thema?');
+    body.push(a.position ? `Gerne würde ich mich mit der zuständigen Person austauschen (${a.position}) – können Sie mir bitte den passenden Kontakt vermitteln?` : 'Wer ist bei Ihnen der passende Ansprechpartner für dieses Thema?');
   } else if (keinInteresse) {
     body.push('Gibt es stattdessen ein anderes Thema aus unserem Angebot, zu dem Informationen für Sie hilfreich wären?');
   } else if (!besprochen.length) {
@@ -2166,12 +2186,24 @@ function acqScreenInner() {
     </main>`;
   }
   if (a.step === 'gespraech') return acqYesNoStep({eyebrow:'Kaltakquise', field:'gespraech', question:'Mit jemandem gesprochen?'});
+  if (a.step === 'zustaendig') {
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Wer ist zuständiger Ansprechpartner?</h1><p>Niemand gesprochen – welche Position ist für Hygiene und Desinfektion zuständig?</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        ${acqPositionChipsHtml()}
+        <label class="modal-field wide" style="display:block;margin-top:16px"><span class="notiz-baustein-label">Name, falls bekannt (optional)</span><input id="acqApName" data-acq-field="apName" type="text" value="${escapeHtml(a.apName || '')}" placeholder="z. B. Frau Meier"></label>
+        <button type="button" class="primary-button compact" data-action="acq-advance" data-field="zustaendig" style="margin-top:14px"><span>Weiter</span></button>
+      </section>
+    </main>`;
+  }
   if (a.step === 'kontaktperson') {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Kontaktdaten der Person</h1><p>Alle Angaben sind optional.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         <p class="notiz-baustein-label">Anrede</p>
         <div class="acq-seg"><button type="button" class="filter-chip ${a.anrede==='Herr'?'active':''}" data-acq-anrede="Herr">Herr</button><button type="button" class="filter-chip ${a.anrede==='Frau'?'active':''}" data-acq-anrede="Frau">Frau</button></div>
+        <p class="notiz-baustein-label" style="margin-top:14px">Position / Funktion</p>
+        ${acqPositionChipsHtml()}
         <div class="new-customer-form" style="margin-top:14px">
           <div><label for="acqVorname">Vorname</label><input id="acqVorname" data-acq-field="vorname" type="text" value="${escapeHtml(a.vorname)}"></div>
           <div><label for="acqNachname">Nachname</label><input id="acqNachname" data-acq-field="nachname" type="text" value="${escapeHtml(a.nachname)}"></div>
@@ -2332,8 +2364,8 @@ function acqEnsureContact() {
   const contact = {
     id, externeNr:'', kundenNr:'', bezirk:'', preisliste:a.konditionPL || 'UVP', comm:'bestand', active:true, override:null, abc:null,
     nextFollowUp:null, kundenstatus:'kontakt', herkunft:'kaltakquise',
-    name:a.firma.trim() || acqPersonName() || 'Kaltakquise-Kontakt', branche:a.branche, anrede:a.anrede || '',
-    ansprechpartnerVorname:a.vorname.trim(), ansprechpartnerNachname:a.nachname.trim(),
+    name:a.firma.trim() || acqPersonName() || 'Kaltakquise-Kontakt', branche:a.branche, anrede:a.anrede || '', position:a.position || '',
+    ansprechpartnerVorname:a.vorname.trim(), ansprechpartnerNachname:(a.nachname.trim() || (a.gespraech !== 'ja' ? (a.apName || '').trim() : '')),
     plz:a.plz.trim(), ort:a.ort.trim(), strasse:a.strasse.trim(), hausnummer:a.hausnummer.trim(), email:a.email.trim(), telefon:a.telefon.trim(),
     handelspartner:(a.handelspartner || '').trim(),
     kondition: acqKonditionText(),
@@ -2370,7 +2402,7 @@ function acqBuildCrmReport() {
   const notiz = [(a.notiz || '').trim(), ...angaben.map(l => '– ' + l)].filter(Boolean).join('\n');
   return {
     date: new Date().toISOString().slice(0,10), firma: a.firma || acqPersonName() || '-', branche: a.branche,
-    anrede:a.anrede || '', vorname:a.vorname, nachname:a.nachname, strasse:a.strasse, hausnummer:a.hausnummer, plz:a.plz, ort:a.ort,
+    anrede:a.anrede || '', vorname:a.vorname, nachname:(a.nachname || (a.gespraech !== 'ja' ? (a.apName || '') : '')), position:a.position || '', nichtGesprochen: a.gespraech !== 'ja', strasse:a.strasse, hausnummer:a.hausnummer, plz:a.plz, ort:a.ort,
     telefon:a.telefon, email:a.email, herkunft:'kaltakquise',
     produktbereicheText: [...new Set(prods.map(p => ({surface:'Fläche', hands:'Hände & Haut', instruments:'Instrumente', application:'Applikation'}[p.category] || p.category)))].join(', '),
     handelspartner:(a.handelspartner || '').trim(), kondition: acqKonditionText(),
@@ -3905,7 +3937,7 @@ function buildNewCustomerInnendienstEmail(contact){
     'bitte nachstehenden Kunden ins System eintragen und mir die Kundennummer zusenden:',
     '',
     `Firma: ${contact.name}`,
-    `Ansprechpartner: ${ansprechpartner || '–'}`,
+    `Ansprechpartner: ${ansprechpartner || '–'}${(contact.position || '').trim() ? ' (' + contact.position.trim() + ')' : ''}`,
     `Anschrift: ${[contact.strasse, contact.hausnummer].filter(Boolean).join(' ')}${contact.plz || contact.ort ? ', ' + [contact.plz, contact.ort].filter(Boolean).join(' ') : ''}`,
     `Telefonnummer: ${contact.telefon || '–'}`,
     `E-Mail-Adresse: ${contact.email || '–'}`,
@@ -5031,7 +5063,7 @@ function buildCrmSummary(report = state.visitReport) {
   if (report.firma !== undefined) {
     // Neukunde/Kaltakquise: Firma und konkreter Ansprechpartner inkl. Anrede stehen im Vordergrund,
     // statt eines allgemeinen "Kunde/Einrichtung"-Feldes wie beim klassischen Besuchsbericht.
-    const anredeLabel = report.anrede === 'Frau' ? 'Ansprechpartnerin' : 'Ansprechpartner';
+    const anredeLabel = report.nichtGesprochen ? 'Zuständiger Ansprechpartner (nicht gesprochen)' : (report.anrede === 'Frau' ? 'Ansprechpartnerin' : 'Ansprechpartner');
     const ansprechpartner = [report.anrede, report.vorname, report.nachname].filter(Boolean).join(' ').trim();
     const adresse = [[report.strasse, report.hausnummer].filter(Boolean).join(' '), [report.plz, report.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
     const parts = [
@@ -5040,6 +5072,7 @@ function buildCrmSummary(report = state.visitReport) {
       `Terminart: ${crmTerminart(report)}`,
       ...(report.branche ? [`Branche: ${report.branche}`] : []),
       `${anredeLabel}: ${ansprechpartner || '-'}`,
+      ...((report.position || '').trim() ? [`Position / Funktion: ${report.position.trim()}`] : []),
       `Adresse: ${adresse || '-'}`,
       `Telefon: ${report.telefon || '-'}`,
       `E-Mail: ${report.email || '-'}`,
@@ -5836,6 +5869,7 @@ function bind() {
     const field = e.currentTarget.dataset.field;
     if (field === 'adresse') acqGo('gespraech');
     else if (field === 'kontaktperson') acqGo('haendler');
+    else if (field === 'zustaendig') acqGo('haendler');
     else if (field === 'haendler') acqGo('konditionen');
     else if (field === 'konditionen') { if (state.acq.gespraech === 'ja') acqEnterProdukte(); else acqGo('muster'); }
     else acqAdvance(field);
@@ -5857,6 +5891,7 @@ function bind() {
     state.acq.notiz = cur.includes(text) ? cur.replace(text, '').replace(/\s{2,}/g, ' ').trim() : (cur ? cur + ' ' + text : text);
     render();
   }));
+  document.querySelectorAll('[data-acq-position]').forEach(button => button.onclick = () => { const v = button.dataset.acqPosition; state.acq.position = state.acq.position === v ? '' : v; render(); });
   document.querySelectorAll('[data-acq-anrede]').forEach(button => button.onclick = () => { const v = button.dataset.acqAnrede; state.acq.anrede = state.acq.anrede === v ? '' : v; render(); });
   document.querySelectorAll('[data-acq-wb]').forEach(button => button.onclick = () => { const v = button.dataset.acqWb; const l = state.acq.wettbewerber || []; state.acq.wettbewerber = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; render(); });
   document.querySelectorAll('[data-acq-fb]').forEach(button => button.onclick = () => { const i = Number(button.dataset.acqFb); const l = state.acq.feedbackSel || []; state.acq.feedbackSel = l.includes(i) ? l.filter(x => x !== i) : [...l, i]; render(); });
