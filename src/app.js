@@ -1291,7 +1291,7 @@ function buildStarredProductsEmail() {
   const lines = [`Hallo Team,`, ``, `bitte nachstehende Informationen${inc.muster ? ' an den Kunden senden und die vermerkten Muster bereitstellen' : ' an den Kunden senden'}:`, ``];
   entries.forEach(({product: p, size}) => {
     const price = resolvePrice(p, size);
-    lines.push(`PRODUKT: ${p.name}`, `Artikelnummer: ${resolveArtNr(p, size)}`, `Gebinde: ${size}`);
+    lines.push(`PRODUKT: ${p.name}`, `Artikelnummer: ${resolveArtNr(p, size)}`, `Gebinde: ${size}`, veLineText(p, size));
     if (inc.price && !state.customerMode && !inMesseContext() && price !== undefined && price !== null && price !== '') {
       lines.push(`Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
       const per = perUnitLabel(p, size);
@@ -4019,7 +4019,7 @@ function buildAngebotInnendienstEmail(){
   if (!contact && state.summaryKundenNr.trim()) lines.push(`KD-Nr.: ${state.summaryKundenNr.trim()}`);
   lines.push(`Preisliste: ${state.priceList}`, '');
   entries.forEach(({product, size}) => {
-    lines.push(`PRODUKT: ${product.name}`, `Artikelnummer: ${resolveArtNr(product, size)}`, `Gebinde: ${size}`, '');
+    lines.push(`PRODUKT: ${product.name}`, `Artikelnummer: ${resolveArtNr(product, size)}`, `Gebinde: ${size}`, veLineText(product, size), '');
   });
   const extras = [];
   if (opts.pif) extras.push('Produktinformation');
@@ -4114,7 +4114,7 @@ async function generateAngebotPdf() {
   const rows = entries.map(({product, size}) => {
     const price = resolvePrice(product, size);
     const priceNum = (typeof price === 'number') ? price : parseFloat(price);
-    return [product.name, resolveArtNr(product, size), size, '1', isNaN(priceNum) ? '–' : money(priceNum), isNaN(priceNum) ? '–' : money(priceNum)];
+    return [product.name, resolveArtNr(product, size), size, resolveVE(product, size) || '–', '1', isNaN(priceNum) ? '–' : money(priceNum), isNaN(priceNum) ? '–' : money(priceNum)];
   });
   const total = entries.reduce((sum, {product, size}) => {
     const price = resolvePrice(product, size);
@@ -4125,12 +4125,12 @@ async function generateAngebotPdf() {
   doc.autoTable({
     startY: 96,
     margin: { left: marginX, right: marginX },
-    head: [['Produkt', 'Art.-Nr.', 'Gebinde', 'Menge', 'Einzelpreis', 'Gesamt']],
+    head: [['Produkt', 'Art.-Nr.', 'Gebinde', 'VE', 'Menge', 'Einzelpreis', 'Gesamt']],
     body: rows,
     styles: { font: 'helvetica', fontSize: 9, textColor: dark, cellPadding: 2.5 },
     headStyles: { fillColor: blue, textColor: [255,255,255], fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [240,246,251] },
-    columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+    columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } }
   });
 
   let y = doc.lastAutoTable.finalY + 8;
@@ -5293,7 +5293,7 @@ function saveQuoteItem(key, field, value) {
 }
 
 function exportOfferCsv() {
-  const lines = [['Kunde','Ansprechpartner','Preisliste','Artikelnummer','Produkt','Gebinde','Menge','Rabatt %','Einzelpreis','Gesamtpreis']];
+  const lines = [['Kunde','Ansprechpartner','Preisliste','Artikelnummer','Produkt','Gebinde','VE','Menge','Rabatt %','Einzelpreis','Gesamtpreis']];
   favoriteEntries().forEach(({product: p, size}) => {
     const key = quoteKey(p.id, size);
     const saved=state.quoteItems[key]||{};
@@ -5301,7 +5301,7 @@ function exportOfferCsv() {
     const discount=Math.min(100,Math.max(0,Number(saved.discount)||0));
     const raw=resolvePrice(p,size); const unit=raw===''||raw==null?'':Number(raw);
     const total=unit===''?'':unit*qty*(1-discount/100);
-    lines.push([state.quoteCustomer,state.quoteContact,state.priceList,resolveArtNr(p,size),p.name,size,qty,discount,unit,total]);
+    lines.push([state.quoteCustomer,state.quoteContact,state.priceList,resolveArtNr(p,size),p.name,size,resolveVE(p,size),qty,discount,unit,total]);
   });
   const csv='\ufeff'+lines.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a');
@@ -5328,7 +5328,7 @@ function buildOfferEmail() {
     const unitPrice = rawPrice === '' || rawPrice == null ? null : Number(rawPrice);
     const lineTotal = unitPrice == null ? null : unitPrice * quantity * (1 - discount / 100);
     if (lineTotal != null) subtotal += lineTotal;
-    lines.push(`- ${p.name} (Art.-Nr. ${resolveArtNr(p, size)}), Gebinde ${size}, Menge ${quantity}${discount ? `, Rabatt ${discount}%` : ''}: ${unitPrice != null ? money(unitPrice) + ' / Stück, Summe ' + money(lineTotal) : 'Preis nicht hinterlegt'}`);
+    lines.push(`- ${p.name} (Art.-Nr. ${resolveArtNr(p, size)}), Gebinde ${size}, ${veLineText(p, size)}, Menge ${quantity}${discount ? `, Rabatt ${discount}%` : ''}: ${unitPrice != null ? money(unitPrice) + ' / Stück, Summe ' + money(lineTotal) : 'Preis nicht hinterlegt'}`);
   });
   const vat = subtotal * 0.19;
   const total = subtotal + vat;
@@ -5710,9 +5710,255 @@ function resolvePrice(product, size='') {
   const row = state.priceByArt[resolveArtNr(product, size)];
   return row ? row[state.priceList] : undefined;
 }
+// Verpackungseinheit (VE) je Artikelnummer laut Gesamtkatalog 2026 (Produktübersicht S. 126–134) – Rückfall,
+// wenn keine Preisliste mit VE importiert ist.
+const VE_KATALOG = {
+  '00-050Z-T080': 8,
+  '00-104-020-02': 6,
+  '00-104-050-01': 3,
+  '00-108-003': 12,
+  '00-115-010': 6,
+  '00-115-050': 1,
+  '00-119-050-02': 3,
+  '00-119-FD200': 1,
+  '00-121-010-01': 10,
+  '00-121-020-02': 6,
+  '00-121-050-01': 3,
+  '00-122-010-01': 10,
+  '00-122-020-02': 6,
+  '00-122-050-01': 3,
+  '00-127-050': 3,
+  '00-127-050AT': 3,
+  '00-128-010': 12,
+  '00-128-020': 6,
+  '00-128-050': 3,
+  '00-134-050-01': 3,
+  '00-134-FD200': 1,
+  '00-136-010': 10,
+  '00-136-050': 3,
+  '00-137-050': 3,
+  '00-138-010': 12,
+  '00-138-010-01': 10,
+  '00-138-020-02': 6,
+  '00-138-050-02': 3,
+  '00-150-010': 10,
+  '00-150-020-01': 6,
+  '00-150-050': 3,
+  '00-155-0004': 100,
+  '00-155-010': 6,
+  '00-170-050': 3,
+  '00-170-100': 1,
+  '00-170-FD200': 1,
+  '00-173-050': 3,
+  '00-180-050': 3,
+  '00-181-050': 3,
+  '00-182-010': 12,
+  '00-182-050': 3,
+  '00-183-050': 3,
+  '00-183-FD200': 1,
+  '00-201-010-02': 10,
+  '00-201-050-02': 3,
+  '00-201-100-02': 1,
+  '00-204-010': 10,
+  '00-204-020-01': 6,
+  '00-204-050': 3,
+  '00-204-100': 1,
+  '00-205-010': 10,
+  '00-205-050': 3,
+  '00-205-100': 1,
+  '00-208-005': 20,
+  '00-208-0075': 6,
+  '00-208-010': 10,
+  '00-208-050': 3,
+  '00-208-D100-01': 12,
+  '00-208-ERS100-01': 1,
+  '00-208-R100-01': 12,
+  '00-208-RS100-01': 2,
+  '00-208-T100': 6,
+  '00-214-0004-01': 200,
+  '00-214-010': 10,
+  '00-214-050': 3,
+  '00-214-250': 1,
+  '00-235-D100': 12,
+  '00-235-T100': 6,
+  '00-245-0002-01': 300,
+  '00-245-010-01': 10,
+  '00-245-050-01': 3,
+  '00-245-250-01': 1,
+  '00-255-0004': 100,
+  '00-255-010': 6,
+  '00-270-020': 6,
+  '00-270-OSEB120': 4,
+  '00-270-T072': 6,
+  '00-323-010': 10,
+  '00-323-050': 3,
+  '00-323-100-01': 1,
+  '00-323-RS120': 2,
+  '00-323DS-005': 20,
+  '00-323DS-0075-02': 6,
+  '00-323DS-010': 10,
+  '00-323DS-025': 3,
+  '00-323DS-050': 3,
+  '00-323DS-100': 1,
+  '00-323DS-OSEB120': 4,
+  '00-323DS-T060': 9,
+  '00-323DS-T100': 6,
+  '00-401-0015-02': 20,
+  '00-401-0025': 30,
+  '00-401-005-02': 20,
+  '00-401-010-03': 12,
+  '00-401-050-01': 3,
+  '00-401-T100-01': 12,
+  '00-403OP-0015-01': 20,
+  '00-403OP-005': 20,
+  '00-403OP-010': 12,
+  '00-407OP-0015': 20,
+  '00-407OP-0015-30': 20,
+  '00-407OP-005': 20,
+  '00-407OP-005-30': 20,
+  '00-407OP-010': 12,
+  '00-407OP-010-30': 12,
+  '00-409-0015-02': 20,
+  '00-409-005-01': 20,
+  '00-409-010-01': 12,
+  '00-410OP-0015': 20,
+  '00-410OP-005': 20,
+  '00-410OP-010': 12,
+  '00-457OP-0005-01': 25,
+  '00-457OP-001': 20,
+  '00-457OP-0015': 20,
+  '00-457OP-005': 20,
+  '00-457OP-010': 12,
+  '00-457OP-050': 3,
+  '00-457OP-B007': 8,
+  '00-457OP-B007L': 8,
+  '00-485OP-0005': 25,
+  '00-485OP-001': 20,
+  '00-485OP-0015': 20,
+  '00-485OP-005-01': 20,
+  '00-485OP-010-01': 12,
+  '00-485OP-050-01': 3,
+  '00-501OP-0025': 20,
+  '00-501OP-010': 10,
+  '00-502OP-010': 10,
+  '00-530-H001': 30,
+  '00-530-T010': 24,
+  '00-531-005': 20,
+  '00-531-010': 12,
+  '00-531-050': 3,
+  '00-602-001-03': 12,
+  '00-602-005-03': 20,
+  '00-602DS-001': 12,
+  '00-602DS-005': 20,
+  '00-604DW1-T010-01': 24,
+  '00-605-001': 12,
+  '00-605-005': 20,
+  '00-607-005-01': 20,
+  '00-607-010-01': 12,
+  '00-609-0025-01': 9,
+  '00-609-005-01': 6,
+  '00-609-050-01': 3,
+  '00-614-005-03': 20,
+  '00-614-010-03': 12,
+  '00-620HC-001-01': 12,
+  '00-620HC-005-01': 20,
+  '00-622IS-001': 12,
+  '00-622IS-005': 20,
+  '00-622OP-001-02': 12,
+  '00-623-001-01': 12,
+  '00-623-005-01': 20,
+  '00-623-B007': 8,
+  '00-623-B007L': 8,
+  '00-627-001': 12,
+  '00-631OP-005-01': 20,
+  '00-631OP-010-01': 12,
+  '00-631OP-050-01': 3,
+  '00-631OP-B007': 8,
+  '00-631OP-B007L': 8,
+  '00-639HI6-T050': 8,
+  '00-639NK-T080': 12,
+  '00-639NK-T080-01': 12,
+  '00-803-020-01': 6,
+  '00-803-050': 3,
+  '00-805-0025': 9,
+  '00-805-005': 6,
+  '00-813-050': 3,
+  '00-814-050-01': 3,
+  '00-817-050-01': 3,
+  '00-818-050-01': 3,
+  '00-901-005-01': 1,
+  '00-901-005-OEP': 1,
+  '00-901-010-01': 1,
+  '00-901-010-OEP': 1,
+  '00-901-105-01': 1,
+  '00-901-110-01': 1,
+  '00-901-210': 1,
+  '00-901-220': 1,
+  '00-901-401-01': 1,
+  '00-901-405-01': 1,
+  '00-901-410-01': 1,
+  '00-901-505-01': 1,
+  '00-901-510-01': 1,
+  '00-901-905': 1,
+  '00-901-910': 1,
+  '00-903-005-01': 1,
+  '00-903-010-01': 1,
+  '00-904V-DT': 1,
+  '00-905-005': 1,
+  '00-905-010': 1,
+  '00-906-0004': 1,
+  '00-906-030': 1,
+  '00-908-010': 1,
+  '00-908-040': 1,
+  '00-911-005TL-01': 1,
+  '00-911-010TL': 1,
+  '00-911-010TO': 1,
+  '00-912-010': 1,
+  '00-915-BW12006-01': 6,
+  '00-915-OSEB120-01': 4,
+  '00-915-OSEE100-01': 2,
+  '00-915-RD10003-01': 3,
+  '00-915-RD10006-01': 6,
+  '00-915-RD5003-01': 3,
+  '00-915-RD7003-01': 3,
+  '00-915-REW10003-01': 3,
+  '00-915-REW10006-01': 6,
+  '00-915-REW11006': 6,
+  '00-915-REW5003-01': 3,
+  '00-915-SD001': 1,
+  '00-915-SD002': 6,
+  '00-915-SE001': 1,
+  '00-915-SE002': 6,
+  '00-915-SE003': 1,
+  '00-915-SKD001': 1,
+  '00-915-SKD002': 6,
+  '00-918-005': 1,
+  '00-918-010': 1,
+  '00-918-105': 1,
+  '00-918-110': 1,
+  '00-918-110-01': 1,
+  'EIM-OT03KOMNABL-02': 1,
+  'EIM-OT03KOMNAGR-02': 1,
+  'EIM-OT03KOMNARO-02': 1,
+  'EIM-OT03KOMNAWE-02': 1,
+  'EIM-OT05KOMNABL-02': 1,
+  'EIM-OT05KOMNAGR-02': 1,
+  'EIM-OT05KOMNARO-02': 1,
+  'EIM-OT05KOMNAWE-02': 1,
+  'EIM-OT05WB06': 1,
+  'EIM-OT05WE06': 1,
+  'EIM-OT05WGR06': 1,
+  'EIM-OT05WRO06': 1
+};
 function resolveVE(product, size='') {
-  const row = state.priceByArt[resolveArtNr(product, size)];
-  return (row && row.ve) || '';
+  const art = resolveArtNr(product, size);
+  const row = state.priceByArt[art];
+  return (row && row.ve) || (VE_KATALOG[art] ? String(VE_KATALOG[art]) : '');
+}
+// „VE: 20 Stück“ – immer vorhanden, bei unbekannter VE „–“.
+function veLineText(product, size='') {
+  const ve = resolveVE(product, size);
+  return `VE: ${ve ? ve + ' Stück' : '–'}`;
 }
 function resolvePal(product, size='') {
   const row = state.priceByArt[resolveArtNr(product, size)];
