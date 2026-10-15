@@ -453,6 +453,7 @@ const state = {
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
   summaryNotiz: localStorage.getItem('summaryNotiz') || '',
+  ncStash: null,
   docLinks: (() => { try { return {pif:false, sdb:false, ba:false, ...JSON.parse(localStorage.getItem('docLinks') || '{}')}; } catch (e) { return {pif:false, sdb:false, ba:false}; } })(),
   // Weitere Ansprechpartner beim Bestandskunden (z. B. zweiter Kontakt in derselben
   // Einrichtung) — werden sowohl im CRM-Eintrag aufgeführt als auch als CC in die
@@ -712,6 +713,7 @@ function render() {
   // window.scrollTo allein nicht greift).
   if (viewChanged && state.screen === 'akquise') { const m = document.querySelector('main.acq-page'); if (m && m.scrollIntoView) m.scrollIntoView({block:'start'}); }
   acqPersistDraft();
+  persistNcStash();
 }
 document.addEventListener('input', () => { if (state.screen === 'akquise') acqPersistDraft(); });
 
@@ -1799,11 +1801,11 @@ function acqSpeicherKundeLabel() {
 // Auch Eingaben aus einem begonnenen Kundenbesuch / einer Zusammenfassung (Name, KD-Nr., Notiz) bleiben
 // gespeichert, bis ein neuer Kunde angelegt wird.
 function wizardHasCustomerData() {
-  return !!(state.summaryCustomer.trim() || state.summaryKundenNr.trim() || state.summaryNotiz.trim());
+  return !!(state.summaryCustomer.trim() || state.summaryKundenNr.trim() || state.summaryNotiz.trim() || ncHasData(state.ncStash) || ncHasData(state.newCustomer));
 }
 function wizardSpeicherKundeLabel() {
-  const name = [state.summarySalutation, state.summaryCustomer.trim()].filter(Boolean).join(' ');
-  return [state.summaryCustomer.trim() ? name : '', state.summaryKundenNr.trim() ? 'KD-Nr. ' + state.summaryKundenNr.trim() : ''].filter(Boolean).join(' · ') || 'Gesprächsnotiz vorhanden';
+  const name = (salutationPrefix() + state.summaryCustomer.trim()).trim();
+  return [ncStashLabel(), state.summaryCustomer.trim() ? name : '', state.summaryKundenNr.trim() ? 'KD-Nr. ' + state.summaryKundenNr.trim() : ''].filter(Boolean).join(' · ') || 'Gesprächsnotiz vorhanden';
 }
 function maybeAskSpeicherKunde() {
   state.summaryUseAcq = false;
@@ -2580,7 +2582,34 @@ function modalCloseBtn(){
 // Kundenname werden hier bewusst NICHT mitgesichert — die gehören zum weiterlaufenden
 // Kundengespräch und sind erst mit "Speicher löschen – neuer Kunde" wirklich abgeschlossen
 // (sonst entstünde bei jedem Ablauf-Neustart ein Verlaufs-Eintrag für denselben Kunden).
+// Anrede (Herr/Frau) gilt nur, wenn sie tatsächlich gewählt wurde – sonst keine geratene Anrede.
+function salutationKnown() { try { return !!localStorage.getItem('summarySalutation'); } catch (e) { return false; } }
+function salutationPrefix() { return salutationKnown() ? state.summarySalutation + ' ' : ''; }
+// Unfertiger Neukunden-Entwurf: bleibt gemerkt (auch nach Neustart), bis ein neuer Kunde begonnen wird.
+function ncHasData(nc) { return !!(nc && nc.draft && Object.values(nc.draft).some(v => typeof v === 'string' && v.trim())); }
+function stashNewCustomer() { if (ncHasData(state.newCustomer)) state.ncStash = state.newCustomer; }
+function ncStashLabel() {
+  const d = state.ncStash && state.ncStash.draft;
+  if (!d) return '';
+  return [d.firma, [d.anrede, d.vorname, d.nachname].filter(Boolean).join(' ').trim(), [d.plz, d.ort].filter(Boolean).join(' ')].filter(x => x && x.trim()).join(' · ');
+}
+function persistNcStash() {
+  try {
+    const nc = ncHasData(state.newCustomer) ? state.newCustomer : state.ncStash;
+    if (ncHasData(nc)) localStorage.setItem('ncStash', JSON.stringify({draft: nc.draft, contactId: nc.contactId || null}));
+    else localStorage.removeItem('ncStash');
+  } catch (e) {}
+}
+function restoreNcStash() {
+  try {
+    const raw = localStorage.getItem('ncStash');
+    if (!raw) return;
+    const o = JSON.parse(raw);
+    if (o && o.draft) state.ncStash = { draft: {...newCustomerDraftDefault(), ...o.draft}, contactId: o.contactId || null, produktbereiche: [], myPos:null, locating:false, locateError:'' };
+  } catch (e) {}
+}
 function closeAnyModal(){
+  stashNewCustomer();
   archiveUnsavedNewCustomerDraft();
   state.summaryStep = null;
   state.summaryPurpose = null;
@@ -2594,6 +2623,7 @@ function closeAnyModal(){
 }
 function startSummaryFlow(){
   archiveUnsavedNewCustomerDraft();
+  stashNewCustomer();
   state.screen = 'summary';
   state.summaryStep = 'purpose';
   state.summaryPurpose = null;
@@ -2612,6 +2642,7 @@ function startSummaryFlow(){
 // zu springen.
 function startKundenbesuchFlow(){
   archiveUnsavedNewCustomerDraft();
+  stashNewCustomer();
   state.screen = 'summary';
   state.summaryStep = 'kundentyp';
   state.summaryPurpose = 'crm';
@@ -2632,6 +2663,7 @@ function startKundenbesuchFlow(){
 // dass der Kontakt neu angelegt werden soll.
 function startAngebotFlow(){
   archiveUnsavedNewCustomerDraft();
+  stashNewCustomer();
   state.screen = 'summary';
   state.summaryStep = 'kundentyp';
   state.summaryPurpose = 'angebot';
@@ -4269,7 +4301,7 @@ function buildCustomerSummaryEmail(){
   const entries=favoriteEntries();
   const branche = currentSummaryBranche();
   const contactName=state.summaryCustomer.trim();
-  const salutation=contactName?`Hallo ${state.summarySalutation} ${contactName}`:'Hallo';
+  const salutation=contactName?`Hallo ${salutationPrefix()}${contactName}`:'Hallo';
   const occasion=state.summaryOccasion.trim()||'unser heutiges Gespräch';
   const ccContacts = state.summaryAdditionalContacts || [];
   const lines=[
@@ -4356,7 +4388,7 @@ function buildKaltakquiseNachfassEmail(){
     ? [contact.anrede, contact.ansprechpartnerVorname, contact.ansprechpartnerNachname].filter(Boolean).join(' ').trim()
     : '';
   const salutationName = ansprechpartner || state.summaryCustomer.trim();
-  const salutation = salutationName ? `Hallo ${state.summarySalutation} ${salutationName}` : 'Hallo';
+  const salutation = salutationName ? `Hallo ${contact && contact.anrede ? '' : salutationPrefix()}${salutationName}` : 'Hallo';
   const wasVorOrt = state.summaryOccasion === 'den Termin';
   const kontaktHatte = state.summaryKontaktHatte === 'ja';
   // Interesse lässt sich nur bewerten, wenn überhaupt ein Gespräch stattfand — ohne Kontakt
@@ -5242,7 +5274,7 @@ function buildQuickCrmEntry(){
     notiz: state.summaryNotiz.trim(),
     musterWanted: !!state.musterWanted, musterListe: computeMusterListe(entries),
     date: oneToday(),
-    contacts: state.summaryCustomer.trim() ? [state.summarySalutation, state.summaryCustomer.trim()].filter(Boolean).join(' ') : '-',
+    contacts: state.summaryCustomer.trim() ? (salutationPrefix() + state.summaryCustomer.trim()) : '-',
     additionalContacts: state.summaryAdditionalContacts.slice(),
     type: state.summaryOccasion.trim() || 'Produktvorstellung',
     products,
@@ -6299,6 +6331,9 @@ function bind() {
   }));
   $('[data-action="occasion-back-purpose"]')?.addEventListener('click', () => { state.summaryStep = 'purpose'; render(); });
   $('[data-action="speicherkunde-ja"]')?.addEventListener('click', () => {
+    // Unfertigen Neukunden-Entwurf wiederherstellen (Adresse usw. sind sofort wieder da).
+    if (ncHasData(state.ncStash) && !state.newCustomer) { state.newCustomer = state.ncStash; }
+    state.ncStash = null;
     state.summaryUseAcq = true;
     state.summaryStep = state.summaryAfterSpeicher || 'kundentyp';
     state.summaryAfterSpeicher = null;
@@ -6309,6 +6344,7 @@ function bind() {
     // (Favoriten bleiben; der bisherige Stand landet im Verlauf „Letzte Kundengespräche“).
     if (acqHasCustomerData()) { acqReset(); acqPersistDraft(); }
     if (wizardHasCustomerData()) resetCustomerData(true, false, true);
+    state.ncStash = null; state.newCustomer = null; persistNcStash();
     state.summaryUseAcq = false;
     state.summaryStep = state.summaryAfterSpeicher || 'kundentyp';
     state.summaryAfterSpeicher = null;
@@ -6361,6 +6397,9 @@ function bind() {
       state.summaryStep = 'angebotKunde';
     } else {
       if (state.summaryUseAcq && !state.summaryCustomer.trim()) { state.summaryCustomer = acqPersonName() || state.acq.firma.trim(); localStorage.setItem('summaryCustomer', state.summaryCustomer); }
+      if (state.summaryUseAcq && state.acq.anrede && !salutationKnown()) { state.summarySalutation = state.acq.anrede; localStorage.setItem('summarySalutation', state.acq.anrede); }
+      // Anrede und Name sind schon bekannt (gespeicherter Kunde): nicht noch einmal abfragen.
+      if (salutationKnown() && state.summaryCustomer.trim()) { state.summaryStep = 'produktbereiche'; render(); return; }
       // Bestandskunde durchläuft jetzt denselben Ablauf wie Neukunde: erst Ansprechpartner
       // (hier per Anrede+Name statt Adressformular, da schon bekannt), dann Produktbereiche,
       // Muster, Gesprächsnotiz und Rückmeldung & Ergebnis — exakt dieselben Abfragen.
@@ -7231,6 +7270,7 @@ function resetCustomerData(silent, clearFavorites, stay) {
   state.summaryCustomer = '';
   state.summaryKundenNr = '';
   state.summaryNotiz = '';
+  state.ncStash = null; state.newCustomer = null; try { localStorage.removeItem('ncStash'); } catch (e) {}
   state.docLinks = {pif:false, sdb:false, ba:false}; try { localStorage.removeItem('docLinks'); } catch (e) {}
   state.summarySalutation = 'Herr';
   state.summaryAdditionalContacts = [];
@@ -10043,6 +10083,7 @@ function bindOne(){
 }
 
 acqRestoreDraft();
+restoreNcStash();
 render();
 // Selbst-Update: GitHub Pages liefert index.html bis zu 10 Min. aus dem Browser-Cache — dann würde ein
 // Gerät noch die alte Version zeigen. Beim Start (und beim Zurückkehren auf die Startseite) wird die
