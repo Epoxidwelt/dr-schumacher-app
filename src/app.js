@@ -5112,64 +5112,103 @@ function crmAddAktion(text) {
 }
 // Terminart im CRM-Text bewusst nur „Termin“ oder „Kaltakquise“.
 function crmTerminart(report) { return report && report.herkunft === 'kaltakquise' ? 'Kaltakquise' : 'Termin'; }
+// Fettschrift in reinem Text (mailto): Unicode-Mathe-Fett (Sans-Serif Bold). Umlaute = Grundbuchstabe + Trema.
+function uBold(str) {
+  const um = {'ä':'a','ö':'o','ü':'u','Ä':'A','Ö':'O','Ü':'U'};
+  const one = ch => {
+    const c = ch.codePointAt(0);
+    if (c >= 65 && c <= 90) return String.fromCodePoint(0x1D5D4 + c - 65);
+    if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D5EE + c - 97);
+    if (c >= 48 && c <= 57) return String.fromCodePoint(0x1D7EC + c - 48);
+    if (um[ch]) return one(um[ch]) + '̈';
+    return ch;
+  };
+  return [...String(str)].map(one).join('');
+}
 function buildCrmSummary(report = state.visitReport) {
-  const date = report.date ? new Date(report.date+'T12:00:00').toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE');
+  const dateFmt = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('de-DE') : '-';
+  const date = report.date ? dateFmt(report.date) : new Date().toLocaleDateString('de-DE');
+  const L = (label, value) => `${uBold(label)}: ${value}`;
+  const LK = (label, value) => `${uBold(label)}: ${uBold(value)}`;           // Schlüsselangaben: Wert ebenfalls fett
+  const H = text => uBold(text.toUpperCase());                                 // Abschnitts-Überschrift
+  const muster = report.musterWanted ? musterSummaryLines(report.musterListe).map(l => /:$/.test(l) ? uBold(l.slice(0, -1)) + ':' : l) : [];
+  const aktionen = aktionStarredTitles();
+  const join = (title, sections) => [title, ...sections.flatMap(([h, lines]) => ['', H(h), ...lines])].join('\n');
   if (report.firma !== undefined) {
-    // Neukunde/Kaltakquise: Firma und konkreter Ansprechpartner inkl. Anrede stehen im Vordergrund,
-    // statt eines allgemeinen "Kunde/Einrichtung"-Feldes wie beim klassischen Besuchsbericht.
+    // Neukunde/Kaltakquise: Firma und konkreter Ansprechpartner inkl. Anrede stehen im Vordergrund.
     const anredeLabel = report.nichtGesprochen ? 'Zuständiger Ansprechpartner (nicht gesprochen)' : (report.anrede === 'Frau' ? 'Ansprechpartnerin' : 'Ansprechpartner');
     const ansprechpartner = [report.anrede, report.vorname, report.nachname].filter(Boolean).join(' ').trim();
     const adresse = [[report.strasse, report.hausnummer].filter(Boolean).join(' '), [report.plz, report.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-    const parts = [
-      `${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : 'Neukunde'} vom ${date}`,
-      `Firma: ${report.firma || '-'}`,
-      `Terminart: ${crmTerminart(report)}`,
-      ...(report.branche ? [`Branche: ${report.branche}`] : []),
-      `${anredeLabel}: ${ansprechpartner || '-'}`,
-      ...((report.position || '').trim() ? [`Position / Funktion: ${report.position.trim()}`] : []),
-      `Adresse: ${adresse || '-'}`,
-      `Telefon: ${report.telefon || '-'}`,
-      `E-Mail: ${report.email || '-'}`,
-      ...((report.handelspartner || '').trim() ? [`Handelspartner: ${report.handelspartner.trim()}`] : []),
-      ...((report.kondition || '').trim() ? [`Konditionen: ${report.kondition.trim()}`] : []),
-      `Besprochene Produktbereiche: ${report.produktbereicheText || '-'}`,
-      `Besprochene Produkte: ${report.produkteText || '-'}`,
-      `Gesprächsnotiz: ${report.notiz || '-'}`,
-      `Aktueller Wettbewerber: ${report.wettbewerber || '-'}`,
-      `Vertragslaufzeit beim aktuellen Anbieter: ${report.vertragBis ? new Date(report.vertragBis+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
-      `Feedback / Bedarf: ${report.feedback || '-'}`,
-      `Muster / Unterlagen: ${report.samples || 'Keine'}`,
-      ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
-      ...(report.unterlagen ? [`Unterlagen als Link mitgesendet: ${report.unterlagen}`] : []),
-      `Ergebnis: ${report.result || 'Offen'}`,
-      `Herkunft: ${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'}`,
-      `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
-      `Nächster Schritt: ${report.nextSteps || report.type || '-'}`
-    ];
-    return crmAddAktion(parts.join('\n'));
+    const title = uBold(`${report.herkunft === 'kaltakquise' ? 'Kaltakquise' : 'Neukunde'} vom ${date}`);
+    return join(title, [
+      ['Kunde', [
+        LK('Firma', report.firma || '-'),
+        L('Terminart', crmTerminart(report)),
+        ...(report.branche ? [L('Branche', report.branche)] : []),
+        LK(anredeLabel, ansprechpartner || '-'),
+        ...((report.position || '').trim() ? [L('Position / Funktion', report.position.trim())] : []),
+        L('Adresse', adresse || '-'),
+        L('Telefon', report.telefon || '-'),
+        L('E-Mail', report.email || '-'),
+        ...((report.handelspartner || '').trim() ? [L('Handelspartner', report.handelspartner.trim())] : []),
+        ...((report.kondition || '').trim() ? [L('Konditionen', report.kondition.trim())] : [])
+      ]],
+      ['Gespräch', [
+        L('Besprochene Produktbereiche', report.produktbereicheText || '-'),
+        L('Besprochene Produkte', report.produkteText || '-'),
+        ...(aktionen.length ? [L('Besprochene Aktion', aktionen.join(', '))] : []),
+        L('Gesprächsnotiz', report.notiz || '-')
+      ]],
+      ['Wettbewerb & Bedarf', [
+        L('Aktueller Wettbewerber', report.wettbewerber || '-'),
+        L('Vertragslaufzeit beim aktuellen Anbieter', dateFmt(report.vertragBis)),
+        L('Feedback / Bedarf', report.feedback || '-')
+      ]],
+      ['Muster & Unterlagen', [
+        L('Muster / Unterlagen', report.samples || 'Keine'),
+        ...muster,
+        ...(report.unterlagen ? [L('Unterlagen als Link mitgesendet', report.unterlagen)] : [])
+      ]],
+      ['Ergebnis & nächste Schritte', [
+        LK('Ergebnis', report.result || 'Offen'),
+        L('Herkunft', report.herkunft === 'kaltakquise' ? 'Kaltakquise' : '-'),
+        L('Follow-up', dateFmt(report.followUp)),
+        L('Nächster Schritt', report.nextSteps || report.type || '-')
+      ]]
+    ]);
   }
-  const parts = [
-    `Besuchsbericht vom ${date}`,
-    `Kunde/Einrichtung: ${report.customer || '-'}`,
-    `KD-Nr.: ${report.kundenNr || '-'}`,
-    `Ansprechpartner: ${report.contacts || '-'}`,
-    ...((report.additionalContacts && report.additionalContacts.length) ? [`Weitere Ansprechpartner: ${report.additionalContacts.map(c => `${c.anrede} ${c.name}${c.email ? ' (' + c.email + ')' : ''}`).join('; ')}`] : []),
-    `Terminart: ${crmTerminart(report)}`,
-    `Ausgangssituation / aktuelle Produkte: ${report.current || '-'}`,
-    `Besprochene Produkte: ${report.products || '-'}`,
-    `Gesprächsnotiz: ${report.notiz || '-'}`,
-    `Aktueller Wettbewerber: ${report.wettbewerber || '-'}`,
-    `Vertragslaufzeit beim aktuellen Anbieter: ${report.vertragBis ? new Date(report.vertragBis+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
-    `Feedback und Bedarf: ${report.feedback || '-'}`,
-    `Muster / Unterlagen: ${report.samples || 'Keine'}`,
-    ...(report.musterWanted ? musterSummaryLines(report.musterListe) : []),
-    ...(report.unterlagen ? [`Unterlagen als Link mitgesendet: ${report.unterlagen}`] : []),
-    `Ergebnis: ${report.result || 'Offen'}`,
-    `Nächste Schritte: ${report.nextSteps || '-'}`,
-    `Follow-up: ${report.followUp ? new Date(report.followUp+'T12:00:00').toLocaleDateString('de-DE') : '-'}`,
-    `Verantwortlich: ${report.owner || '-'}`
-  ];
-  return crmAddAktion(parts.join('\n'));
+  const title = uBold(`Besuchsbericht vom ${date}`);
+  return join(title, [
+    ['Kunde', [
+      LK('Kunde/Einrichtung', report.customer || '-'),
+      L('KD-Nr.', report.kundenNr || '-'),
+      LK('Ansprechpartner', report.contacts || '-'),
+      ...((report.additionalContacts && report.additionalContacts.length) ? [L('Weitere Ansprechpartner', report.additionalContacts.map(c => `${c.anrede} ${c.name}${c.email ? ' (' + c.email + ')' : ''}`).join('; '))] : []),
+      L('Terminart', crmTerminart(report))
+    ]],
+    ['Gespräch', [
+      L('Ausgangssituation / aktuelle Produkte', report.current || '-'),
+      L('Besprochene Produkte', report.products || '-'),
+      ...(aktionen.length ? [L('Besprochene Aktion', aktionen.join(', '))] : []),
+      L('Gesprächsnotiz', report.notiz || '-')
+    ]],
+    ['Wettbewerb & Bedarf', [
+      L('Aktueller Wettbewerber', report.wettbewerber || '-'),
+      L('Vertragslaufzeit beim aktuellen Anbieter', dateFmt(report.vertragBis)),
+      L('Feedback und Bedarf', report.feedback || '-')
+    ]],
+    ['Muster & Unterlagen', [
+      L('Muster / Unterlagen', report.samples || 'Keine'),
+      ...muster,
+      ...(report.unterlagen ? [L('Unterlagen als Link mitgesendet', report.unterlagen)] : [])
+    ]],
+    ['Ergebnis & nächste Schritte', [
+      LK('Ergebnis', report.result || 'Offen'),
+      L('Nächste Schritte', report.nextSteps || '-'),
+      L('Follow-up', dateFmt(report.followUp)),
+      L('Verantwortlich', report.owner || '-')
+    ]]
+  ]);
 }
 
 function currentRepUser(){
@@ -6386,9 +6425,9 @@ function bind() {
   $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : 'angebotask'; render(); });
   $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : 'angebotask'; render(); });
   $('[data-action="occasion-back-innendienstask"]')?.addEventListener('click', () => { state.summaryStep = 'innendienstask'; render(); });
-  // Nach der letzten Frage des Ablaufs wird alles auf 0 gesetzt (bisheriger Stand landet – begrenzt auf
-  // die letzten 15 Kontakte – im Verlauf „Letzte Kundengespräche“).
-  $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; resetCustomerData(true); });
+  // Nach der letzten Frage bleiben die Daten gespeichert: beim nächsten Start fragt die App, ob mit
+  // diesem Kunden weitergemacht oder ein neuer Kunde (bei 0) begonnen wird.
+  $('[data-action="angebot-ask-no"]')?.addEventListener('click', () => { state.summaryStep = null; state.screen = 'menu'; render(); });
   $('[data-action="angebot-ask-yes"]')?.addEventListener('click', () => { state.summaryStep = 'angebotOptionen'; render(); });
   $('[data-action="occasion-back-angebotask"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
   $('[data-action="occasion-back-angebotkunde"]')?.addEventListener('click', () => { state.summaryStep = 'angebotKunde'; render(); });
@@ -6403,7 +6442,7 @@ function bind() {
     localStorage.setItem('priceList', state.priceList);
     render();
   }));
-  $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; resetCustomerData(true); });
+  $('[data-action="angebot-senden"]')?.addEventListener('click', () => { sendAngebotInnendienstEmail(); state.summaryStep = null; state.screen = 'menu'; render(); });
   $('[data-action="angebot-pdf-senden"]')?.addEventListener('click', () => { sendAngebotPdfToCustomer(); });
   document.querySelectorAll('[data-action="modal-close"]').forEach(btn => btn.addEventListener('click', closeAnyModal));
   document.querySelectorAll('.modal-overlay').forEach(overlay => overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAnyModal(); }));
