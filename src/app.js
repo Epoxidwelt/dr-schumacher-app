@@ -447,7 +447,7 @@ const state = {
   advisor: {category:'', subtype:'', need:''},
   idea: {bereich:'', kategorie:'', kategorieSonstiges:'', text:'', sentOk:false, editingId:null},
   savedIdeas: JSON.parse(localStorage.getItem('savedIdeas') || '[]'),
-  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'', position:'', apName:'', wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
+  acq: {branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'', myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'', position:'', apName:'', anlass:'', wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', step:'branche', history:[], gespraech:null, vorname:'', nachname:'', telefon:'', email:'', produkteBesprochen:null, produktKategorie:null, interesse:null, interesseIds:[], musterHinterlassen:null, musterEintraege:[], musterSuche:'', infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false}, terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'], previewTo:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false, editingId:null, fromHistory:false, contactId:null, crmDone:false, innendienstDone:false},
   savedAcq: JSON.parse(localStorage.getItem('savedAcq') || '[]').slice(0, 15),
   compareIds: JSON.parse(localStorage.getItem('compareIds') || '[]'),
   summaryCustomer: localStorage.getItem('summaryCustomer') || '',
@@ -1729,7 +1729,7 @@ function acqReset() {
   state.acqArrangeMode = false;
   state.acq = {
     branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
-    myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'', position:'', apName:'',
+    myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'', position:'', apName:'', anlass:'',
     wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', 
     step:'branche', history:[],
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
@@ -1796,10 +1796,19 @@ function acqSpeicherKundeLabel() {
 }
 // Beim Start von Angebot / Kundenzusammenfassung / Kundenbesuch: liegt noch ein Kunde aus der
 // Kaltakquise im Speicher, wird zuerst gefragt, ob mit diesem Kunden fortgefahren werden soll.
+// Auch Eingaben aus einem begonnenen Kundenbesuch / einer Zusammenfassung (Name, KD-Nr., Notiz) bleiben
+// gespeichert, bis ein neuer Kunde angelegt wird.
+function wizardHasCustomerData() {
+  return !!(state.summaryCustomer.trim() || state.summaryKundenNr.trim() || state.summaryNotiz.trim());
+}
+function wizardSpeicherKundeLabel() {
+  const name = [state.summarySalutation, state.summaryCustomer.trim()].filter(Boolean).join(' ');
+  return [state.summaryCustomer.trim() ? name : '', state.summaryKundenNr.trim() ? 'KD-Nr. ' + state.summaryKundenNr.trim() : ''].filter(Boolean).join(' · ') || 'Gesprächsnotiz vorhanden';
+}
 function maybeAskSpeicherKunde() {
   state.summaryUseAcq = false;
   state.summaryAfterSpeicher = null;
-  if (!acqHasCustomerData()) return;
+  if (!acqHasCustomerData() && !wizardHasCustomerData()) return;
   state.summaryAfterSpeicher = state.summaryStep;
   state.summaryStep = 'speicherkunde';
 }
@@ -1937,11 +1946,22 @@ function buildAcqEmail() {
   let subject = 'Rückmeldung zu unserem Kontakt';
 
   if (!gespraech) {
-    body.push('ich möchte Ihnen gerne das für Ihren Betrieb passende Angebot von Dr. Schumacher vorstellen.');
-    body.push('Ein persönliches Gespräch ist bisher noch nicht zustande gekommen.');
+    if (a.anlass === 'telefon') {
+      body.push('ich habe heute versucht, Sie telefonisch zu erreichen – leider hat es nicht geklappt.');
+      body.push('Gerne möchte ich Ihnen kurz das für Ihren Betrieb passende Angebot von Dr. Schumacher vorstellen.');
+    } else if (a.anlass === 'vorort' || a.anlass === 'netzwerk') {
+      body.push('ich war heute bei Ihnen vor Ort, konnte Sie dabei aber leider nicht persönlich antreffen.');
+      body.push('Gerne möchte ich Ihnen kurz das für Ihren Betrieb passende Angebot von Dr. Schumacher vorstellen.');
+    } else {
+      body.push('ich möchte Ihnen gerne das für Ihren Betrieb passende Angebot von Dr. Schumacher vorstellen.');
+      body.push('Ein persönliches Gespräch ist bisher noch nicht zustande gekommen.');
+    }
     subject = 'Der richtige Kontakt für eine kurze Vorstellung';
   } else {
-    body.push('vielen Dank für das kurze Gespräch.');
+    if (a.anlass === 'telefon') body.push('vielen Dank für das nette Telefongespräch.');
+    else if (a.anlass === 'vorort') body.push('vielen Dank für das persönliche Gespräch heute bei Ihnen vor Ort.');
+    else if (a.anlass === 'netzwerk') body.push(`schön, dass wir uns heute vor Ort kurz ausgetauscht haben – auch ohne festen Termin.${besprochen.length ? ' Wir haben uns dabei über ' + besprochen.join(', ') + ' unterhalten.' : ''}`);
+    else body.push('vielen Dank für das kurze Gespräch.');
     if (!besprochen.length) {
       body.push('Konkrete Produkte haben wir noch nicht besprochen. Deshalb möchte ich zunächst erfahren, welche Themen und Anforderungen für Ihren Betrieb aktuell relevant sind.');
       subject = 'Anknüpfend an unser kurzes Gespräch';
@@ -2186,6 +2206,19 @@ function acqScreenInner() {
       ${acqHistoryListHtml()}
     </main>`;
   }
+  if (a.step === 'anlass') {
+    const opt = (v, label, sub) => `<button type="button" class="answer-button ${a.anlass===v?'active':''}" data-acq-anlass="${v}"><strong>${label}</strong><small style="display:block;font-weight:500;opacity:.8">${sub}</small></button>`;
+    return `<main class="page advisor-page">
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Wie war der Kontakt?</h1><p>Ein Klick – die E-Mail wird passend formuliert.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <section class="advisor-card">
+        <div class="acq-stack">
+          ${opt('vorort','Vor Ort','persönlich bei der Einrichtung')}
+          ${opt('telefon','Telefonat','telefonisch Kontakt aufgenommen')}
+          ${opt('netzwerk','Netzwerken','kurzer Austausch, kein fester Termin')}
+        </div>
+      </section>
+    </main>`;
+  }
   if (a.step === 'gespraech') return acqYesNoStep({eyebrow:'Kaltakquise', field:'gespraech', question:'Mit jemandem gesprochen?'});
   if (a.step === 'zustaendig') {
     return `<main class="page advisor-page">
@@ -2372,7 +2405,7 @@ function acqEnsureContact() {
     handelspartner:(a.handelspartner || '').trim(),
     kondition: acqKonditionText(),
     notiz:(a.notiz || '').trim(), produktbereiche:[...new Set(prods.map(p => p.category))], produkte:prods.map(p => p.name).join(', '),
-    musterWanted: acqMusterListe().length > 0, musterListe: acqMusterListe(), wettbewerber: acqWettbewerberText(), feedback: acqFeedbackText(), samples: acqMusterListe().length ? 'Muster dagelassen' : 'Keine', result: a.result || 'Offen', vertragBis: a.vertragBis || null
+    musterWanted: acqMusterListe().length > 0, musterListe: acqMusterListe(), wettbewerber: acqWettbewerberText(), feedback: acqFeedbackText(), samples: acqMusterListe().length ? 'Muster übergeben' : 'Keine', result: a.result || 'Offen', vertragBis: a.vertragBis || null
   };
   contact.nextFollowUp = a.followUp || null;
   state.one.contacts.push(contact);
@@ -2391,6 +2424,7 @@ function acqBuildCrmReport() {
   const aktionenTitel = aktionenStarred().map(ak => ak.titel).filter(Boolean);
   const docLabels = [a.infoDocs && a.infoDocs.pif ? 'PIF' : '', a.infoDocs && a.infoDocs.sdb ? 'SDB' : '', a.infoDocs && a.infoDocs.ba ? 'BA' : ''].filter(Boolean);
   const angaben = [
+    a.anlass ? `Kontaktart: ${({vorort:'Vor Ort', telefon:'Telefonat', netzwerk:'Netzwerken (ohne festen Termin)'})[a.anlass]}` : '',
     `Gespräch geführt: ${a.gespraech === 'ja' ? 'ja' : 'nein'}`,
     a.produkteBesprochen === 'ja' ? `Interesse an besprochenen Produkten: ${a.interesse === 'ja' ? 'ja (' + a.interesseIds.map(acqProductName).join(', ') + ')' : 'nein'}` : '',
     a.infoGewuenscht === 'ja' ? `Weitere Informationen gewünscht zu: ${a.infoIds.map(acqProductName).join(', ')}${docLabels.length ? ' (' + docLabels.join(', ') + ')' : ''}` : '',
@@ -2410,7 +2444,7 @@ function acqBuildCrmReport() {
     handelspartner:(a.handelspartner || '').trim(), kondition: acqKonditionText(),
     unterlagen: (a.infoGewuenscht === 'ja' && a.infoIds.length) ? docLabels.join(', ') : '',
     produkteText: prods.map(p => p.name).join(', '), notiz, wettbewerber: acqWettbewerberText(), vertragBis: a.vertragBis || '', feedback: acqFeedbackText(),
-    samples: muster.length ? 'Muster dagelassen' : 'Keine', result: a.result || 'Offen',
+    samples: muster.length ? 'Muster übergeben' : 'Keine', result: a.result || 'Offen',
     followUp: a.followUp || (termine.length ? termine[0].slice(0,10) : ''), nextSteps: termine.length ? 'Termin wahrnehmen' : 'Termin vereinbaren',
     owner: state.repName || '-', musterWanted: musterListe.length > 0, musterListe
   };
@@ -3491,8 +3525,8 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">Kunde im Speicher</span>
         <h2>Mit diesem Kunden fortfahren?</h2>
-        <p>Aus der Kaltakquise ist noch gespeichert:</p>
-        <p><strong>${escapeHtml(acqSpeicherKundeLabel())}</strong></p>
+        ${acqHasCustomerData() ? `<p>Aus der Kaltakquise ist noch gespeichert:</p><p><strong>${escapeHtml(acqSpeicherKundeLabel())}</strong></p>` : ''}
+        ${wizardHasCustomerData() ? `<p>Aus dem letzten Kundenbesuch ist noch gespeichert:</p><p><strong>${escapeHtml(wizardSpeicherKundeLabel())}</strong></p>` : ''}
         <p class="muted-copy">Bei „Ja“ werden die Daten übernommen – im nächsten Schritt wählst du weiterhin Bestandskunde oder Neukunde.</p>
         <div class="modal-choices">
           <button class="modal-choice" data-action="speicherkunde-ja">${icon('pm')}<span>Ja, Daten übernehmen</span></button>
@@ -3632,7 +3666,9 @@ function occasionPromptModal() {
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.notiz} von ${total}</span>
         <h2>Gesprächsnotiz</h2>
-        <p>Kundenbedarf, Interesse, Einwände, Rückrufwunsch, nächste Schritte …</p>
+        <p>Einfach einsprechen oder tippen: Kundenbedarf, Interesse, Einwände, Rückrufwunsch, nächste Schritte …</p>
+        <label class="modal-field"><textarea id="occasionNotiz" rows="6" autofocus placeholder="Hier einsprechen oder tippen …">${escapeHtml(state.summaryNotiz)}</textarea></label>
+        <details class="notiz-optional"><summary>Bausteine zum Antippen (optional)</summary>
         <div class="notiz-bausteine">
           ${bausteinGroups.map(([key,title]) => `<div class="notiz-baustein-group">
             <span class="notiz-baustein-label">${escapeHtml(title)}</span>
@@ -3641,7 +3677,7 @@ function occasionPromptModal() {
             </div>
           </div>`).join('')}
         </div>
-        <label class="modal-field"><textarea id="occasionNotiz" rows="4" placeholder="Gesprächsnotiz (optional)">${escapeHtml(state.summaryNotiz)}</textarea></label>
+        </details>
         <div class="modal-actions">
           <button class="secondary-button compact" data-action="occasion-back-musterfrage">Zurück</button>
           <button class="primary-button compact" data-action="notiz-weiter">Weiter</button>
@@ -4212,6 +4248,23 @@ function setDocLink(key, on) {
   state.docLinks = {...state.docLinks, [key]: !!on};
   try { localStorage.setItem('docLinks', JSON.stringify(state.docLinks)); } catch (e) {}
 }
+// Einleitung der Kunden-Zusammenfassung – locker und passend zum Anlass (Telefonat / Vor Ort / Netzwerken).
+function summaryIntro(entries, occasion) {
+  const occ = state.summaryOccasion;
+  const names = [...new Set(entries.map(e => e.product.name))];
+  const nameText = names.length <= 3 ? names.join(', ') : `${names.slice(0, 3).join(', ')} und weiteren Produkten`;
+  if (occ === 'das freundliche Telefonat') return `vielen Dank für das nette Telefongespräch! Hier kurz und knapp zusammengefasst, was für Sie interessant sein könnte – mit den Vorteilen, die für Sie den größten Mehrwert bieten:`;
+  if (occ === 'den Termin') return `vielen Dank für das persönliche Gespräch heute bei Ihnen vor Ort! Hier kurz zusammengefasst, was wir besprochen haben – mit den Vorteilen, die für Sie den größten Mehrwert bieten:`;
+  if (occ === 'das Netzwerken') return `schön, dass wir uns heute vor Ort kurz ausgetauscht haben – auch ohne festen Termin${names.length ? `. Wir haben uns über ${nameText} unterhalten` : ''}. Hier die wichtigsten Punkte in Kürze:`;
+  return `vielen Dank für ${occasion}. Wie besprochen fasse ich Ihnen nachfolgend die für Sie passenden Produkte von Dr. Schumacher zusammen – mit den Vorteilen, die für Sie den größten Mehrwert bieten:`;
+}
+function summarySubject() {
+  const occ = state.summaryOccasion;
+  if (occ === 'das freundliche Telefonat') return 'Unser Telefonat – kurz zusammengefasst (Dr. Schumacher)';
+  if (occ === 'den Termin') return 'Unser Gespräch vor Ort – kurz zusammengefasst (Dr. Schumacher)';
+  if (occ === 'das Netzwerken') return 'Schön, dass wir uns ausgetauscht haben (Dr. Schumacher)';
+  return 'Ihr Mehrwert im Überblick – Zusammenfassung unseres Gesprächs (Dr. Schumacher)';
+}
 function buildCustomerSummaryEmail(){
   const entries=favoriteEntries();
   const branche = currentSummaryBranche();
@@ -4222,7 +4275,7 @@ function buildCustomerSummaryEmail(){
   const lines=[
     `${salutation},`,
     ``,
-    `vielen Dank für ${occasion}. Wie besprochen fasse ich Ihnen nachfolgend die für Sie passenden Produkte von Dr. Schumacher zusammen – mit den Vorteilen, die für Sie den größten Mehrwert bieten:`,
+    summaryIntro(entries, occasion),
     ``,
     ...(ccContacts.length ? [`In Kopie: ${ccContacts.map(c => `${c.anrede} ${c.name}`).join(', ')}`, ``] : [])
   ];
@@ -4269,7 +4322,7 @@ function buildCustomerSummaryEmail(){
     '',
     'Mit freundlichen Grüßen'
   );
-  return {subject:`Ihr Mehrwert im Überblick – Zusammenfassung unseres Gesprächs (Dr. Schumacher)`, body:lines.join('\n')};
+  return {subject: summarySubject(), body:lines.join('\n')};
 }
 function sendCustomerSummaryEmail(){
   if(!state.favorites.length && !aktionenStarred().length)return;
@@ -5869,7 +5922,7 @@ function bind() {
   });
   $('[data-action="acq-advance"]')?.addEventListener('click', (e) => {
     const field = e.currentTarget.dataset.field;
-    if (field === 'adresse') acqGo('gespraech');
+    if (field === 'adresse') acqGo('anlass');
     else if (field === 'kontaktperson') acqGo('haendler');
     else if (field === 'zustaendig') acqGo('haendler');
     else if (field === 'haendler') acqGo('konditionen');
@@ -5893,6 +5946,7 @@ function bind() {
     state.acq.notiz = cur.includes(text) ? cur.replace(text, '').replace(/\s{2,}/g, ' ').trim() : (cur ? cur + ' ' + text : text);
     render();
   }));
+  document.querySelectorAll('[data-acq-anlass]').forEach(button => button.onclick = () => { state.acq.anlass = button.dataset.acqAnlass; acqGo('gespraech'); render(); });
   document.querySelectorAll('[data-acq-position]').forEach(button => button.onclick = () => { const v = button.dataset.acqPosition; state.acq.position = state.acq.position === v ? '' : v; render(); });
   document.querySelectorAll('[data-acq-anrede]').forEach(button => button.onclick = () => { const v = button.dataset.acqAnrede; state.acq.anrede = state.acq.anrede === v ? '' : v; render(); });
   document.querySelectorAll('[data-acq-wb]').forEach(button => button.onclick = () => { const v = button.dataset.acqWb; const l = state.acq.wettbewerber || []; state.acq.wettbewerber = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; render(); });
@@ -5966,9 +6020,10 @@ function bind() {
     render();
   });
   $('[data-action="speicherkunde-nein"]')?.addEventListener('click', () => {
-    // Anderer Kunde: die gespeicherten Kaltakquise-Daten werden verworfen (Favoriten bleiben).
-    acqReset();
-    acqPersistDraft();
+    // Anderer Kunde: die gespeicherten Daten werden verworfen und der Kundenbesuch startet bei 0
+    // (Favoriten bleiben; der bisherige Stand landet im Verlauf „Letzte Kundengespräche“).
+    if (acqHasCustomerData()) { acqReset(); acqPersistDraft(); }
+    if (wizardHasCustomerData()) resetCustomerData(true, false, true);
     state.summaryUseAcq = false;
     state.summaryStep = state.summaryAfterSpeicher || 'kundentyp';
     state.summaryAfterSpeicher = null;
@@ -6193,6 +6248,8 @@ function bind() {
   $('[data-action="notiz-weiter"]')?.addEventListener('click', () => {
     state.summaryNotiz = (($('#occasionNotiz')||{}).value || '').trim();
     localStorage.setItem('summaryNotiz', state.summaryNotiz);
+    // Wurden Muster dagelassen, ist „Muster übergeben“ im Ergebnis voreingestellt (bleibt änderbar).
+    if ((state.crmSamples || 'Keine') === 'Keine' && computeMusterListe(favoriteEntries()).some(m => m.status === 'dagelassen')) state.crmSamples = 'Muster übergeben';
     if (state.newCustomer) newCustomerSave();
     state.summaryStep = 'ergebnis';
     render();
@@ -6878,7 +6935,7 @@ function customerHistoryScreen() {
   </main>`;
 }
 
-function resetCustomerData(silent, clearFavorites) {
+function resetCustomerData(silent, clearFavorites, stay) {
   const quiet = silent === true;
   const dropFavorites = clearFavorites === true;
   if (!quiet && !confirm('Daten des aktuellen Kundengesprächs löschen? Kundenzusammenfassung, Angebotsentwurf, Besuchsbericht-Entwurf, Messe-Erfassung und der Konzept-Gesprächsstand (besprochene Bereiche, eigene Bereiche, Hersteller-Auswahl) werden zurückgesetzt. Favoriten (★), Preise, bereits gespeicherte Besuchsberichte und branchentypische Hersteller-Vorschläge bleiben erhalten.')) return;
@@ -6937,6 +6994,7 @@ function resetCustomerData(silent, clearFavorites) {
   // Zurücksetzen am Ende eines Ablaufs lässt ihn bestehen, bis ein neuer Kunde erfasst wird.
   if (!quiet) { acqReset(); acqPersistDraft(); }
   if (!quiet) alert('Kundendaten wurden zurückgesetzt. Bereit für den nächsten Termin.');
+  if (stay === true) return;
   state.summaryStep = null;
   state.screen = 'menu';
   render();
