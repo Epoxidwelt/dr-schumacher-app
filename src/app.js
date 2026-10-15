@@ -714,8 +714,14 @@ function render() {
   if (viewChanged && state.screen === 'akquise') { const m = document.querySelector('main.acq-page'); if (m && m.scrollIntoView) m.scrollIntoView({block:'start'}); }
   acqPersistDraft();
   persistNcStash();
+  persistWizardDraft();
 }
-document.addEventListener('input', () => { if (state.screen === 'akquise') acqPersistDraft(); });
+document.addEventListener('input', e => {
+  if (state.screen === 'akquise') acqPersistDraft();
+  // Gesprächsnotiz sofort mitschreiben (nicht erst beim Klick auf „Weiter“).
+  if (e.target && e.target.id === 'occasionNotiz') { state.summaryNotiz = e.target.value; try { localStorage.setItem('summaryNotiz', state.summaryNotiz); } catch (err) {} }
+  persistWizardDraft();
+});
 
 
 function profileScreen() {
@@ -2585,6 +2591,24 @@ function modalCloseBtn(){
 // Anrede (Herr/Frau) gilt nur, wenn sie tatsächlich gewählt wurde – sonst keine geratene Anrede.
 function salutationKnown() { try { return !!localStorage.getItem('summarySalutation'); } catch (e) { return false; } }
 function salutationPrefix() { return salutationKnown() ? state.summarySalutation + ' ' : ''; }
+// Alle Angaben des laufenden Kundenbesuchs (Gesprächsnotiz, Wettbewerber, Feedback, Muster, Follow-up …) bleiben
+// unverändert gespeichert, bis ein neuer Kunde angelegt wird – auch nach Verklicken, Schließen oder Neustart.
+const WIZARD_DRAFT_KEYS = ['summaryNotiz','summaryBranche','musterWanted','musterCycleIndex','musterMengen','crmWettbewerber','crmWettbewerberCustomOpen','crmWettbewerberCustomText','crmFeedback','crmFeedbackSelected','crmSamples','crmResult','crmFollowUpWanted','crmFollowUpDate','crmVertragBisWanted','crmVertragBisDate'];
+function persistWizardDraft() {
+  try {
+    const o = {};
+    WIZARD_DRAFT_KEYS.forEach(k => { o[k] = state[k]; });
+    localStorage.setItem('wizardDraft', JSON.stringify(o));
+  } catch (e) {}
+}
+function restoreWizardDraft() {
+  try {
+    const raw = localStorage.getItem('wizardDraft');
+    if (!raw) return;
+    const o = JSON.parse(raw);
+    WIZARD_DRAFT_KEYS.forEach(k => { if (o[k] !== undefined) state[k] = o[k]; });
+  } catch (e) {}
+}
 // Unfertiger Neukunden-Entwurf: bleibt gemerkt (auch nach Neustart), bis ein neuer Kunde begonnen wird.
 function ncHasData(nc) { return !!(nc && nc.draft && Object.values(nc.draft).some(v => typeof v === 'string' && v.trim())); }
 function stashNewCustomer() { if (ncHasData(state.newCustomer)) state.ncStash = state.newCustomer; }
@@ -7270,7 +7294,7 @@ function resetCustomerData(silent, clearFavorites, stay) {
   state.summaryCustomer = '';
   state.summaryKundenNr = '';
   state.summaryNotiz = '';
-  state.ncStash = null; state.newCustomer = null; try { localStorage.removeItem('ncStash'); } catch (e) {}
+  state.ncStash = null; state.newCustomer = null; try { localStorage.removeItem('ncStash'); localStorage.removeItem('wizardDraft'); } catch (e) {}
   state.docLinks = {pif:false, sdb:false, ba:false}; try { localStorage.removeItem('docLinks'); } catch (e) {}
   state.summarySalutation = 'Herr';
   state.summaryAdditionalContacts = [];
@@ -10084,6 +10108,7 @@ function bindOne(){
 
 acqRestoreDraft();
 restoreNcStash();
+restoreWizardDraft();
 render();
 // Selbst-Update: GitHub Pages liefert index.html bis zu 10 Min. aus dem Browser-Cache — dann würde ein
 // Gerät noch die alte Version zeigen. Beim Start (und beim Zurückkehren auf die Startseite) wird die
