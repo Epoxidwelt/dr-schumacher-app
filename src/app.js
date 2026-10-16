@@ -3676,7 +3676,7 @@ function followUpQuickDate(v) {
   }
   return oneAddDays(oneToday(), Number(v));
 }
-const ERGEBNIS_WETTBEWERBER_OPTIONS = ['Schülke','Bode','Ecolab','B. Braun'];
+const ERGEBNIS_WETTBEWERBER_OPTIONS = ['Schülke','Bode / Hartmann','B. Braun','Ecolab','Dr. Weigert','Antiseptica'];
 // Baustein-Text beim erneuten Antippen wieder herausnehmen (Toggle statt Duplikat). Wurde der
 // eingefügte Satz zwischenzeitlich manuell verändert, greift kein Fall mehr — dann bleibt der
 // Text unangetastet, statt versehentlich fremden Text zu löschen.
@@ -4656,7 +4656,7 @@ function competitionScreen(){
       <label>Unser Produkt<select id="vsProduct"><option value="">Bitte wählen…</option>${PRODUCTS.map(p=>`<option value="${p.id}" ${p.id===v.productId?'selected':''}>${p.name}</option>`).join('')}</select></label>
       ${calc.product ? `<label>Gebinde<select id="vsSize">${calc.product.sizes.map(s=>`<option ${s===calc.size?'selected':''}>${s}</option>`).join('')}</select></label>` : '<div></div>'}
       ${(() => {
-        const suggestions = calc.product ? competitorSuggestions(calc.product.kind) : [];
+        const suggestions = calc.product ? competitorSuggestions(calc.product.kind, calc.product.id) : [];
         const isKnown = suggestions.includes(v.competitorName);
         const isCustom = v.competitorCustom || (!!v.competitorName.trim() && !isKnown);
         if (!suggestions.length) return `<label>Wettbewerber<input id="vsCompetitorName" value="${escapeHtml(v.competitorName)}" placeholder="Hersteller / Produktname"></label>`;
@@ -4825,8 +4825,27 @@ const COMPETITOR_BY_KIND = {
   'Vliestuchspendersysteme': ['Bode – Cleansafe Wipes System', 'Schülke – System-Eimer', 'Diversey'],
   'Wandspender & Zubehör': ['OPHARDT Hygiene', 'CWS', 'Deb Stoko']
 };
-function competitorSuggestions(kind) {
-  return COMPETITOR_BY_KIND[kind] || [];
+// Direkte Gegenspieler je Produkt (Stand 10/2026, aus Hersteller-Produktinformationen abgeleitet) – haben Vorrang
+// vor den Kategorie-Vorschlägen. Beispiel: ULTRASOL OXY WIPES ↔ Schülke mikrozid PAA+ wipes.
+const COMPETITOR_BY_PRODUCT = {
+  'ultrasol-oxy-wipes': ['Schülke – mikrozid PAA+ wipes', 'Schülke – mikrozid PAA wipes'],
+  'ultrasol-oxy-wipes-xl': ['Schülke – mikrozid PAA+ wipes', 'Schülke – mikrozid PAA wipes'],
+  'descosept-sensitive-wipes': ['Schülke – mikrozid universal wipes premium', 'Bode/Hartmann – Bacillol AF Tissues'],
+  'descosept-sensitive-wipes-xl': ['Schülke – mikrozid universal wipes premium', 'Bode/Hartmann – Bacillol AF Tissues'],
+  'descosept-pur-wipes-rtu': ['Schülke – mikrozid universal wipes premium', 'Bode/Hartmann – Bacillol AF Tissues'],
+  'descosept-spezial-wipes': ['Schülke – mikrozid sensitive wipes', 'Bode/Hartmann – Bacillol 30 Sensitive Tissues'],
+  'cleanisept-wipes': ['Schülke – mikrozid sensitive wipes', 'Bode/Hartmann – Bacillol 30 Sensitive Tissues'],
+  'cleanisept-wipes-maxi': ['Schülke – mikrozid sensitive wipes', 'Bode/Hartmann – Bacillol 30 Sensitive Tissues'],
+  'aseptoman-viral': ['Bode/Hartmann – Sterillium Virugard'],
+  'aseptoman-forte': ['Bode/Hartmann – Sterillium Virugard'],
+  'aseptoman-parfümfrei': ['Bode/Hartmann – Sterillium classic pure', 'B. Braun – Softa-Man pure'],
+  'descoderm': ['Bode/Hartmann – Sterillium classic pure', 'B. Braun – Softa-Man pure'],
+  'ultrasol-active': ['Schülke – perform classic concentrate OXY']
+};
+function competitorSuggestions(kind, productId) {
+  const direct = (productId && COMPETITOR_BY_PRODUCT[productId]) || [];
+  const byKind = COMPETITOR_BY_KIND[kind] || [];
+  return [...direct, ...byKind.filter(x => !direct.includes(x))];
 }
 
 const PRODUCT_MANAGERS = [
@@ -7124,7 +7143,7 @@ function bind() {
     render();
   });
   $('[data-action="discard-scan"]')?.addEventListener('click', () => { state.messeScanPreview = null; state.messeScanStatus = ''; render(); });
-  $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); const patch={productId:e.target.value, size:p?p.sizes[0]:''}; if (p && !state.vsCompare.competitorName.trim()) { const suggestions=competitorSuggestions(p.kind); if (suggestions.length){ patch.competitorName=suggestions[0]; patch.competitorCustom=false; } } saveVsCompare(patch); render(); });
+  $('#vsProduct')?.addEventListener('change', e => { const p=PRODUCTS.find(x=>x.id===e.target.value); const patch={productId:e.target.value, size:p?p.sizes[0]:''}; if (p && !state.vsCompare.competitorName.trim()) { const suggestions=competitorSuggestions(p.kind, p.id); if (suggestions.length){ patch.competitorName=suggestions[0]; patch.competitorCustom=false; } } saveVsCompare(patch); render(); });
   $('#vsSize')?.addEventListener('change', e => { saveVsCompare({size:e.target.value}); render(); });
   $('#vsCompetitorName')?.addEventListener('input', e => { saveVsCompare({competitorName:e.target.value}); render(); });
   $('#vsCompetitorSelect')?.addEventListener('change', e => { const custom = e.target.value === '__custom__'; saveVsCompare(custom ? {competitorCustom:true} : {competitorName:e.target.value, competitorCustom:false}); render(); });
