@@ -479,3 +479,21 @@
 .aktion-pick.on .aktion-check{color:#e8a317}
 .answer-button:disabled{opacity:.4;cursor:not-allowed}
 .price-card-detail .primary-button.compact{margin-top:10px}
+/* Reklamation */
+.category-card.reklamation{background:linear-gradient(140deg,#c2410c,#f59e0b)}
+.rekl-row{padding:12px;border-bottom:1px solid #e3ecf4}
+.rekl-row:last-child{border-bottom:0}
+.rekl-row-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rekl-row-head strong{flex:1;min-width:0}
+.rekl-row-head select{padding:8px 10px;border-radius:10px;border:1px solid #c9d9e8;background:#fff;font:inherit;max-width:100%}
+.rekl-row-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.rekl-row-fields label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;font-weight:700;color:#42576d}
+.rekl-row-fields input{padding:9px;border-radius:10px;border:1px solid #c9d9e8;font:inherit;font-weight:500;min-width:0}
+@media(max-width:520px){.rekl-row-fields{grid-template-columns:1fr 1fr}.rekl-row-fields label:last-child{grid-column:1/-1}}
+.rekl-list{border:1px solid #d6e2ee;border-radius:14px;background:#fff;overflow:hidden}
+.rekl-row-head{flex-wrap:nowrap}
+.rekl-row-head strong{overflow-wrap:anywhere}
+.rekl-row-head select{flex:0 1 46%}
+.rekl-row-fields input{width:100%;box-sizing:border-box}
+.rekl-row-fields label{min-width:0}
+.rekl-row-head .danger-link{border:0;background:transparent;font-size:1.25rem;padding:6px 8px;color:#b4232c;cursor:pointer}

@@ -454,6 +454,7 @@ const state = {
   summaryKundenNr: localStorage.getItem('summaryKundenNr') || '',
   summaryNotiz: localStorage.getItem('summaryNotiz') || '',
   ncStash: null,
+  rekl: reklDefault(),
   docLinks: (() => { try { return {pif:false, sdb:false, ba:false, ...JSON.parse(localStorage.getItem('docLinks') || '{}')}; } catch (e) { return {pif:false, sdb:false, ba:false}; } })(),
   // Weitere Ansprechpartner beim Bestandskunden (z. B. zweiter Kontakt in derselben
   // Einrichtung) — werden sowohl im CRM-Eintrag aufgeführt als auch als CC in die
@@ -560,6 +561,7 @@ const moneyPerUnit = (value) => value === undefined || value === null || value =
 function icon(name) {
   const icons = {
     surface:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>',
+    reklamation:'<svg viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3Z"/><path d="M12 10v5M12 18v.4"/></svg>',
     hands:'<svg viewBox="0 0 24 24"><path d="M7 12V5a1.5 1.5 0 0 1 3 0v5-7a1.5 1.5 0 0 1 3 0v7-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v8c0 5-3 8-8 8-4 0-7-2-8-6l-1-4a1.6 1.6 0 0 1 3-1l2 4z"/></svg>',
     instruments:'<svg viewBox="0 0 24 24"><path d="M5 20 19 6M7 4l3 3-3 3-3-3 3-3Zm10 10 3 3-3 3-3-3 3-3Z"/></svg>',
     application:'<svg viewBox="0 0 24 24"><path d="M9 3h6v3H9zM8 6h8l2 5v10H6V11l2-5Zm2 6h4"/></svg>',
@@ -637,7 +639,7 @@ const debouncedRender = debounce(render, 150);
 let lastViewKey = null;
 let lastModalStepKey = null;
 function currentViewKey() {
-  return [state.screen, state.category, state.selected, state.screen === 'akquise' ? state.acq.step : ''].join(':');
+  return [state.screen, state.category, state.selected, state.screen === 'akquise' ? state.acq.step : (state.screen === 'reklamation' ? state.rekl.step + (state.rekl.sentOk ? '-sent' : '') : '')].join(':');
 }
 
 function render() {
@@ -688,6 +690,7 @@ function render() {
   if (state.screen === 'aktionen') html = header(true) + aktionenScreen() + bottomNav('home');
   if (state.screen === 'wirkspektrum') html = header(true) + wirkspektrumScreen() + bottomNav('home');
   if (state.screen === 'akquise') html = header(true) + acqScreen();
+  if (state.screen === 'reklamation') html = header(true) + reklScreen();
   if (state.screen === 'konzept') html = header(true) + konzeptScreen() + bottomNav('home');
   if (state.screen === 'aroundme') html = header(true) + aroundMeScreen() + bottomNav('home');
   if (state.summaryStep) html += occasionPromptModal();
@@ -711,16 +714,18 @@ function render() {
   window.scrollTo(0, viewChanged ? 0 : scrollY);
   // Kaltakquise: jeder neue Schritt startet sichtbar ganz oben (auch wenn die Seite eingebettet ist und
   // window.scrollTo allein nicht greift).
-  if (viewChanged && state.screen === 'akquise') { const m = document.querySelector('main.acq-page'); if (m && m.scrollIntoView) m.scrollIntoView({block:'start'}); }
+  if (viewChanged && (state.screen === 'akquise' || state.screen === 'reklamation')) { const m = document.querySelector('main.acq-page'); if (m && m.scrollIntoView) m.scrollIntoView({block:'start'}); }
   acqPersistDraft();
   persistNcStash();
   persistWizardDraft();
+  reklPersist();
 }
 document.addEventListener('input', e => {
   if (state.screen === 'akquise') acqPersistDraft();
   // Gesprächsnotiz sofort mitschreiben (nicht erst beim Klick auf „Weiter“).
   if (e.target && e.target.id === 'occasionNotiz') { state.summaryNotiz = e.target.value; try { localStorage.setItem('summaryNotiz', state.summaryNotiz); } catch (err) {} }
   persistWizardDraft();
+  if (state.screen === 'reklamation') reklPersist();
 });
 
 
@@ -783,7 +788,7 @@ function coreCategoryGrid() {
 // "Anordnen"-Modus selbst zurechtlegen (lokal auf dem eigenen Gerät gespeichert). Diese Liste
 // ist nur der Ausgangszustand; neu hinzukommende Kacheln werden an bestehende Reihenfolgen
 // automatisch hinten angehängt.
-const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','meinekontakte','smartmailing','advisor','wirkspektrum','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
+const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','reklamation','meinekontakte','smartmailing','advisor','wirkspektrum','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
 function orderedToolCards(toolCards) {
   const order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder : DASHBOARD_TOOL_KEYS_DEFAULT;
   const byKey = new Map(toolCards.map(c => [c[0], c]));
@@ -882,6 +887,7 @@ function menuScreen() {
     ['instruments','Instrumente','Aufbereitung & Desinfektion'],
     ['application','Applikation','Spendersysteme & Zubehör'],
     ['aroundme','Rund um mich','Kunden in der Nähe finden oder nach Kliniken, Praxen usw. suchen'],
+    ['reklamation','Reklamation', reklTileSubtitle()],
     ['kundenbesuch','Kundenbesuch', acqHasData() ? `Kaltakquise offen: ${acqOpenLabel()} – hier geht es weiter` : 'Bestandskunde oder Kaltakquise – ein gemeinsamer Ablauf'],
     ['meinekontakte','Meine Kontakte','Ihre freigegebenen Kunden und zuletzt angelegten Kontakte'],
     ['smartmailing','Smart Mailing','Viele Kunden gezielt und persönlich per E-Mail informieren'],
@@ -903,7 +909,7 @@ function menuScreen() {
     ['all','Alle Funktionen','Gesamte Produktübersicht öffnen']
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
-  if (!can('sales')) cards = cards.filter(card => !['compare','offer','angebot','summary','kundenbesuch','meinekontakte','smartmailing','akquise','aktionen'].includes(card[0]));
+  if (!can('sales')) cards = cards.filter(card => !['compare','offer','angebot','summary','kundenbesuch','reklamation','meinekontakte','smartmailing','akquise','aktionen'].includes(card[0]));
   if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = orderedToolCards(cards.filter(c => !coreKeys.includes(c[0])));
@@ -2509,6 +2515,152 @@ function acqVorschauScreen() {
     ${acqAbschlussHtml()}
     ${acqHistoryListHtml()}
   </main>`;
+}
+
+
+// ===== Reklamation: geführter Ablauf (Kontakt → Produkt → Beschreibung → Zusammenfassung → Innendienst) =====
+const REKL_GRUENDE = ['Produktmangel / Qualität','Verpackung beschädigt / undicht','Falsch- oder Fehllieferung','Wirksamkeit / Anwendung','Haltbarkeit / MHD','Spender / Pumpe defekt','Geruch / Konsistenz / Farbe','Hautverträglichkeit / Reaktion','Sonstiges'];
+const REKL_WUENSCHE = ['Ersatzlieferung','Gutschrift','Rückruf / Kontakt','Abholung / Rücksendung','Nur zur Information'];
+const REKL_STEPS = ['kontakt','produkt','beschreibung','zusammenfassung'];
+function reklDefault() {
+  return { step:'kontakt', history:[], firma:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', kundenNr:'',
+    produkte:[], suche:'', gruende:[], wuensche:[], beschreibung:'', previewSubject:'', previewBody:'', previewTouched:false, sentOk:false };
+}
+function reklHasData() {
+  const r = state.rekl;
+  return !!(r && (r.firma || r.vorname || r.nachname || r.telefon || r.email || r.strasse || r.plz || r.ort || r.kundenNr || r.produkte.length || r.gruende.length || r.beschreibung || r.step !== 'kontakt' || r.sentOk));
+}
+function reklPersist() { try { if (!reklHasData()) localStorage.removeItem('reklDraft'); else localStorage.setItem('reklDraft', JSON.stringify(state.rekl)); } catch (e) {} }
+function reklRestore() { try { const raw = localStorage.getItem('reklDraft'); if (raw) state.rekl = {...reklDefault(), ...JSON.parse(raw)}; } catch (e) {} }
+function reklReset() { state.rekl = reklDefault(); reklPersist(); }
+function reklLabel() { const r = state.rekl; return r.firma.trim() || [r.vorname, r.nachname].filter(Boolean).join(' ').trim() || 'Reklamation'; }
+function reklTileSubtitle() { return reklHasData() && !state.rekl.sentOk ? `Offen: ${reklLabel()} – hier geht es weiter` : 'Kundenreklamation aufnehmen und an den Innendienst melden'; }
+function reklGo(step) { const r = state.rekl; r.history.push(r.step); r.step = step; if (step === 'zusammenfassung' && !r.previewTouched) { const m = reklBuildEmail(); r.previewSubject = m.subject; r.previewBody = m.body; } }
+function reklBack() { const r = state.rekl; const prev = r.history.pop(); if (prev) r.step = prev; }
+function reklKey(id, size) { return id + '|' + (size || ''); }
+function reklEntryKey(e) { return reklKey(e.id, e.size); }
+function reklProductLabel(e) { const p = PRODUCTS.find(x => x.id === e.id); return (p ? p.name : e.id) + (e.size ? ' · ' + e.size : ''); }
+function reklValid(step) {
+  const r = state.rekl;
+  if (step === 'kontakt') return !!(r.firma.trim() || r.nachname.trim());
+  if (step === 'produkt') return r.produkte.length > 0;
+  if (step === 'beschreibung') return !!(r.beschreibung.trim() || r.gruende.length);
+  return true;
+}
+function reklBuildEmail() {
+  const r = state.rekl;
+  const B = uBold;
+  const L = (label, value) => `${B(label)}: ${value}`;
+  const person = [r.anrede, r.vorname, r.nachname].filter(Boolean).join(' ').trim();
+  const adresse = [[r.strasse, r.hausnummer].filter(Boolean).join(' '), [r.plz, r.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const lines = [
+    'Hallo Team,', '',
+    'ich habe beim Kunden eine Reklamation aufgenommen. Bitte legt dazu einen Vorgang an und gebt mir die Reklamationsnummer durch.', '',
+    B('KUNDE'),
+    L('Firma', B(r.firma.trim() || '-')),
+    L('Ansprechpartner', B(person || '-')),
+    ...(r.kundenNr.trim() ? [L('KD-Nr.', r.kundenNr.trim())] : []),
+    L('Telefon', r.telefon.trim() || '-'),
+    L('E-Mail', r.email.trim() || '-'),
+    L('Adresse', adresse || '-'),
+    '', B('PRODUKT')
+  ];
+  r.produkte.forEach(e => {
+    const p = PRODUCTS.find(x => x.id === e.id);
+    lines.push(`▸ ${p ? p.name : e.id}${e.size ? ' · ' + e.size : ''}`);
+    if (p) lines.push(`   Artikelnummer: ${resolveArtNr(p, e.size)}`);
+    if ((e.menge || '').trim()) lines.push(`   Betroffene Menge: ${e.menge.trim()}`);
+    if ((e.charge || '').trim()) lines.push(`   Charge / LOT: ${e.charge.trim()}`);
+    if ((e.mhd || '').trim()) lines.push(`   MHD: ${e.mhd.trim()}`);
+  });
+  lines.push('', B('GRUND DER REKLAMATION'));
+  if (r.gruende.length) lines.push(L('Art', r.gruende.map(i => REKL_GRUENDE[i]).filter(Boolean).join(', ')));
+  lines.push(L('Beschreibung', r.beschreibung.trim() || '-'));
+  if (r.wuensche.length) lines.push(L('Gewünscht vom Kunden', r.wuensche.map(i => REKL_WUENSCHE[i]).filter(Boolean).join(', ')));
+  lines.push('', 'Danke und Grüße');
+  return { subject: `Reklamation ${r.firma.trim() || person || 'Kunde'} – bitte Reklamationsnummer vergeben`, body: lines.join('\n') };
+}
+function reklSendMail() {
+  const r = state.rekl;
+  openMailto(r.previewSubject, r.previewBody, innendienstEmail());
+  r.sentOk = true;
+}
+function reklPrefillFromMemory() {
+  const r = state.rekl;
+  const a = state.acq;
+  if (acqHasCustomerData()) {
+    Object.assign(r, { firma: a.firma, anrede: a.anrede || '', vorname: a.vorname, nachname: a.nachname || a.apName || '', strasse: a.strasse, hausnummer: a.hausnummer, plz: a.plz, ort: a.ort, telefon: a.telefon, email: a.email });
+  } else if (wizardHasCustomerData()) {
+    r.nachname = state.summaryCustomer.trim(); r.kundenNr = state.summaryKundenNr.trim(); if (salutationKnown()) r.anrede = state.summarySalutation;
+  }
+}
+function reklScreen() {
+  const r = state.rekl;
+  const chip = (on, attr, label) => `<button type="button" class="filter-chip ${on?'active':''}" ${attr}>${on?'✓ ':''}${escapeHtml(label)}</button>`;
+  const head = (title, sub) => `<div class="section-heading acq-heading"><div><span class="eyebrow">Reklamation</span><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div></div>`;
+  const bar = (nextLabel) => `<nav class="acq-action-bar no-print" aria-label="Navigation Reklamation"><button type="button" class="secondary-button" data-action="rekl-back">← Zurück</button>${nextLabel ? `<button type="button" class="primary-button" data-action="rekl-next" ${reklValid(r.step) ? '' : 'disabled'}>${escapeHtml(nextLabel)} →</button>` : '<span class="acq-bar-spacer"></span>'}</nav>`;
+  const openBar = reklHasData() && !r.sentOk ? `<div class="acq-open-bar no-print"><span>Reklamation: <strong>${escapeHtml(reklLabel())}</strong></span><button type="button" class="secondary-button compact" data-action="rekl-new">Neu</button></div>` : '';
+  const input = (id, field, label, type = 'text', wide = false) => `<div class="${wide ? 'wide' : ''}"><label for="${id}">${label}</label><input id="${id}" data-rekl-field="${field}" type="${type}" value="${escapeHtml(r[field] || '')}"></div>`;
+
+  if (r.sentOk) {
+    return `<main class="page advisor-page acq-page">${head('An den Innendienst übergeben', 'Versand erfolgt in deinem E-Mail-Programm.')}
+      <section class="advisor-card"><p class="muted-copy">Reklamation <strong>${escapeHtml(reklLabel())}</strong> – der Innendienst vergibt die Reklamationsnummer und meldet sich bei dir.</p></section>
+      <section class="acq-restart-wrap"><button type="button" class="acq-action neutral" data-action="rekl-new-direct"><span class="acq-action-main"><strong>Weitere Reklamation aufnehmen</strong><small>Startet eine neue, leere Reklamation</small></span><b aria-hidden="true">›</b></button></section>
+    </main>`;
+  }
+  if (r.step === 'kontakt') {
+    const canPrefill = acqHasCustomerData() || wizardHasCustomerData();
+    return `<main class="page advisor-page acq-page">${openBar}${head('Kontaktdaten des Kunden', 'Wer reklamiert? Firma oder Nachname genügt – alles andere optional.')}
+      <section class="advisor-card">
+        ${canPrefill ? `<button type="button" class="secondary-button compact" data-rekl-prefill="1" style="margin-bottom:14px">Daten des gespeicherten Kunden übernehmen</button>` : ''}
+        <p class="notiz-baustein-label">Anrede</p>
+        <div class="acq-seg"><button type="button" class="filter-chip ${r.anrede==='Herr'?'active':''}" data-rekl-anrede="Herr">Herr</button><button type="button" class="filter-chip ${r.anrede==='Frau'?'active':''}" data-rekl-anrede="Frau">Frau</button></div>
+        <div class="new-customer-form" style="margin-top:14px">
+          ${input('reklFirma','firma','Firma / Einrichtung','text',true)}
+          ${input('reklVorname','vorname','Vorname')}${input('reklNachname','nachname','Nachname')}
+          ${input('reklTelefon','telefon','Telefon','tel')}${input('reklEmail','email','E-Mail','email')}
+          ${input('reklStrasse','strasse','Straße')}${input('reklHausnummer','hausnummer','Hausnummer')}
+          ${input('reklPlz','plz','PLZ')}${input('reklOrt','ort','Ort')}
+          ${input('reklKundenNr','kundenNr','KD-Nr. (falls bekannt)','text',true)}
+        </div>
+      </section>${bar('Weiter')}</main>`;
+  }
+  if (r.step === 'produkt') {
+    const matches = p => matchesQuery(`${p.name} ${p.kind} ${p.sku || ''}`, r.suche);
+    const selKeys = r.produkte.map(reklEntryKey);
+    const seen = new Set();
+    const favs = state.favorites.map(f => ({product: PRODUCTS.find(p => p.id === f.id), size: f.size || ''})).filter(e => e.product && matches(e.product)).filter(e => { const k = reklKey(e.product.id, e.size); if (seen.has(k)) return false; seen.add(k); return true; });
+    const favIds = new Set(state.favorites.map(f => f.id));
+    const rest = r.suche.trim() ? PRODUCTS.filter(p => !favIds.has(p.id) && matches(p)).slice(0, 30) : [];
+    const pchip = (p, size) => { const k = reklKey(p.id, size); return chip(selKeys.includes(k), `data-rekl-prod-toggle="${escapeHtml(k)}"`, p.name + (size ? ' · ' + size : '')); };
+    return `<main class="page advisor-page acq-page">${openBar}${head('Welches Produkt?', 'Aus den Favoriten wählen oder ein Produkt suchen.')}
+      <section class="advisor-card">
+        ${favs.length ? `<p class="notiz-baustein-label">★ Favoriten</p><div class="acq-stack">${favs.map(e => pchip(e.product, e.size)).join('')}</div>` : ''}
+        <p class="notiz-baustein-label" style="margin-top:16px">Produkt suchen</p>
+        <label class="search-box">${icon('search')}<input id="reklSuche" value="${escapeHtml(r.suche)}" placeholder="Produktname oder Artikelnummer"></label>
+        ${r.suche.trim() ? `<div class="filter-row" style="flex-wrap:wrap;margin-top:10px">${rest.map(p => pchip(p, p.sizes[0] || '')).join('') || '<p class="muted-copy">Kein Produkt gefunden.</p>'}</div>` : ''}
+        ${r.produkte.length ? `<p class="notiz-baustein-label" style="margin-top:18px">Reklamiert</p><div class="rekl-list">${r.produkte.map(e => { const k = reklEntryKey(e); const p = PRODUCTS.find(x => x.id === e.id); const sizes = p ? p.sizes : []; return `<div class="rekl-row"><div class="rekl-row-head"><strong>${escapeHtml(p ? p.name : e.id)}</strong>${sizes.length > 1 ? `<select data-rekl-prod-size="${escapeHtml(k)}" aria-label="Gebinde">${sizes.map(sz => `<option value="${escapeHtml(sz)}" ${sz===e.size?'selected':''}>${escapeHtml(sz)}</option>`).join('')}</select>` : `<small>${escapeHtml(e.size || '')}</small>`}<button type="button" class="danger-link" data-rekl-prod-remove="${escapeHtml(k)}" aria-label="Entfernen">✕</button></div>
+          <div class="rekl-row-fields"><label>Menge<input type="text" inputmode="numeric" data-rekl-prod-field="menge" data-rekl-prod-key="${escapeHtml(k)}" value="${escapeHtml(e.menge || '')}" placeholder="z. B. 3"></label><label>Charge / LOT<input type="text" data-rekl-prod-field="charge" data-rekl-prod-key="${escapeHtml(k)}" value="${escapeHtml(e.charge || '')}"></label><label>MHD<input type="text" data-rekl-prod-field="mhd" data-rekl-prod-key="${escapeHtml(k)}" value="${escapeHtml(e.mhd || '')}" placeholder="MM/JJJJ"></label></div></div>`; }).join('')}</div>` : ''}
+      </section>${bar('Weiter')}</main>`;
+  }
+  if (r.step === 'beschreibung') {
+    return `<main class="page advisor-page acq-page">${openBar}${head('Warum reklamiert der Kunde?', 'Einfach einsprechen oder tippen – Gründe zum Antippen sind optional.')}
+      <section class="advisor-card">
+        <label class="modal-field wide" style="display:block"><textarea id="reklBeschreibung" data-rekl-field="beschreibung" rows="6" placeholder="Was ist passiert? Hier einsprechen oder tippen …">${escapeHtml(r.beschreibung)}</textarea></label>
+        <p class="notiz-baustein-label" style="margin-top:16px">Art der Reklamation</p>
+        <div class="acq-stack acq-grid2">${REKL_GRUENDE.map((g, i) => chip(r.gruende.includes(i), `data-rekl-grund="${i}"`, g)).join('')}</div>
+        <p class="notiz-baustein-label" style="margin-top:16px">Gewünscht vom Kunden</p>
+        <div class="acq-stack acq-grid2">${REKL_WUENSCHE.map((g, i) => chip(r.wuensche.includes(i), `data-rekl-wunsch="${i}"`, g)).join('')}</div>
+      </section>${bar('Weiter')}</main>`;
+  }
+  // Zusammenfassung + Versand
+  return `<main class="page advisor-page acq-page">${openBar}${head('Zusammenfassung', 'Prüfen, bei Bedarf anpassen – dann an den Innendienst senden.')}
+    <section class="advisor-card">
+      <label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Betreff</span><input id="reklSubject" data-rekl-field="previewSubject" type="text" value="${escapeHtml(r.previewSubject)}"></label>
+      <label class="modal-field wide" style="display:block"><span class="notiz-baustein-label">Text</span><textarea id="reklBody" data-rekl-field="previewBody" rows="16">${escapeHtml(r.previewBody)}</textarea></label>
+      ${sendToHint(innendienstEmail())}
+      <div class="acq-send-actions"><button type="button" class="secondary-button" data-action="rekl-copy">${icon('copy')}<span>Text kopieren</span></button></div>
+    </section>${bar('An Innendienst senden')}</main>`;
 }
 
 function advisorResults() {
@@ -6183,7 +6335,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='reklamation'){ if (!reklHasData()) reklReset(); state.previousScreen = null; state.screen='reklamation'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
@@ -6296,6 +6448,41 @@ function bind() {
     startKundenbesuchFlow();
     render();
   }));
+  // ---- Reklamation ----
+  document.querySelectorAll('[data-rekl-field]').forEach(el => el.addEventListener('input', e => {
+    const f = el.dataset.reklField; state.rekl[f] = e.target.value;
+    if (f === 'previewSubject' || f === 'previewBody') state.rekl.previewTouched = true;
+  }));
+  $('#reklSuche')?.addEventListener('input', e => { state.rekl.suche = e.target.value; debouncedRender(); });
+  document.querySelectorAll('[data-rekl-anrede]').forEach(b => b.onclick = () => { const v = b.dataset.reklAnrede; state.rekl.anrede = state.rekl.anrede === v ? '' : v; render(); });
+  document.querySelectorAll('[data-rekl-prefill]').forEach(b => b.onclick = () => { reklPrefillFromMemory(); render(); });
+  document.querySelectorAll('[data-rekl-prod-toggle]').forEach(b => b.onclick = () => {
+    const key = b.dataset.reklProdToggle; const [id, size] = key.split('|'); const r = state.rekl;
+    r.produkte = r.produkte.some(e => reklEntryKey(e) === key) ? r.produkte.filter(e => reklEntryKey(e) !== key) : [...r.produkte, {id, size: size || '', menge:'', charge:'', mhd:''}];
+    render();
+  });
+  document.querySelectorAll('[data-rekl-prod-remove]').forEach(b => b.onclick = () => { state.rekl.produkte = state.rekl.produkte.filter(e => reklEntryKey(e) !== b.dataset.reklProdRemove); render(); });
+  document.querySelectorAll('[data-rekl-prod-size]').forEach(sel => sel.addEventListener('change', e => {
+    const key = sel.dataset.reklProdSize; const r = state.rekl; const entry = r.produkte.find(x => reklEntryKey(x) === key); if (!entry) return;
+    const newKey = reklKey(entry.id, e.target.value);
+    if (r.produkte.some(x => reklEntryKey(x) === newKey)) r.produkte = r.produkte.filter(x => x !== entry); else entry.size = e.target.value;
+    render();
+  }));
+  document.querySelectorAll('[data-rekl-prod-field]').forEach(inp => inp.addEventListener('input', e => { const entry = state.rekl.produkte.find(x => reklEntryKey(x) === inp.dataset.reklProdKey); if (entry) entry[inp.dataset.reklProdField] = e.target.value; }));
+  document.querySelectorAll('[data-rekl-grund]').forEach(b => b.onclick = () => { const i = Number(b.dataset.reklGrund); const l = state.rekl.gruende; state.rekl.gruende = l.includes(i) ? l.filter(x => x !== i) : [...l, i]; render(); });
+  document.querySelectorAll('[data-rekl-wunsch]').forEach(b => b.onclick = () => { const i = Number(b.dataset.reklWunsch); const l = state.rekl.wuensche; state.rekl.wuensche = l.includes(i) ? l.filter(x => x !== i) : [...l, i]; render(); });
+  $('[data-action="rekl-back"]')?.addEventListener('click', () => {
+    if (!state.rekl.history.length) { state.previousScreen = null; state.screen = 'menu'; render(); return; }
+    reklBack(); render();
+  });
+  $('[data-action="rekl-next"]')?.addEventListener('click', () => {
+    const r = state.rekl; if (!reklValid(r.step)) return;
+    if (r.step === 'zusammenfassung') { reklSendMail(); render(); return; }
+    reklGo(REKL_STEPS[REKL_STEPS.indexOf(r.step) + 1]); render();
+  });
+  $('[data-action="rekl-new"]')?.addEventListener('click', () => { if (confirm('Diese Reklamation verwerfen und eine neue beginnen?')) { reklReset(); render(); } });
+  $('[data-action="rekl-new-direct"]')?.addEventListener('click', () => { reklReset(); render(); });
+  $('[data-action="rekl-copy"]')?.addEventListener('click', (e) => { copyEmailText(state.rekl.previewSubject, state.rekl.previewBody, e.currentTarget); });
   document.querySelectorAll('[data-acq-anlass]').forEach(button => button.onclick = () => { state.acq.anlass = button.dataset.acqAnlass; acqGo('gespraech'); render(); });
   document.querySelectorAll('[data-acq-position]').forEach(button => button.onclick = () => { const v = button.dataset.acqPosition; state.acq.position = state.acq.position === v ? '' : v; render(); });
   document.querySelectorAll('[data-acq-anrede]').forEach(button => button.onclick = () => { const v = button.dataset.acqAnrede; state.acq.anrede = state.acq.anrede === v ? '' : v; render(); });
@@ -10116,6 +10303,7 @@ function bindOne(){
 }
 
 acqRestoreDraft();
+reklRestore();
 restoreNcStash();
 restoreWizardDraft();
 render();
