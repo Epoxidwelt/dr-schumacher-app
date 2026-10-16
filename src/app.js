@@ -4879,8 +4879,8 @@ const COMPETITOR_BY_KIND = {
 // Direkte Gegenspieler je Produkt (Stand 10/2026, aus Hersteller-Produktinformationen abgeleitet) – haben Vorrang
 // vor den Kategorie-Vorschlägen. Beispiel: ULTRASOL OXY WIPES ↔ Schülke mikrozid PAA+ wipes.
 const COMPETITOR_BY_PRODUCT = {
-  'ultrasol-oxy-wipes': ['Schülke – mikrozid PAA+ wipes', 'Schülke – mikrozid PAA wipes'],
-  'ultrasol-oxy-wipes-xl': ['Schülke – mikrozid PAA+ wipes', 'Schülke – mikrozid PAA wipes'],
+  'ultrasol-oxy-wipes': ['Schülke – mikrozid PAA+ wipes', 'Ecolab – Incidin OxyWipe S', 'Schülke – mikrozid PAA wipes'],
+  'ultrasol-oxy-wipes-xl': ['Schülke – mikrozid PAA+ wipes', 'Ecolab – Incidin OxyWipe S', 'Schülke – mikrozid PAA wipes'],
   'descosept-sensitive-wipes': ['Schülke – mikrozid universal wipes premium', 'Bode/Hartmann – Bacillol AF Tissues'],
   'descosept-sensitive-wipes-xl': ['Schülke – mikrozid universal wipes premium', 'Bode/Hartmann – Bacillol AF Tissues'],
   'descosept-pur-wipes-rtu': ['Schülke – mikrozid universal wipes premium', 'Bode/Hartmann – Bacillol AF Tissues'],
