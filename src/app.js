@@ -455,6 +455,7 @@ const state = {
   summaryNotiz: localStorage.getItem('summaryNotiz') || '',
   ncStash: null,
   rekl: reklDefault(),
+  reklFotos: [],
   docLinks: (() => { try { return {pif:false, sdb:false, ba:false, ...JSON.parse(localStorage.getItem('docLinks') || '{}')}; } catch (e) { return {pif:false, sdb:false, ba:false}; } })(),
   // Weitere Ansprechpartner beim Bestandskunden (z. B. zweiter Kontakt in derselben
   // Einrichtung) — werden sowohl im CRM-Eintrag aufgeführt als auch als CC in die
@@ -2528,11 +2529,50 @@ function reklDefault() {
 }
 function reklHasData() {
   const r = state.rekl;
-  return !!(r && (r.firma || r.vorname || r.nachname || r.telefon || r.email || r.strasse || r.plz || r.ort || r.kundenNr || r.produkte.length || r.gruende.length || r.beschreibung || r.step !== 'kontakt' || r.sentOk));
+  return !!(r && (r.firma || r.vorname || r.nachname || r.telefon || r.email || r.strasse || r.plz || r.ort || r.kundenNr || r.produkte.length || r.gruende.length || r.beschreibung || (state.reklFotos && state.reklFotos.length) || r.step !== 'kontakt' || r.sentOk));
+}
+// Fotos zur Dokumentation (Kamera): verkleinert (max. 1280 px, JPEG) und getrennt vom Entwurf gespeichert.
+const REKL_FOTO_MAX = 8;
+function reklFotosPersist() { try { localStorage.setItem('reklFotos', JSON.stringify(state.reklFotos)); } catch (e) { try { localStorage.removeItem('reklFotos'); } catch (e2) {} } }
+function reklFotosRestore() { try { const raw = localStorage.getItem('reklFotos'); if (raw) state.reklFotos = JSON.parse(raw) || []; } catch (e) {} }
+function reklCompressFoto(file) {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const max = 1280; let w = img.naturalWidth, h = img.naturalHeight;
+      const sc = Math.min(1, max / Math.max(w, h)); w = Math.round(w * sc); h = Math.round(h * sc);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+async function reklAddFotos(fileList) {
+  const files = [...fileList].filter(f => f && /^image\//.test(f.type));
+  for (const f of files) {
+    if (state.reklFotos.length >= REKL_FOTO_MAX) break;
+    const data = await reklCompressFoto(f);
+    if (data) state.reklFotos.push(data);
+  }
+  reklFotosPersist();
+  render();
+}
+async function reklShareWithFotos() {
+  const r = state.rekl;
+  try {
+    const files = await Promise.all(state.reklFotos.map(async (d, i) => new File([await (await fetch(d)).blob()], `Reklamation-Foto-${i + 1}.jpg`, {type:'image/jpeg'})));
+    const data = { files, title: r.previewSubject, text: r.previewBody };
+    if (navigator.canShare && navigator.canShare({files})) { await navigator.share(data); r.sentOk = true; render(); }
+    else alert('Dieses Gerät kann Fotos nicht direkt teilen. Bitte „An Innendienst senden“ nutzen und die Fotos in der geöffneten Mail anhängen.');
+  } catch (e) { /* abgebrochen */ }
 }
 function reklPersist() { try { if (!reklHasData()) localStorage.removeItem('reklDraft'); else localStorage.setItem('reklDraft', JSON.stringify(state.rekl)); } catch (e) {} }
 function reklRestore() { try { const raw = localStorage.getItem('reklDraft'); if (raw) state.rekl = {...reklDefault(), ...JSON.parse(raw)}; } catch (e) {} }
-function reklReset() { state.rekl = reklDefault(); reklPersist(); }
+function reklReset() { state.rekl = reklDefault(); state.reklFotos = []; reklFotosPersist(); reklPersist(); }
 function reklLabel() { const r = state.rekl; return r.firma.trim() || [r.vorname, r.nachname].filter(Boolean).join(' ').trim() || 'Reklamation'; }
 function reklTileSubtitle() { return reklHasData() && !state.rekl.sentOk ? `Offen: ${reklLabel()} – hier geht es weiter` : 'Kundenreklamation aufnehmen und an den Innendienst melden'; }
 function reklGo(step) { const r = state.rekl; r.history.push(r.step); r.step = step; if (step === 'zusammenfassung' && !r.previewTouched) { const m = reklBuildEmail(); r.previewSubject = m.subject; r.previewBody = m.body; } }
@@ -2577,6 +2617,7 @@ function reklBuildEmail() {
   if (r.gruende.length) lines.push(L('Art', r.gruende.map(i => REKL_GRUENDE[i]).filter(Boolean).join(', ')));
   lines.push(L('Beschreibung', r.beschreibung.trim() || '-'));
   if (r.wuensche.length) lines.push(L('Gewünscht vom Kunden', r.wuensche.map(i => REKL_WUENSCHE[i]).filter(Boolean).join(', ')));
+  if (state.reklFotos.length) lines.push(L('Fotos', `${state.reklFotos.length} Foto(s) zur Dokumentation – werden separat angehängt`));
   lines.push('', 'Danke und Grüße');
   return { subject: `Reklamation ${r.firma.trim() || person || 'Kunde'} – bitte Reklamationsnummer vergeben`, body: lines.join('\n') };
 }
@@ -2593,6 +2634,10 @@ function reklPrefillFromMemory() {
   } else if (wizardHasCustomerData()) {
     r.nachname = state.summaryCustomer.trim(); r.kundenNr = state.summaryKundenNr.trim(); if (salutationKnown()) r.anrede = state.summarySalutation;
   }
+}
+function reklFotosHtml(removable) {
+  if (!state.reklFotos.length) return '';
+  return `<div class="rekl-fotos">${state.reklFotos.map((d, i) => `<div class="rekl-foto"><img src="${d}" alt="Foto ${i + 1}">${removable ? `<button type="button" class="rekl-foto-x" data-rekl-foto-remove="${i}" aria-label="Foto entfernen">✕</button>` : ''}</div>`).join('')}</div>`;
 }
 function reklScreen() {
   const r = state.rekl;
@@ -2647,6 +2692,11 @@ function reklScreen() {
     return `<main class="page advisor-page acq-page">${openBar}${head('Warum reklamiert der Kunde?', 'Einfach einsprechen oder tippen – Gründe zum Antippen sind optional.')}
       <section class="advisor-card">
         <label class="modal-field wide" style="display:block"><textarea id="reklBeschreibung" data-rekl-field="beschreibung" rows="6" placeholder="Was ist passiert? Hier einsprechen oder tippen …">${escapeHtml(r.beschreibung)}</textarea></label>
+        <p class="notiz-baustein-label" style="margin-top:16px">Fotos zur Dokumentation</p>
+        <div class="acq-seg"><button type="button" class="secondary-button" data-action="rekl-foto-cam">📷 Foto aufnehmen</button><button type="button" class="secondary-button" data-action="rekl-foto-gal">Aus Galerie</button></div>
+        <input type="file" id="reklFotoCamInput" accept="image/*" capture="environment" style="display:none">
+        <input type="file" id="reklFotoGalInput" accept="image/*" multiple style="display:none">
+        ${reklFotosHtml(true)}
         <p class="notiz-baustein-label" style="margin-top:16px">Art der Reklamation</p>
         <div class="acq-stack acq-grid2">${REKL_GRUENDE.map((g, i) => chip(r.gruende.includes(i), `data-rekl-grund="${i}"`, g)).join('')}</div>
         <p class="notiz-baustein-label" style="margin-top:16px">Gewünscht vom Kunden</p>
@@ -2658,8 +2708,9 @@ function reklScreen() {
     <section class="advisor-card">
       <label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">Betreff</span><input id="reklSubject" data-rekl-field="previewSubject" type="text" value="${escapeHtml(r.previewSubject)}"></label>
       <label class="modal-field wide" style="display:block"><span class="notiz-baustein-label">Text</span><textarea id="reklBody" data-rekl-field="previewBody" rows="16">${escapeHtml(r.previewBody)}</textarea></label>
+      ${state.reklFotos.length ? `<p class="notiz-baustein-label" style="margin-top:14px">Fotos (${state.reklFotos.length})</p>${reklFotosHtml(false)}<p class="muted-copy">Fotos werden nicht automatisch angehängt: entweder unten „Mit Fotos teilen“ nutzen (Mail-App wählen, Empfänger: ${escapeHtml(innendienstEmail())}) oder sie in der geöffneten Mail anhängen.</p>` : ''}
       ${sendToHint(innendienstEmail())}
-      <div class="acq-send-actions"><button type="button" class="secondary-button" data-action="rekl-copy">${icon('copy')}<span>Text kopieren</span></button></div>
+      <div class="acq-send-actions">${state.reklFotos.length ? `<button type="button" class="primary-button" data-action="rekl-share">📎 Mit Fotos teilen</button>` : ''}<button type="button" class="secondary-button" data-action="rekl-copy">${icon('copy')}<span>Text kopieren</span></button></div>
     </section>${bar('An Innendienst senden')}</main>`;
 }
 
@@ -6490,6 +6541,12 @@ function bind() {
   document.querySelectorAll('[data-rekl-prod-field]').forEach(inp => inp.addEventListener('input', e => { const entry = state.rekl.produkte.find(x => reklEntryKey(x) === inp.dataset.reklProdKey); if (entry) entry[inp.dataset.reklProdField] = e.target.value; }));
   document.querySelectorAll('[data-rekl-grund]').forEach(b => b.onclick = () => { const i = Number(b.dataset.reklGrund); const l = state.rekl.gruende; state.rekl.gruende = l.includes(i) ? l.filter(x => x !== i) : [...l, i]; render(); });
   document.querySelectorAll('[data-rekl-wunsch]').forEach(b => b.onclick = () => { const i = Number(b.dataset.reklWunsch); const l = state.rekl.wuensche; state.rekl.wuensche = l.includes(i) ? l.filter(x => x !== i) : [...l, i]; render(); });
+  $('[data-action="rekl-foto-cam"]')?.addEventListener('click', () => $('#reklFotoCamInput')?.click());
+  $('[data-action="rekl-foto-gal"]')?.addEventListener('click', () => $('#reklFotoGalInput')?.click());
+  $('#reklFotoCamInput')?.addEventListener('change', e => { reklAddFotos(e.target.files); e.target.value = ''; });
+  $('#reklFotoGalInput')?.addEventListener('change', e => { reklAddFotos(e.target.files); e.target.value = ''; });
+  document.querySelectorAll('[data-rekl-foto-remove]').forEach(b => b.onclick = () => { state.reklFotos.splice(Number(b.dataset.reklFotoRemove), 1); reklFotosPersist(); render(); });
+  $('[data-action="rekl-share"]')?.addEventListener('click', reklShareWithFotos);
   $('[data-action="rekl-back"]')?.addEventListener('click', () => {
     if (!state.rekl.history.length) { state.previousScreen = null; state.screen = 'menu'; render(); return; }
     reklBack(); render();
@@ -10323,6 +10380,7 @@ function bindOne(){
 
 acqRestoreDraft();
 reklRestore();
+reklFotosRestore();
 restoreNcStash();
 restoreWizardDraft();
 render();
