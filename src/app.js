@@ -1255,6 +1255,7 @@ function detailScreen() {
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
         return `<button class="${active?'active':''}" data-size="${size}" ${isMulti?`data-size-favorite="${p.id}"`:''}>${escapeHtml(size)}</button>`;
       }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${(state.customerMode||inMesseContext())?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
+        ${(state.customerMode||inMesseContext()||!can('sales')||state.activeProfile!=='sales') ? '' : `<button class="primary-button compact" data-action="start-kundenbesuch" data-product="${p.id}">${icon('kundenbesuch')}<span>Kundenbesuch starten</span></button>`}
         ${(state.customerMode||inMesseContext()) ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
@@ -6285,6 +6286,14 @@ function bind() {
     const cur = (state.acq.notiz || '').trim();
     // erneutes Antippen nimmt den Baustein wieder heraus (wie in der Kundenzusammenfassung)
     state.acq.notiz = cur.includes(text) ? cur.replace(text, '').replace(/\s{2,}/g, ' ').trim() : (cur ? cur + ' ' + text : text);
+    render();
+  }));
+  // Kundenbesuch direkt aus dem Produkt starten: das Produkt wird (mit dem gewählten Gebinde) als Favorit ★ markiert.
+  document.querySelectorAll('[data-action="start-kundenbesuch"]').forEach(btn => btn.addEventListener('click', () => {
+    const prod = PRODUCTS.find(x => x.id === btn.dataset.product);
+    if (prod && !state.favorites.some(f => f.id === prod.id)) { state.favorites = [...state.favorites, {id: prod.id, size: state.size || prod.sizes[0]}]; persistFavorites(); }
+    state.previousScreen = null;
+    startKundenbesuchFlow();
     render();
   }));
   document.querySelectorAll('[data-acq-anlass]').forEach(button => button.onclick = () => { state.acq.anlass = button.dataset.acqAnlass; acqGo('gespraech'); render(); });

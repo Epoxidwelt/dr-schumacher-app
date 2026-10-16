@@ -478,3 +478,4 @@
 .aktion-pick.on{border-color:#e8a317;background:#fff7e0}
 .aktion-pick.on .aktion-check{color:#e8a317}
 .answer-button:disabled{opacity:.4;cursor:not-allowed}
+.price-card-detail .primary-button.compact{margin-top:10px}
