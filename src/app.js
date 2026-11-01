@@ -123,6 +123,8 @@ const OFFICIAL = {
   disinfectionPlans: 'https://www.eqmed.de/'
 };
 
+// Preislisten der App (Spaltenüberschriften der Google-Tabelle, siehe PRICE_COLUMNS). TEST1 = Testpreisliste.
+const PRICE_LIST_KEYS = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi','Henry Schein','TEST1'];
 const PRICE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1z_FuQiBslt71eLzNA-6cstToQp86PKud_7HXY8JK0eQ/export?format=csv&gid=1702267749';
 // Neues Tabellenblatt in derselben (oder einer eigenen) Google-Tabelle: Spalten "Art. Nr.", "Vorteil 1".."Vorteil 5".
 // Sobald das Blatt veröffentlicht ist (Datei > Freigeben > Im Web veröffentlichen > CSV), hier die Export-URL eintragen.
@@ -760,7 +762,7 @@ function regionScreen() {
 }
 
 function priceScreen() {
-  const options = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi','Henry Schein'];
+  const options = PRICE_LIST_KEYS;
   return `<main class="price-shell">
     <section class="price-panel">
       <img class="welcome-logo" src="public/assets/dr-schumacher-logo.png" alt="Dr. Schumacher">
@@ -769,7 +771,7 @@ function priceScreen() {
       <p>Die Auswahl gilt für die gesamte Sitzung. Sie kann später jederzeit geändert werden.</p>
       <div class="price-options">
         <button class="price-option hide-prices-option ${state.customerMode?'selected':''}" data-price="hide"><span class="price-option-strike">UVP</span><small>Keine Preise anzeigen</small></button>
-        ${options.map(option => `<button class="price-option ${!state.customerMode && state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':option==='UVP Hygi'?'<small>Marktreferenz hygi.de</small>':option==='Henry Schein'?'<small>Händlerpreisliste Henry Schein</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}
+        ${options.map(option => `<button class="price-option ${!state.customerMode && state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':option==='UVP Hygi'?'<small>Marktreferenz hygi.de</small>':option==='Henry Schein'?'<small>Händlerpreisliste Henry Schein</small>':option==='TEST1'?'<small>Testpreisliste – Spalte „TEST1“ in der Preistabelle</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}
       </div>
       <p class="privacy-note">Preise bleiben lokal auf diesem Gerät und werden nicht in eine Cloud übertragen.</p>
     </section>
@@ -1261,7 +1263,7 @@ function detailScreen() {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
         return `<button class="${active?'active':''}" data-size="${size}" ${isMulti?`data-size-favorite="${p.id}"`:''}>${escapeHtml(size)}</button>`;
-      }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${(state.customerMode||inMesseContext())?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi','Henry Schein'].map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
+      }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${(state.customerMode||inMesseContext())?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${PRICE_LIST_KEYS.map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
         ${(state.customerMode||inMesseContext()||!can('sales')||state.activeProfile!=='sales') ? '' : `<button class="primary-button compact" data-action="start-kundenbesuch" data-product="${p.id}">${icon('kundenbesuch')}<span>Kundenbesuch starten</span></button>`}
         ${(state.customerMode||inMesseContext()) ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
@@ -2353,7 +2355,7 @@ function acqScreenInner() {
       <section class="advisor-card">
         <div class="acq-stack acq-grid2">
           <button type="button" class="filter-chip ${!a.konditionPL?'active':''}" data-acq-kondition="">${!a.konditionPL?'✓ ':''}Keine</button>
-          ${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi','Henry Schein'].map(pl => `<button type="button" class="filter-chip ${a.konditionPL===pl?'active':''}" data-acq-kondition="${pl}">${a.konditionPL===pl?'✓ ':''}${pl}</button>`).join('')}
+          ${PRICE_LIST_KEYS.map(pl => `<button type="button" class="filter-chip ${a.konditionPL===pl?'active':''}" data-acq-kondition="${pl}">${a.konditionPL===pl?'✓ ':''}${pl}</button>`).join('')}
         </div>
         <label class="modal-field wide" style="display:block;margin-top:16px"><span class="notiz-baustein-label">Weitere Konditionen (optional)</span><input id="acqKonditionText" data-acq-field="konditionText" type="text" value="${escapeHtml(a.konditionText || '')}" placeholder="z. B. Rabatt, Staffel"></label>
         <button type="button" class="primary-button compact" data-action="acq-advance" data-field="konditionen" style="margin-top:14px"><span>Weiter</span></button>
@@ -4168,7 +4170,7 @@ function occasionPromptModal() {
     const angebotBackAction = state.summaryPurpose === 'angebot'
       ? (state.newCustomer ? 'occasion-back-innendienstask' : 'occasion-back-angebotkunde')
       : 'occasion-back-angebotask';
-    const priceListOptions = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi','Henry Schein'];
+    const priceListOptions = PRICE_LIST_KEYS;
     return `<div class="modal-overlay">
       <div class="modal-card" style="width:min(480px,100%)">
         ${modalCloseBtn()}
@@ -7694,7 +7696,8 @@ const PRICE_COLUMNS = [
   ['PL 4',  ['Preisliste 4', 'PL 4', 'PL4']],
   ['PL 5',  ['Preisliste 5', 'PL 5', 'PL5']],
   ['UVP Hygi', ['Preisliste UVP Hygi', 'UVP Hygi', 'Preisliste UVP HYGI', 'UVP HYGI']],
-  ['Henry Schein', ['Preisliste Henry Schein', 'Henry Schein', 'Preisliste HENRY SCHEIN', 'HENRY SCHEIN', 'HS']]
+  ['Henry Schein', ['Preisliste Henry Schein', 'Henry Schein', 'Preisliste HENRY SCHEIN', 'HENRY SCHEIN', 'HS']],
+  ['TEST1', ['TEST1', 'Test1', 'Test 1', 'Preisliste TEST1', 'Preisliste Test1']]
 ];
 const ART_NR_COLUMNS = ['Art. Nr.', 'Art.Nr.', 'Art-Nr.', 'Artikelnummer', 'Artikel-Nr.', 'SKU'];
 function sheetCell(row, names) {
@@ -8779,7 +8782,7 @@ function oneContactFormHtml(){
       </div>
       <div class="one-filters">
         ${fields.map(([k,label]) => `<div class="one-field"><label for="oneNC-${k}">${label}</label><input type="text" id="oneNC-${k}" data-one-nc="${k}" value="${escapeHtml(d[k])}"></div>`).join('')}
-        <div class="one-field"><label for="oneNC-preisliste">Preisliste</label><select class="f" id="oneNC-preisliste" data-one-nc="preisliste">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi','Henry Schein'].map(p=>`<option ${d.preisliste===p?'selected':''}>${p}</option>`).join('')}</select></div>
+        <div class="one-field"><label for="oneNC-preisliste">Preisliste</label><select class="f" id="oneNC-preisliste" data-one-nc="preisliste">${PRICE_LIST_KEYS.map(p=>`<option ${d.preisliste===p?'selected':''}>${p}</option>`).join('')}</select></div>
         <div class="one-field"><label for="oneNC-kundenstatus">Status</label><select class="f" id="oneNC-kundenstatus" data-one-nc="kundenstatus"><option value="kunde" ${d.kundenstatus==='kunde'?'selected':''}>Kaufender Kunde</option><option value="kontakt" ${d.kundenstatus==='kontakt'?'selected':''}>Nur Kontakt im System (noch kein Kauf)</option></select></div>
       </div>
       <div class="one-wizard-actions" style="margin-top:14px">
@@ -8814,7 +8817,7 @@ function oneMineContactFormHtml(){
       </div>
       <div class="one-filters">
         ${fields.map(([k,label]) => `<div class="one-field"><label for="oneNC-${k}">${label}</label><input type="text" id="oneNC-${k}" data-one-nc="${k}" value="${escapeHtml(d[k])}"></div>`).join('')}
-        <div class="one-field"><label for="oneNC-preisliste">Preisliste</label><select class="f" id="oneNC-preisliste" data-one-nc="preisliste">${['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi','Henry Schein'].map(p=>`<option ${d.preisliste===p?'selected':''}>${p}</option>`).join('')}</select></div>
+        <div class="one-field"><label for="oneNC-preisliste">Preisliste</label><select class="f" id="oneNC-preisliste" data-one-nc="preisliste">${PRICE_LIST_KEYS.map(p=>`<option ${d.preisliste===p?'selected':''}>${p}</option>`).join('')}</select></div>
         <div class="one-field"><label for="oneNC-kundenstatus">Status</label><select class="f" id="oneNC-kundenstatus" data-one-nc="kundenstatus"><option value="kunde" ${d.kundenstatus==='kunde'?'selected':''}>Kaufender Kunde</option><option value="kontakt" ${d.kundenstatus==='kontakt'?'selected':''}>Nur Kontakt im System (noch kein Kauf)</option></select></div>
       </div>
       <div class="one-wizard-actions" style="margin-top:14px">
