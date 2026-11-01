@@ -123,9 +123,8 @@ const OFFICIAL = {
   disinfectionPlans: 'https://www.eqmed.de/'
 };
 
-// Preislisten der App (Spaltenüberschriften der Google-Tabelle, siehe PRICE_COLUMNS). TEST1 = Testpreisliste.
-const PRICE_LIST_KEYS = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi','Henry Schein','TEST1'];
-const TEST1_FICTIVE_PRICE = 100;
+// Preislisten der App (Spaltenüberschriften der Google-Tabelle, siehe PRICE_COLUMNS).
+const PRICE_LIST_KEYS = ['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'];
 const PRICE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1z_FuQiBslt71eLzNA-6cstToQp86PKud_7HXY8JK0eQ/export?format=csv&gid=1702267749';
 // Neues Tabellenblatt in derselben (oder einer eigenen) Google-Tabelle: Spalten "Art. Nr.", "Vorteil 1".."Vorteil 5".
 // Sobald das Blatt veröffentlicht ist (Datei > Freigeben > Im Web veröffentlichen > CSV), hier die Export-URL eintragen.
@@ -425,7 +424,8 @@ const state = {
   repName: localStorage.getItem('repName') || '',
   regionLoginName: '', regionLoginError: '',
   aroundMe: { mode:'kunden', radiusKm:10, myPos:null, category:null, results:[], loading:false, error:'', searched:false, kundenFilter:'all', savedIndices:[] },
-  priceList: localStorage.getItem('priceList') || 'UVP',
+  // Gespeicherte Preisliste nur übernehmen, wenn sie (noch) existiert – sonst UVP.
+  priceList: (['UVP','PL 1','PL 2','PL 3','PL 4','PL 5','UVP Hygi'].includes(localStorage.getItem('priceList')) ? localStorage.getItem('priceList') : 'UVP'),
   customerMode: sessionStorage.getItem('customerMode') === 'true',
   category: 'all', query: '', spectrum: 'all', selected: null,
   // Preise liegen ausschliesslich unter der Artikelnummer - kein Namensabgleich mehr.
@@ -772,7 +772,7 @@ function priceScreen() {
       <p>Die Auswahl gilt für die gesamte Sitzung. Sie kann später jederzeit geändert werden.</p>
       <div class="price-options">
         <button class="price-option hide-prices-option ${state.customerMode?'selected':''}" data-price="hide"><span class="price-option-strike">UVP</span><small>Keine Preise anzeigen</small></button>
-        ${options.map(option => `<button class="price-option ${!state.customerMode && state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':option==='UVP Hygi'?'<small>Marktreferenz hygi.de</small>':option==='Henry Schein'?'<small>Händlerpreisliste Henry Schein</small>':option==='TEST1'?'<small>Testpreisliste – fiktiv 100 € je Artikel</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}
+        ${options.map(option => `<button class="price-option ${!state.customerMode && state.priceList===option?'selected':''}" data-price="${option}"><span>${option}</span>${option==='UVP'?'<small>Öffentliche Verkaufspreise</small>':option==='UVP Hygi'?'<small>Marktreferenz hygi.de</small>':'<small>Interne Preisliste</small>'}</button>`).join('')}
       </div>
       <p class="privacy-note">Preise bleiben lokal auf diesem Gerät und werden nicht in eine Cloud übertragen.</p>
     </section>
@@ -7696,9 +7696,7 @@ const PRICE_COLUMNS = [
   ['PL 3',  ['Preisliste 3', 'PL 3', 'PL3']],
   ['PL 4',  ['Preisliste 4', 'PL 4', 'PL4']],
   ['PL 5',  ['Preisliste 5', 'PL 5', 'PL5']],
-  ['UVP Hygi', ['Preisliste UVP Hygi', 'UVP Hygi', 'Preisliste UVP HYGI', 'UVP HYGI']],
-  ['Henry Schein', ['Preisliste Henry Schein', 'Henry Schein', 'Preisliste HENRY SCHEIN', 'HENRY SCHEIN', 'HS']],
-  ['TEST1', ['TEST1', 'Test1', 'Test 1', 'Preisliste TEST1', 'Preisliste Test1']]
+  ['UVP Hygi', ['Preisliste UVP Hygi', 'UVP Hygi', 'Preisliste UVP HYGI', 'UVP HYGI']]
 ];
 const ART_NR_COLUMNS = ['Art. Nr.', 'Art.Nr.', 'Art-Nr.', 'Artikelnummer', 'Artikel-Nr.', 'SKU'];
 function sheetCell(row, names) {
@@ -7718,8 +7716,6 @@ function parsePriceRows(rows) {
       if (value !== '') hasPrice = true;
     });
     if (!hasPrice) return;
-    // Testpreisliste: solange die Tabelle keine eigene Spalte „TEST1“ mit Preis führt, gilt fiktiv 100 € je Artikel.
-    if (entry.TEST1 === '' || entry.TEST1 === undefined) entry.TEST1 = TEST1_FICTIVE_PRICE;
     const ve = extractVE(row);
     if (ve) entry.ve = ve;
     const pal = extractPal(row);
