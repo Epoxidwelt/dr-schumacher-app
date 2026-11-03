@@ -441,6 +441,7 @@ const state = {
   dashboardArrangeMode: false,
   ezOpen: false,
   fitOpen: false,
+  tipOpen: {},
   aktionOpen: null,
   wsSel: [],
   wsCat: 'all',
@@ -1261,7 +1262,7 @@ function detailScreen() {
       <div class="detail-copy"><span class="eyebrow">${p.kind}</span><div class="title-line"><h1>${p.name}</h1><button class="favorite-button large ${favorite?'active':''}" data-favorite="${p.id}" data-favorite-size="${escapeHtml(state.size)}" aria-label="Favorit (${escapeHtml(state.size)})">${icon('star')}</button></div><div class="badges">${p.spectrum.map(spectrumBadge).join('')}${haccpBadge(p)}${p.biozid ? biozidBadge() : ''}</div><p>${p.summary}</p>${p.biozid ? `<div class="biozid-notice">⚠️ <strong>Biozidprodukt.</strong> Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Kennzeichnung und Produktinformationen lesen.</div>` : ''}<small class="meta-line">Artikelnummer: ${resolveArtNr(p, state.size)}</small>${resolveVE(p, state.size) ? `<small class="meta-line">VE: ${resolveVE(p, state.size)} Stück</small>` : ''}${resolvePal(p, state.size) ? `<small class="meta-line">Palette: ${resolvePal(p, state.size)} Stück</small>` : ''}${markedSizes.length ? `<small class="marked-sizes">★ markiert: ${markedSizes.map(escapeHtml).join(', ')}</small>` : ''}</div>
     </section>
     <section class="detail-grid">
-      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${arzneimittelNoticeHtml(p)}${wirkspektrumChipsHtml(p)}${einwirkzeitenHtml(p)}${dispenserFitHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
+      <div class="info-card"><h2>Das Wichtigste auf einen Blick</h2>${arzneimittelNoticeHtml(p)}${wirkspektrumChipsHtml(p)}${einwirkzeitenHtml(p)}${dispenserFitHtml(p)}${productTipsHtml(p)}<ul>${productFacts(p).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul>${p.ingredients ? `<div class="ingredients-block"><strong>Inhaltsstoffe</strong><span>${escapeHtml(p.ingredients)}</span></div>` : ''}${sizeBonusFacts(state.size).length ? `<div class="vacu-bag-block"><strong>Vorteile ESH Vacu-Bag®</strong><ul>${sizeBonusFacts(state.size).map(f => `<li><span>✓</span>${f}</li>`).join('')}</ul></div>` : ''}<div class="info-warning">Verbindliche Anwendung, Einwirkzeiten und Sicherheit bitte immer anhand der aktuellen offiziellen Produktinformation prüfen.</div></div>
       <div class="price-card-detail"><span>Gebinde auswählen${p.sizes.length>1?' · anklicken markiert die Variante als Favorit':''}</span><div class="size-selector">${p.sizes.map(size => {
         const isMulti = p.sizes.length > 1;
         const active = isMulti ? state.favorites.some(f=>f.id===p.id && f.size===size) : (state.size===size);
@@ -5915,6 +5916,33 @@ const DISPENSER_FIT = [
 ];
 const DISPENSER_FIT_PRODUCTS = ['descoderm','aseptoman-parfümfrei','aseptoman-med','aseptoman-duo','aseptoman-plus','aseptoman-forte','aseptoman-viral','aseptoman-gel','descolind-comfort-wash','descolind-comfort','descolind-pure-wash','descolind-pure','descolind-pure-intensive-cream','descolind-expert-wash','descolind-expert','descolind-expert-protect-cream'];
 const DISPENSER_PRODUCTS = ['ak-plus-500-wandspender','ak-plus-1000-wandspender','ak-plus-1000-touchless','rx5-touchless','spe-500-touchless','spe-1000-touchless'];
+// Tipps aus der Praxis je Produkt (nur intern für den Außendienst, nicht im Kunden-/Messemodus).
+// Wächst nach und nach mit der Erfahrung im Alltag: einfach einen weiteren Eintrag unter der
+// Produkt-ID ergänzen. verweise = Produkt-IDs, die als Querverweis-Button unter dem Tipp erscheinen.
+const PRODUCT_TIPS = {
+  'ultrasol-oxy-wipes': [{
+    branche: 'Rettungswache / Rettungsdienst',
+    titel: 'Tücher und Flüssigkeit zusammen anbieten',
+    text: 'Möchte die Wache die ULTRASOL OXY® WIPES nutzen, immer auch die Flüssigkeit anbieten: Tücher sind ideal für Kontaktflächen und die schnelle Zwischendesinfektion, für große Flächen (Fahrzeuginnenraum, Liegen, Boden, Fahrzeughalle) ist die Flüssigkeit praktischer. Neben dem Zusatzverkauf ist das der Mehrwert für den Kunden. Alternative: ULTRASOL® ACTIVE als Sachet – einfach beschrieben und einfach in der Anwendung.',
+    verweise: ['ultrasol-oxy', 'ultrasol-active']
+  }],
+  'desoderm-care-wipes': [{
+    branche: 'Feuerwehr',
+    titel: 'Frisch machen im Einsatz',
+    text: 'Im Einsatz gibt es keine Möglichkeit zu duschen. Die Pflegetücher eignen sich, um sich schnell zu reinigen und frisch zu machen – alkohol- und parfümfrei, extra weiches Vlies. Aktuell kommen vor Ort häufig die Waschlappen von Schülke zum Einsatz: als Gesprächseinstieg nach dem Wechsel auf die Tücher fragen.',
+    verweise: []
+  }]
+};
+function productTipsHtml(p) {
+  const tips = PRODUCT_TIPS[p.id];
+  if (!tips || !tips.length || state.customerMode || inMesseContext()) return '';
+  return tips.map((t, i) => {
+    const key = p.id + ':' + i;
+    const links = (t.verweise || []).map(id => PRODUCTS.find(x => x.id === id)).filter(Boolean)
+      .map(x => `<button type="button" class="tip-link" data-product="${x.id}">→ ${escapeHtml(x.name)}</button>`).join('');
+    return `<details class="tip-box" data-tip="${key}" ${state.tipOpen[key] ? 'open' : ''}><summary><span>💡 Tipp · ${escapeHtml(t.branche)}</span><small>${escapeHtml(t.titel)}</small></summary><p>${escapeHtml(t.text)}</p>${links ? `<div class="tip-links"><span>Querverweis:</span>${links}</div>` : ''}</details>`;
+  }).join('');
+}
 function dispenserFitHtml(p) {
   const src = 'Quelle: Produktseiten und GHK-Broschüre von schumacher-online.com (Stand 04/2026). ';
   const note = src + '„–“ = keine Angabe in der Produktinformation, nicht als „passt nicht“ lesen.';
@@ -6440,6 +6468,7 @@ function bind() {
   $('[data-action="clear-global-search"]')?.addEventListener('click', () => { state.globalQuery=''; render(); });
   $('[data-action="toggle-arrange-tools"]')?.addEventListener('click', () => { state.dashboardArrangeMode = !state.dashboardArrangeMode; render(); });
   if (state.dashboardArrangeMode) bindTileDrag();
+  document.querySelectorAll('.tip-box').forEach(box => box.addEventListener('toggle', e => { state.tipOpen[box.dataset.tip] = e.target.open; }));
   document.querySelectorAll('.ez-box').forEach(box => box.addEventListener('toggle', e => { state[box.dataset.ez === 'fit' ? 'fitOpen' : 'ezOpen'] = e.target.open; }));
   document.querySelectorAll('[data-ws-tag]').forEach(b => b.onclick = () => { const k = b.dataset.wsTag; state.wsSel = state.wsSel.includes(k) ? state.wsSel.filter(x => x !== k) : [...state.wsSel, k]; render(); });
   document.querySelectorAll('[data-ws-cat]').forEach(b => b.onclick = () => { state.wsCat = b.dataset.wsCat; render(); });
