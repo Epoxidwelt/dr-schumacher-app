@@ -1887,8 +1887,8 @@ function acqKuecheProducts() {
 function acqKuecheRelevant() {
   return acqKuecheProducts().length > 0 && brancheExclusionTags(state.acq.branche).length === 0;
 }
-// Sind Konzentrate (Dosieranlage) im Spiel, lautet die Frage „Muster oder Testaufstellung?“ statt nur „Muster?“.
-function acqMusterTestFrage() { return markedKonzentratIds().length > 0; }
+// Eine Frage statt zwei: Muster, Testphase, beides oder nichts – der Folgeablauf richtet sich danach.
+function acqMusterTestFrage() { return true; }
 function acqAfterMuster() {
   const a = state.acq;
   return (acqBesprocheneIds().length || a.interesseIds.length || (a.musterEintraege && a.musterEintraege.length)) ? 'info' : acqPreTermin();
@@ -2305,9 +2305,9 @@ function acqScreenInner() {
     return acqYesNoStep({eyebrow:'Kaltakquise', field:'kueche', question:'Ist das Thema Küche interessant?', sub:`${escapeHtml(names)} – HACCP-konform und damit auch im Lebensmittelbereich/in der Küche einsetzbar.`});
   }
   if (a.step === 'muster' && acqMusterTestFrage()) {
-    const opts = [['muster','Muster'],['test','Testaufstellung'],['beides','Muster und Testaufstellung'],['nein','Weder noch']];
+    const opts = [['muster','Muster'],['test','Testphase'],['beides','Muster und Testphase'],['nein','Weder noch']];
     return `<main class="page advisor-page">
-    <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Muster oder Testaufstellung gewünscht?</h1><p>Konzentrate laufen über Dosieranlagen. Bei Testaufstellung bereiten wir am Ende die Technik-E-Mail für den Kunden vor.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+    <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Muster oder Testphase?</h1><p>Muster: Menge je Produkt festhalten. Testphase: wird im CRM-Eintrag vermerkt${markedKonzentratIds().length ? ' – bei Konzentraten bereiten wir am Ende die Technik-E-Mail für den Kunden vor' : ''}.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
     <section class="advisor-card"><div class="answer-grid wizard">${opts.map(([v,l]) => `<button class="answer-button ${a.musterTest===v?'active':''}" data-acq-set="musterTest:${v}">${l}</button>`).join('')}</div></section>
   </main>`;
   }
@@ -2444,7 +2444,7 @@ function acqEnsureContact() {
     handelspartner:(a.handelspartner || '').trim(),
     kondition: acqKonditionText(),
     notiz:(a.notiz || '').trim(), produktbereiche:[...new Set(prods.map(p => p.category))], produkte:prods.map(p => p.name).join(', '),
-    musterWanted: acqMusterListe().length > 0, musterListe: acqMusterListe(), wettbewerber: acqWettbewerberText(), feedback: acqFeedbackText(), samples: acqMusterListe().length ? 'Muster übergeben' : 'Keine', result: a.result || 'Offen', vertragBis: a.vertragBis || null
+    musterWanted: acqMusterListe().length > 0, musterListe: acqMusterListe(), wettbewerber: acqWettbewerberText(), feedback: acqFeedbackText(), samples: acqMusterListe().length ? 'Muster übergeben' : (a.testaufstellung === 'ja' ? 'Test vereinbart' : 'Keine'), result: a.result || 'Offen', vertragBis: a.vertragBis || null
   };
   contact.nextFollowUp = a.followUp || null;
   state.one.contacts.push(contact);
@@ -2470,7 +2470,7 @@ function acqBuildCrmReport() {
     aktionenTitel.length ? `Aktion besprochen: ${aktionenTitel.join(', ')}` : '',
     (a.handelspartner || '').trim() ? `Handelspartner: ${a.handelspartner.trim()}` : '',
     acqKonditionText() ? `Konditionen: ${acqKonditionText()}` : '',
-    a.testaufstellung === 'ja' ? 'Testaufstellung gewünscht (Technik-E-Mail an den Kunden)' : '',
+    a.testaufstellung === 'ja' ? 'Testphase gewünscht' + (markedKonzentratIds().length ? ' (Technik-E-Mail an den Kunden)' : '') : '',
     (a.kueche === 'ja' && acqKuecheRelevant()) ? `Thema Küche (HACCP-konform) interessant: ${acqKuecheProducts().map(p => p.name).join(', ')}` : '',
     termine.length ? `Terminvorschläge: ${termine.map(acqFormatTermin).join('; ')}` : ''
   ].filter(Boolean);
@@ -2484,7 +2484,7 @@ function acqBuildCrmReport() {
     handelspartner:(a.handelspartner || '').trim(), kondition: acqKonditionText(),
     unterlagen: (a.infoGewuenscht === 'ja' && a.infoIds.length) ? docLabels.join(', ') : '',
     produkteText: prods.map(p => p.name).join(', '), notiz, wettbewerber: acqWettbewerberText(), vertragBis: a.vertragBis || '', feedback: acqFeedbackText(),
-    samples: muster.length ? 'Muster übergeben' : 'Keine', result: a.result || 'Offen',
+    samples: muster.length ? 'Muster übergeben' : (a.testaufstellung === 'ja' ? 'Test vereinbart' : 'Keine'), result: a.result || 'Offen',
     followUp: a.followUp || (termine.length ? termine[0].slice(0,10) : ''), nextSteps: termine.length ? 'Termin wahrnehmen' : 'Termin vereinbaren',
     owner: state.repName || '-', musterWanted: musterListe.length > 0, musterListe
   };
@@ -2513,7 +2513,7 @@ function acqAbschlussHtml() {
   return `<section class="advisor-card acq-abschluss" style="margin-top:16px"><h2 style="margin-top:0">Abschluss</h2><p class="muted-copy">Alle erfassten Angaben werden übernommen – kein erneutes Eintippen.</p>
     ${action('acq-crm', 'CRM-Eintrag erstellen', 'Gesprächsnotiz mit allen Daten', a.crmDone, myOwnEmail())}
     ${action('acq-innendienst', 'Neukunde an den Innendienst senden', 'legt den Kontakt an und meldet ihn zur Aufnahme', a.innendienstDone, innendienstEmail())}
-    ${a.testaufstellung === 'ja' ? action('open-testphase', 'Testphase vorbereiten (Technik-E-Mail an den Kunden)', 'Testaufstellung gewünscht – Dosieranlagen, Kalibrierung, Edelstahlauslauf', a.testphaseDone, '') : ''}
+    ${(a.testaufstellung === 'ja' && markedKonzentratIds().length) ? action('open-testphase', 'Testphase vorbereiten (Technik-E-Mail an den Kunden)', 'Testphase gewünscht – Dosieranlagen, Kalibrierung, Edelstahlauslauf', a.testphaseDone, '') : ''}
   </section>`;
 }
 function acqVorschauScreen() {
@@ -3892,19 +3892,14 @@ function occasionPromptModal() {
       <div class="modal-card">
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.musterfrage} von ${total}</span>
-        ${markedKonzentratIds().length ? `<h2>Muster oder Testaufstellung gewünscht?</h2>
-        <p>Konzentrate laufen über Dosieranlagen. Bei Testaufstellung bereiten wir am Ende die Technik-E-Mail für den Kunden vor. Bei Mustern fragen wir die Menge je Produkt einzeln ab.</p>
+        <h2>Muster oder Testphase?</h2>
+        <p>Muster: wir fragen die Menge je Produkt ab. Testphase: wird im CRM-Eintrag vermerkt${markedKonzentratIds().length ? ' – bei Konzentraten bereiten wir am Ende die Technik-E-Mail für den Kunden vor' : ''}.</p>
         <div class="modal-choices">
           <button class="modal-choice" data-muster-test="nein">${icon('pm')}<span>Weder noch</span></button>
           <button class="modal-choice" data-muster-test="muster">${icon('pm')}<span>Muster</span></button>
-          <button class="modal-choice" data-muster-test="test">${icon('pm')}<span>Testaufstellung</span></button>
-          <button class="modal-choice" data-muster-test="beides">${icon('pm')}<span>Muster und Testaufstellung</span></button>
-        </div>` : `<h2>Muster gewünscht?</h2>
-        <p>Bei Bedarf fragen wir im nächsten Schritt für jedes Produkt einzeln die gewünschte Menge ab.</p>
-        <div class="modal-choices">
-          <button class="modal-choice" data-muster-wanted="nein">${icon('pm')}<span>Nein, keine Muster</span></button>
-          <button class="modal-choice" data-muster-wanted="ja">${icon('pm')}<span>Ja, Muster gewünscht</span></button>
-        </div>`}
+          <button class="modal-choice" data-muster-test="test">${icon('pm')}<span>Testphase</span></button>
+          <button class="modal-choice" data-muster-test="beides">${icon('pm')}<span>Muster und Testphase</span></button>
+        </div>
         <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-produktbereiche">Zurück</button></div>
       </div>
     </div>`;
@@ -4166,7 +4161,7 @@ function occasionPromptModal() {
     return `<div class="modal-overlay">
       <div class="modal-card">
         ${modalCloseBtn()}
-        <span class="eyebrow">Testaufstellung</span>
+        <span class="eyebrow">Testphase</span>
         <h2>Technik-E-Mail an den Kunden vorbereiten?</h2>
         <p>Dosieranlagen, Kalibrierung und Edelstahlauslauf – mit passender Anrede, vor dem Versand noch änderbar.</p>
         <div class="modal-actions">
@@ -5963,7 +5958,7 @@ const PRODUCT_TIPS = {
   'optisal-plus': [{
     branche: 'Konzentrate · Technik / Testphase',
     titel: 'Auslaufhahn der Dosieranlage auf Edelstahl umstellen',
-    text: 'Bei OPTISAL® PLUS muss der Auslaufhahn der Dosieranlage auf Edelstahl umgestellt werden – bei Ausläufen aus Kupfer oder Messing kann es zu Verfärbungen kommen. Kosten ca. 50 € zzgl. MwSt. (nur zur Info; in der Testphase wird der Edelstahlauslauf kostenfrei gestellt). Vor der Umstellung klären: aktuelles Produkt und Hersteller der Dosieranlage, Einsatzkonzentration (z. B. 1 %), Haustechniker oder unser Techniker. Die Technik-E-Mail an den Kunden gibt es im Kundenbesuch: Frage „Muster oder Testaufstellung gewünscht?“ → Testaufstellung.',
+    text: 'Bei OPTISAL® PLUS muss der Auslaufhahn der Dosieranlage auf Edelstahl umgestellt werden – bei Ausläufen aus Kupfer oder Messing kann es zu Verfärbungen kommen. Kosten ca. 50 € zzgl. MwSt. (nur zur Info; in der Testphase wird der Edelstahlauslauf kostenfrei gestellt). Vor der Umstellung klären: aktuelles Produkt und Hersteller der Dosieranlage, Einsatzkonzentration (z. B. 1 %), Haustechniker oder unser Techniker. Die Technik-E-Mail an den Kunden gibt es im Kundenbesuch: Frage „Muster oder Testphase?“ → Testphase.',
     verweise: []
   }],
   'ultrasol-oxy-wipes': [{
@@ -6470,7 +6465,7 @@ function resolvePal(product, size='') {
   return (row && row.pal) || '';
 }
 // Letzter Schritt vor dem Angebot: bei gewünschter Testaufstellung zuerst die Technik-E-Mail anbieten.
-function nextAfterInnendienst() { return state.testaufstellung === true ? 'testphaseask' : 'angebotask'; }
+function nextAfterInnendienst() { return (state.testaufstellung === true && markedKonzentratIds().length) ? 'testphaseask' : 'angebotask'; }
 function musterEntryKey(product, size) { return product.id + '::' + (size || ''); }
 // Gilt jetzt für Bestandskunde genauso wie für Neukunde/Kaltakquise — beide sprechen im
 // Gespräch über Muster, nur die Bestellung selbst läuft immer über den Onlineshop des
@@ -6725,7 +6720,7 @@ function bind() {
   document.querySelectorAll('[data-acq-set]').forEach(button => button.onclick = () => {
     const [field,value] = button.dataset.acqSet.split(':');
     state.acq[field] = value;
-    if (field === 'musterTest') { state.acq.musterHinterlassen = (value === 'muster' || value === 'beides') ? 'ja' : 'nein'; state.acq.testaufstellung = (value === 'test' || value === 'beides') ? 'ja' : 'nein'; }
+    if (field === 'musterTest') { state.acq.musterHinterlassen = (value === 'muster' || value === 'beides') ? 'ja' : 'nein'; state.acq.testaufstellung = (value === 'test' || value === 'beides') ? 'ja' : 'nein'; if (state.acq.testaufstellung === 'ja' && (!state.acq.result || state.acq.result === 'Offen')) state.acq.result = 'Testphase'; }
     acqAdvance(field);
     render();
   });
@@ -7036,6 +7031,7 @@ function bind() {
     const v = b.dataset.musterTest;
     state.musterWanted = v === 'muster' || v === 'beides';
     state.testaufstellung = v === 'test' || v === 'beides';
+    if (state.testaufstellung) { if ((state.crmResult || 'Offen') === 'Offen') state.crmResult = 'Testphase'; if (!state.musterWanted && (state.crmSamples || 'Keine') === 'Keine') state.crmSamples = 'Test vereinbart'; }
     if (state.musterWanted) { state.musterCycleIndex = 0; state.summaryStep = 'musterzyklus'; } else state.summaryStep = 'notiz';
     render();
   }));
