@@ -5961,11 +5961,10 @@ function materialCompatHtml(p) {
   const pif = productDocUrl(p, 'pif');
   const src = `<p class="ez-note">Quelle: ${pif ? `<a href="${pif}" target="_blank" rel="noopener">Produktinformation des Herstellers</a>` : 'Produktinformation des Herstellers'} – dort stehen auch die Produktbeispiele. Verbindlich ist immer die aktuelle Produktinformation.</p>`;
   const warnHtml = warn ? `<div class="mat-warning"><strong>⚠ ${escapeHtml(warn.text)}</strong>${warn.intern && !state.customerMode && !inMesseContext() ? `<small>${escapeHtml(warn.intern)}</small>` : ''}</div>` : '';
-  let body = '', summary = '';
+  let body = '';
   if (tab) {
     const flat = tab.flatMap(([sec, rows]) => rows.map(r => ({sec, label: r[0], r: r[1], star: r[2], ex: r[3]})));
     const groups = [[0, 'Nicht empfohlen', 'bad', '✕'], [1, 'Bedingt empfohlen', 'warn', '!'], [2, 'Empfohlen', 'ok', '✓']];
-    summary = groups.map(([k, , cls, sym]) => { const n = flat.filter(x => x.r === k).length; return n ? `<b class="mat-count ${cls}">${sym} ${n}</b>` : ''; }).join('');
     body = groups.map(([k, title, cls]) => {
       const items = flat.filter(x => x.r === k);
       if (!items.length) return '';
@@ -5978,7 +5977,7 @@ function materialCompatHtml(p) {
   } else {
     body = '<p class="mat-text muted-copy">In der Produktinformation sind keine Materialangaben hinterlegt (z. B. bei Haut- und Händedesinfektion oder Pflege). Bei Fragen zu Spendern, Oberflächen oder Geräten bitte den Innendienst fragen.</p>';
   }
-  return `<details class="tip-box mat-box" data-mat="1" ${state.matOpen ? 'open' : ''}><summary><span>🧪 Materialverträglichkeit ${summary}</span><small>${tab ? 'Metalle, Kunststoffe, Elastomere im Überblick' : 'Hinweis aus der Produktinformation'}</small></summary>${warnHtml}${body}${src}</details>`;
+  return `<details class="tip-box mat-box" data-mat="1" ${state.matOpen ? 'open' : ''}><summary><span>🧪 Materialverträglichkeit</span><small>${tab ? 'Metalle, Kunststoffe, Elastomere im Überblick' : 'Hinweis aus der Produktinformation'}</small></summary>${warnHtml}${body}${src}</details>`;
 }
 
 // ===== Testphase vorbereiten: technische E-Mail an den Kunden (Konzentrate / Dosieranlagen) =====
