@@ -1760,7 +1760,7 @@ function acqReset() {
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
     produkteBesprochen:null, produktKategorie:null,
     interesse:null, interesseIds:[],
-    musterHinterlassen:null, musterEintraege:[], musterSuche:'', testaufstellung:null,
+    musterHinterlassen:null, musterEintraege:[], musterSuche:'', testaufstellung:null, musterTest:null,
     infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false},
     terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'],
     previewTo:'', previewSubject:'', previewBody:'', previewTouched:false,
@@ -1887,13 +1887,8 @@ function acqKuecheProducts() {
 function acqKuecheRelevant() {
   return acqKuecheProducts().length > 0 && brancheExclusionTags(state.acq.branche).length === 0;
 }
-// Testaufstellung nur sinnvoll, wenn Konzentrate (Dosieranlage) im Spiel sind: Muster hinterlassen und
-// darunter ein Konzentrat – oder zumindest ein Konzentrat mit ★ markiert.
-function acqTestaufstellungRelevant() {
-  const a = state.acq;
-  if (a.musterHinterlassen !== 'ja' || !(a.musterEintraege || []).some(m => m.id)) return false;
-  return a.musterEintraege.some(m => { const p = PRODUCTS.find(x => x.id === m.id); return p && isKonzentrat(p); }) || markedKonzentratIds().length > 0;
-}
+// Sind Konzentrate (Dosieranlage) im Spiel, lautet die Frage „Muster oder Testaufstellung?“ statt nur „Muster?“.
+function acqMusterTestFrage() { return markedKonzentratIds().length > 0; }
 function acqAfterMuster() {
   const a = state.acq;
   return (acqBesprocheneIds().length || a.interesseIds.length || (a.musterEintraege && a.musterEintraege.length)) ? 'info' : acqPreTermin();
@@ -1918,7 +1913,7 @@ function acqNextStepFor(field, value) {
   if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : acqAfterInteresse();
   if (field === 'kueche') return 'muster';
   if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length || (a.musterEintraege && a.musterEintraege.length)) ? 'info' : acqPreTermin());
-  if (field === 'testaufstellung') return acqAfterMuster();
+  if (field === 'musterTest') return (value === 'muster' || value === 'beides') ? 'musterAuswahl' : acqAfterMuster();
   if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : acqPreTermin();
   if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'notiz';
   return 'vorschau';
@@ -2309,17 +2304,23 @@ function acqScreenInner() {
     const names = acqKuecheProducts().map(p => p.name).join(', ');
     return acqYesNoStep({eyebrow:'Kaltakquise', field:'kueche', question:'Ist das Thema Küche interessant?', sub:`${escapeHtml(names)} – HACCP-konform und damit auch im Lebensmittelbereich/in der Küche einsetzbar.`});
   }
+  if (a.step === 'muster' && acqMusterTestFrage()) {
+    const opts = [['muster','Muster'],['test','Testaufstellung'],['beides','Muster und Testaufstellung'],['nein','Weder noch']];
+    return `<main class="page advisor-page">
+    <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Muster oder Testaufstellung gewünscht?</h1><p>Konzentrate laufen über Dosieranlagen. Bei Testaufstellung bereiten wir am Ende die Technik-E-Mail für den Kunden vor.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+    <section class="advisor-card"><div class="answer-grid wizard">${opts.map(([v,l]) => `<button class="answer-button ${a.musterTest===v?'active':''}" data-acq-set="musterTest:${v}">${l}</button>`).join('')}</div></section>
+  </main>`;
+  }
   if (a.step === 'muster') return acqYesNoStep({eyebrow:'Kaltakquise', field:'musterHinterlassen', question:'Muster hinterlassen?'});
   if (a.step === 'musterAuswahl') {
     return `<main class="page advisor-page">
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Muster wurden hinterlassen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${acqMusterPicker()}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${acqTestaufstellungRelevant() ? 'testaufstellung' : acqAfterMuster()}" style="margin-top:14px"><span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${acqAfterMuster()}" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
-  if (a.step === 'testaufstellung') return acqYesNoStep({eyebrow:'Kaltakquise', field:'testaufstellung', question:'Testaufstellung gewünscht?', sub:'Konzentrate laufen über Dosieranlagen. Bei „Ja“ bereiten wir am Ende die Technik-E-Mail für den Kunden vor (Kalibrierung, Edelstahlauslauf).'});
   if (a.step === 'info') return acqYesNoStep({eyebrow:'Kaltakquise', field:'infoGewuenscht', question:'Unterlagen als Link mitsenden?', sub:'Produktinformation, Sicherheitsdatenblatt, Betriebsanweisung – für Muster, Interesse oder weitere Infos.'});
   if (a.step === 'infoAuswahl') {
     const pool = [...new Set([...acqBesprocheneIds(), ...a.interesseIds, ...(a.musterEintraege || []).map(m => m.id)])];
@@ -3891,12 +3892,19 @@ function occasionPromptModal() {
       <div class="modal-card">
         ${modalCloseBtn()}
         <span class="eyebrow">Schritt ${stepNum.musterfrage} von ${total}</span>
-        <h2>Muster gewünscht?</h2>
+        ${markedKonzentratIds().length ? `<h2>Muster oder Testaufstellung gewünscht?</h2>
+        <p>Konzentrate laufen über Dosieranlagen. Bei Testaufstellung bereiten wir am Ende die Technik-E-Mail für den Kunden vor. Bei Mustern fragen wir die Menge je Produkt einzeln ab.</p>
+        <div class="modal-choices">
+          <button class="modal-choice" data-muster-test="nein">${icon('pm')}<span>Weder noch</span></button>
+          <button class="modal-choice" data-muster-test="muster">${icon('pm')}<span>Muster</span></button>
+          <button class="modal-choice" data-muster-test="test">${icon('pm')}<span>Testaufstellung</span></button>
+          <button class="modal-choice" data-muster-test="beides">${icon('pm')}<span>Muster und Testaufstellung</span></button>
+        </div>` : `<h2>Muster gewünscht?</h2>
         <p>Bei Bedarf fragen wir im nächsten Schritt für jedes Produkt einzeln die gewünschte Menge ab.</p>
         <div class="modal-choices">
           <button class="modal-choice" data-muster-wanted="nein">${icon('pm')}<span>Nein, keine Muster</span></button>
           <button class="modal-choice" data-muster-wanted="ja">${icon('pm')}<span>Ja, Muster gewünscht</span></button>
-        </div>
+        </div>`}
         <div class="modal-actions"><button class="secondary-button compact" data-action="occasion-back-produktbereiche">Zurück</button></div>
       </div>
     </div>`;
@@ -4151,21 +4159,6 @@ function occasionPromptModal() {
           <button class="secondary-button compact" data-action="innendienst-ask-no">Nein, fertig</button>
           <button class="primary-button compact" data-action="innendienst-ask-yes">${icon('talk')}<span>Ja, senden</span></button>
         </div>
-      </div>
-    </div>`;
-  }
-  if (state.summaryStep === 'testaufstellung') {
-    return `<div class="modal-overlay">
-      <div class="modal-card">
-        ${modalCloseBtn()}
-        <span class="eyebrow">Muster · Konzentrate</span>
-        <h2>Testaufstellung gewünscht?</h2>
-        <p>Konzentrate laufen über Dosieranlagen. Bei „Ja“ bereiten wir am Ende die Technik-E-Mail für den Kunden vor (Kalibrierung, Edelstahlauslauf).</p>
-        <div class="modal-choices">
-          <button class="modal-choice" data-testaufstellung="nein">${icon('pm')}<span>Nein</span></button>
-          <button class="modal-choice" data-testaufstellung="ja">${icon('pm')}<span>Ja, Testaufstellung</span></button>
-        </div>
-        <div class="modal-actions"><button class="secondary-button compact" data-action="testaufstellung-back">Zurück</button></div>
       </div>
     </div>`;
   }
@@ -5970,7 +5963,7 @@ const PRODUCT_TIPS = {
   'optisal-plus': [{
     branche: 'Konzentrate · Technik / Testphase',
     titel: 'Auslaufhahn der Dosieranlage auf Edelstahl umstellen',
-    text: 'Bei OPTISAL® PLUS muss der Auslaufhahn der Dosieranlage auf Edelstahl umgestellt werden – bei Ausläufen aus Kupfer oder Messing kann es zu Verfärbungen kommen. Kosten ca. 50 € zzgl. MwSt. (nur zur Info; in der Testphase wird der Edelstahlauslauf kostenfrei gestellt). Vor der Umstellung klären: aktuelles Produkt und Hersteller der Dosieranlage, Einsatzkonzentration (z. B. 1 %), Haustechniker oder unser Techniker. Die Technik-E-Mail an den Kunden gibt es im Kundenbesuch: Muster hinterlassen → „Testaufstellung gewünscht?“ → Ja.',
+    text: 'Bei OPTISAL® PLUS muss der Auslaufhahn der Dosieranlage auf Edelstahl umgestellt werden – bei Ausläufen aus Kupfer oder Messing kann es zu Verfärbungen kommen. Kosten ca. 50 € zzgl. MwSt. (nur zur Info; in der Testphase wird der Edelstahlauslauf kostenfrei gestellt). Vor der Umstellung klären: aktuelles Produkt und Hersteller der Dosieranlage, Einsatzkonzentration (z. B. 1 %), Haustechniker oder unser Techniker. Die Technik-E-Mail an den Kunden gibt es im Kundenbesuch: Frage „Muster oder Testaufstellung gewünscht?“ → Testaufstellung.',
     verweise: []
   }],
   'ultrasol-oxy-wipes': [{
@@ -6476,10 +6469,6 @@ function resolvePal(product, size='') {
   const row = state.priceByArt[resolveArtNr(product, size)];
   return (row && row.pal) || '';
 }
-function summaryTestaufstellungRelevant() {
-  if (!state.musterWanted) return false;
-  return favoriteEntries().some(({product, size}) => { const m = state.musterMengen[musterEntryKey(product, size)]; return isKonzentrat(product) && m && m.status && m.status !== 'skip'; });
-}
 // Letzter Schritt vor dem Angebot: bei gewünschter Testaufstellung zuerst die Technik-E-Mail anbieten.
 function nextAfterInnendienst() { return state.testaufstellung === true ? 'testphaseask' : 'angebotask'; }
 function musterEntryKey(product, size) { return product.id + '::' + (size || ''); }
@@ -6736,6 +6725,7 @@ function bind() {
   document.querySelectorAll('[data-acq-set]').forEach(button => button.onclick = () => {
     const [field,value] = button.dataset.acqSet.split(':');
     state.acq[field] = value;
+    if (field === 'musterTest') { state.acq.musterHinterlassen = (value === 'muster' || value === 'beides') ? 'ja' : 'nein'; state.acq.testaufstellung = (value === 'test' || value === 'beides') ? 'ja' : 'nein'; }
     acqAdvance(field);
     render();
   });
@@ -7042,8 +7032,13 @@ function bind() {
     localStorage.setItem('summaryAdditionalContacts', JSON.stringify(state.summaryAdditionalContacts));
     render();
   }));
-  document.querySelectorAll('[data-testaufstellung]').forEach(b => b.addEventListener('click', () => { state.testaufstellung = b.dataset.testaufstellung === 'ja'; state.summaryStep = 'notiz'; render(); }));
-  $('[data-action="testaufstellung-back"]')?.addEventListener('click', () => { state.summaryStep = 'musterzyklus'; render(); });
+  document.querySelectorAll('[data-muster-test]').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.musterTest;
+    state.musterWanted = v === 'muster' || v === 'beides';
+    state.testaufstellung = v === 'test' || v === 'beides';
+    if (state.musterWanted) { state.musterCycleIndex = 0; state.summaryStep = 'musterzyklus'; } else state.summaryStep = 'notiz';
+    render();
+  }));
   $('[data-action="testphase-ask-no"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
   $('[data-action="testphase-ask-yes"]')?.addEventListener('click', () => { tpOpen(state.screen, '', 'angebotask'); render(); window.scrollTo(0, 0); });
   $('[data-action="occasion-back-musterfrage"]')?.addEventListener('click', () => { state.summaryStep = 'musterfrage'; render(); });
@@ -7113,7 +7108,7 @@ function bind() {
     const entries = favoriteEntries();
     const idx = state.musterCycleIndex || 0;
     if (idx < entries.length - 1) state.musterCycleIndex = idx + 1;
-    else state.summaryStep = summaryTestaufstellungRelevant() ? 'testaufstellung' : 'notiz';
+    else state.summaryStep = 'notiz';
     render();
   });
   $('[data-action="occasion-back-notiz"]')?.addEventListener('click', () => { state.summaryStep = 'notiz'; render(); });
