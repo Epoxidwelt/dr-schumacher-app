@@ -473,7 +473,7 @@ const state = {
   summaryContactDraft: {anrede: 'Herr', name: '', email: ''},
   // Muster-Abfrage: für Bestandskunde genauso wie für Neukunde/Kaltakquise, deshalb hier auf
   // dem Top-Level-State statt in state.newCustomer (das es für Bestandskunde nicht gibt).
-  musterWanted: null, musterCycleIndex: 0, musterMengen: {},
+  musterWanted: null, musterCycleIndex: 0, musterMengen: {}, testaufstellung: null,
   // Rückmeldung-&-Ergebnis-Schritt: bewusst auf dem Top-Level-State statt in state.newCustomer,
   // weil dieser Schritt für Bestandskunde (kein state.newCustomer) genauso greift wie für
   // Neukunde/Kaltakquise.
@@ -1272,7 +1272,6 @@ function detailScreen() {
         return `<button class="${active?'active':''}" data-size="${size}" ${isMulti?`data-size-favorite="${p.id}"`:''}>${escapeHtml(size)}</button>`;
       }).join('')}</div>${p.sizeNotes && p.sizeNotes[state.size] ? `<small class="size-note">${p.sizeNotes[state.size]}</small>` : ''}<div class="price-display"><div>${(state.customerMode||inMesseContext())?'<strong class="hidden-price">Preis verborgen</strong>':`<small>Ihr Preis</small><strong>${money(price)}</strong><span>${perUnitCalc(p,state.size) || 'zzgl. MwSt.'}</span>`}</div>${(state.customerMode||inMesseContext())?'':`<select class="price-list-inline" data-action="price-list-inline" aria-label="Preisliste wechseln">${PRICE_LIST_KEYS.map(o=>`<option value="${o}" ${state.priceList===o?'selected':''}>${o}</option>`).join('')}</select>`}</div>
         ${(state.customerMode||inMesseContext()||!can('sales')||state.activeProfile!=='sales') ? '' : `<button class="primary-button compact" data-action="start-kundenbesuch" data-product="${p.id}">${icon('kundenbesuch')}<span>Kundenbesuch starten</span></button>`}
-        ${(state.customerMode||inMesseContext()||!isKonzentrat(p)) ? '' : `<button class="secondary-button compact" data-action="open-testphase" data-tp-product="${p.id}">${icon('talk')}<span>Testphase vorbereiten (E-Mail)</span></button>`}
         ${(state.customerMode||inMesseContext()) ? '' : `<button class="primary-button compact vs-button" data-action="compare-competitor" data-product="${p.id}">${icon('competition')}<span>Mit Wettbewerber vergleichen</span></button>`}
         ${emailCard(p)}
       </div>
@@ -1761,7 +1760,7 @@ function acqReset() {
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
     produkteBesprochen:null, produktKategorie:null,
     interesse:null, interesseIds:[],
-    musterHinterlassen:null, musterEintraege:[], musterSuche:'',
+    musterHinterlassen:null, musterEintraege:[], musterSuche:'', testaufstellung:null,
     infoGewuenscht:null, infoIds:[], infoDocs:{pif:false, sdb:false, ba:false},
     terminVorschlagen:null, termine:['','',''], terminZeiten:['10:00','10:00','10:00'],
     previewTo:'', previewSubject:'', previewBody:'', previewTouched:false,
@@ -1888,6 +1887,17 @@ function acqKuecheProducts() {
 function acqKuecheRelevant() {
   return acqKuecheProducts().length > 0 && brancheExclusionTags(state.acq.branche).length === 0;
 }
+// Testaufstellung nur sinnvoll, wenn Konzentrate (Dosieranlage) im Spiel sind: Muster hinterlassen und
+// darunter ein Konzentrat – oder zumindest ein Konzentrat mit ★ markiert.
+function acqTestaufstellungRelevant() {
+  const a = state.acq;
+  if (a.musterHinterlassen !== 'ja' || !(a.musterEintraege || []).some(m => m.id)) return false;
+  return a.musterEintraege.some(m => { const p = PRODUCTS.find(x => x.id === m.id); return p && isKonzentrat(p); }) || markedKonzentratIds().length > 0;
+}
+function acqAfterMuster() {
+  const a = state.acq;
+  return (acqBesprocheneIds().length || a.interesseIds.length || (a.musterEintraege && a.musterEintraege.length)) ? 'info' : acqPreTermin();
+}
 function acqAfterInteresse() { return acqKuecheRelevant() ? 'kueche' : 'muster'; }
 function acqEnterProdukte() {
   if (acqBesprocheneIds().length) { state.acq.produkteBesprochen = 'ja'; acqGo('produkteAuswahl'); }
@@ -1908,6 +1918,7 @@ function acqNextStepFor(field, value) {
   if (field === 'interesse') return value === 'ja' ? 'interesseAuswahl' : acqAfterInteresse();
   if (field === 'kueche') return 'muster';
   if (field === 'musterHinterlassen') return value === 'ja' ? 'musterAuswahl' : ((acqBesprocheneIds().length || a.interesseIds.length || (a.musterEintraege && a.musterEintraege.length)) ? 'info' : acqPreTermin());
+  if (field === 'testaufstellung') return acqAfterMuster();
   if (field === 'infoGewuenscht') return value === 'ja' ? 'infoAuswahl' : acqPreTermin();
   if (field === 'terminVorschlagen') return value === 'ja' ? 'terminAuswahl' : 'notiz';
   return 'vorschau';
@@ -2304,10 +2315,11 @@ function acqScreenInner() {
       <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Welche Muster wurden hinterlassen?</h1></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         ${acqMusterPicker()}
-        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${(acqBesprocheneIds().length||a.interesseIds.length||a.musterEintraege.length)?'info':acqPreTermin()}" style="margin-top:14px"><span>Weiter</span></button>
+        <button type="button" class="primary-button compact" data-action="acq-goto" data-step="${acqTestaufstellungRelevant() ? 'testaufstellung' : acqAfterMuster()}" style="margin-top:14px"><span>Weiter</span></button>
       </section>
     </main>`;
   }
+  if (a.step === 'testaufstellung') return acqYesNoStep({eyebrow:'Kaltakquise', field:'testaufstellung', question:'Testaufstellung gewünscht?', sub:'Konzentrate laufen über Dosieranlagen. Bei „Ja“ bereiten wir am Ende die Technik-E-Mail für den Kunden vor (Kalibrierung, Edelstahlauslauf).'});
   if (a.step === 'info') return acqYesNoStep({eyebrow:'Kaltakquise', field:'infoGewuenscht', question:'Unterlagen als Link mitsenden?', sub:'Produktinformation, Sicherheitsdatenblatt, Betriebsanweisung – für Muster, Interesse oder weitere Infos.'});
   if (a.step === 'infoAuswahl') {
     const pool = [...new Set([...acqBesprocheneIds(), ...a.interesseIds, ...(a.musterEintraege || []).map(m => m.id)])];
@@ -2457,6 +2469,7 @@ function acqBuildCrmReport() {
     aktionenTitel.length ? `Aktion besprochen: ${aktionenTitel.join(', ')}` : '',
     (a.handelspartner || '').trim() ? `Handelspartner: ${a.handelspartner.trim()}` : '',
     acqKonditionText() ? `Konditionen: ${acqKonditionText()}` : '',
+    a.testaufstellung === 'ja' ? 'Testaufstellung gewünscht (Technik-E-Mail an den Kunden)' : '',
     (a.kueche === 'ja' && acqKuecheRelevant()) ? `Thema Küche (HACCP-konform) interessant: ${acqKuecheProducts().map(p => p.name).join(', ')}` : '',
     termine.length ? `Terminvorschläge: ${termine.map(acqFormatTermin).join('; ')}` : ''
   ].filter(Boolean);
@@ -2499,7 +2512,7 @@ function acqAbschlussHtml() {
   return `<section class="advisor-card acq-abschluss" style="margin-top:16px"><h2 style="margin-top:0">Abschluss</h2><p class="muted-copy">Alle erfassten Angaben werden übernommen – kein erneutes Eintippen.</p>
     ${action('acq-crm', 'CRM-Eintrag erstellen', 'Gesprächsnotiz mit allen Daten', a.crmDone, myOwnEmail())}
     ${action('acq-innendienst', 'Neukunde an den Innendienst senden', 'legt den Kontakt an und meldet ihn zur Aufnahme', a.innendienstDone, innendienstEmail())}
-    ${markedKonzentratIds().length ? action('open-testphase', 'Testphase vorbereiten (Technik-E-Mail an den Kunden)', a.result === 'Testphase' ? 'Ergebnis „Testphase“ – Dosieranlagen, Kalibrierung, Edelstahlauslauf' : 'Dosieranlagen, Kalibrierung, Edelstahlauslauf abstimmen', false, '') : ''}
+    ${a.testaufstellung === 'ja' ? action('open-testphase', 'Testphase vorbereiten (Technik-E-Mail an den Kunden)', 'Testaufstellung gewünscht – Dosieranlagen, Kalibrierung, Edelstahlauslauf', a.testphaseDone, '') : ''}
   </section>`;
 }
 function acqVorschauScreen() {
@@ -2808,7 +2821,7 @@ function salutationKnown() { try { return !!localStorage.getItem('summarySalutat
 function salutationPrefix() { return salutationKnown() ? state.summarySalutation + ' ' : ''; }
 // Alle Angaben des laufenden Kundenbesuchs (Gesprächsnotiz, Wettbewerber, Feedback, Muster, Follow-up …) bleiben
 // unverändert gespeichert, bis ein neuer Kunde angelegt wird – auch nach Verklicken, Schließen oder Neustart.
-const WIZARD_DRAFT_KEYS = ['summaryNotiz','summaryBranche','musterWanted','musterCycleIndex','musterMengen','crmWettbewerber','crmWettbewerberCustomOpen','crmWettbewerberCustomText','crmFeedback','crmFeedbackSelected','crmSamples','crmResult','crmFollowUpWanted','crmFollowUpDate','crmVertragBisWanted','crmVertragBisDate'];
+const WIZARD_DRAFT_KEYS = ['summaryNotiz','summaryBranche','musterWanted','testaufstellung','musterCycleIndex','musterMengen','crmWettbewerber','crmWettbewerberCustomOpen','crmWettbewerberCustomText','crmFeedback','crmFeedbackSelected','crmSamples','crmResult','crmFollowUpWanted','crmFollowUpDate','crmVertragBisWanted','crmVertragBisDate'];
 function persistWizardDraft() {
   try {
     const o = {};
@@ -4141,6 +4154,35 @@ function occasionPromptModal() {
       </div>
     </div>`;
   }
+  if (state.summaryStep === 'testaufstellung') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Muster · Konzentrate</span>
+        <h2>Testaufstellung gewünscht?</h2>
+        <p>Konzentrate laufen über Dosieranlagen. Bei „Ja“ bereiten wir am Ende die Technik-E-Mail für den Kunden vor (Kalibrierung, Edelstahlauslauf).</p>
+        <div class="modal-choices">
+          <button class="modal-choice" data-testaufstellung="nein">${icon('pm')}<span>Nein</span></button>
+          <button class="modal-choice" data-testaufstellung="ja">${icon('pm')}<span>Ja, Testaufstellung</span></button>
+        </div>
+        <div class="modal-actions"><button class="secondary-button compact" data-action="testaufstellung-back">Zurück</button></div>
+      </div>
+    </div>`;
+  }
+  if (state.summaryStep === 'testphaseask') {
+    return `<div class="modal-overlay">
+      <div class="modal-card">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Testaufstellung</span>
+        <h2>Technik-E-Mail an den Kunden vorbereiten?</h2>
+        <p>Dosieranlagen, Kalibrierung und Edelstahlauslauf – mit passender Anrede, vor dem Versand noch änderbar.</p>
+        <div class="modal-actions">
+          <button class="secondary-button compact" data-action="testphase-ask-no">Nein, weiter</button>
+          <button class="primary-button compact" data-action="testphase-ask-yes">${icon('talk')}<span>Ja, E-Mail vorbereiten</span></button>
+        </div>
+      </div>
+    </div>`;
+  }
   if (state.summaryStep === 'angebotask') {
     return `<div class="modal-overlay">
       <div class="modal-card">
@@ -4476,7 +4518,7 @@ function summaryScreen(){
   </section>` : ''}
   <div class="offer-actions summary-send">${state.summarySent
     ? `<button class="primary-button compact" data-action="back-to-menu">${icon('surface')}<span>Zurück zum Menü</span></button>`
-    : `<button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button>`}${markedKonzentratIds().length ? `<button class="secondary-button compact" data-action="open-testphase">${icon('talk')}<span>Testphase vorbereiten (Technik-E-Mail)</span></button>` : ''}</div>
+    : `<button class="primary-button compact" data-action="send-summary" ${chosen.length?'':'disabled'}>${icon('talk')}<span>An Kunden senden</span></button>`}</div>
   </main>`;
 }
 function summaryProductCard(p){const selected=state.favorites.some(f=>f.id===p.id);return `<article class="mini-product"><span style="--dot:${p.color}"></span><div><strong>${p.name}</strong><small>${p.kind}</small></div><button data-favorite="${p.id}">${selected?'−':'+'}</button></article>`}
@@ -5928,9 +5970,8 @@ const PRODUCT_TIPS = {
   'optisal-plus': [{
     branche: 'Konzentrate · Technik / Testphase',
     titel: 'Auslaufhahn der Dosieranlage auf Edelstahl umstellen',
-    text: 'Bei OPTISAL® PLUS muss der Auslaufhahn der Dosieranlage auf Edelstahl umgestellt werden – bei Ausläufen aus Kupfer oder Messing kann es zu Verfärbungen kommen. Kosten ca. 50 € zzgl. MwSt. (nur zur Info; in der Testphase wird der Edelstahlauslauf kostenfrei gestellt). Vor der Umstellung klären: aktuelles Produkt und Hersteller der Dosieranlage, Einsatzkonzentration (z. B. 1 %), Haustechniker oder unser Techniker. Alle Punkte gehen automatisch in die Testphasen-E-Mail an den Kunden.',
-    verweise: [],
-    testphase: true
+    text: 'Bei OPTISAL® PLUS muss der Auslaufhahn der Dosieranlage auf Edelstahl umgestellt werden – bei Ausläufen aus Kupfer oder Messing kann es zu Verfärbungen kommen. Kosten ca. 50 € zzgl. MwSt. (nur zur Info; in der Testphase wird der Edelstahlauslauf kostenfrei gestellt). Vor der Umstellung klären: aktuelles Produkt und Hersteller der Dosieranlage, Einsatzkonzentration (z. B. 1 %), Haustechniker oder unser Techniker. Die Technik-E-Mail an den Kunden gibt es im Kundenbesuch: Muster hinterlassen → „Testaufstellung gewünscht?“ → Ja.',
+    verweise: []
   }],
   'ultrasol-oxy-wipes': [{
     branche: 'Rettungswache / Rettungsdienst',
@@ -5985,7 +6026,7 @@ const EDELSTAHL_AUSLAUF_PRODUCTS = ['optisal-plus'];
 function isKonzentrat(p) { return /konzentrat/i.test((p && p.kind) || ''); }
 function konzentrateAll() { return PRODUCTS.filter(p => p.category === 'surface' && isKonzentrat(p)); }
 function markedKonzentratIds() { return [...new Set(state.favorites.map(f => f.id))].filter(id => { const p = PRODUCTS.find(x => x.id === id); return p && isKonzentrat(p); }); }
-function tpOpen(returnTo, productId) {
+function tpOpen(returnTo, productId, resume) {
   const a = state.acq || {};
   const old = state.tp || {};
   let acqName = '', wb = '', email = '';
@@ -5996,6 +6037,7 @@ function tpOpen(returnTo, productId) {
   const ids = productId ? [productId] : markedKonzentratIds();
   state.tp = {
     returnTo: returnTo || 'menu',
+    resume: resume || '',
     anrede: a.anrede || (salutationKnown() ? state.summarySalutation : '') || old.anrede || '',
     name: acqName || state.summaryCustomer.trim() || old.name || '',
     email: email || old.email || '',
@@ -6064,7 +6106,7 @@ function testphaseScreen() {
   const field = (key, label, ph, type) => `<label class="modal-field wide" style="display:block;margin-bottom:12px"><span class="notiz-baustein-label">${label}</span><input type="${type || 'text'}" data-tp-field="${key}" placeholder="${escapeHtml(ph || '')}" value="${escapeHtml(tp[key] || '')}"></label>`;
   const stahlGewaehlt = (tp.produkte || []).some(id => EDELSTAHL_AUSLAUF_PRODUCTS.includes(id));
   return `<main class="page advisor-page">
-    <div class="section-heading"><div><span class="eyebrow">Konzentrate &amp; Technik</span><h1>Testphase vorbereiten</h1><p>E-Mail an den Kunden mit den technischen Punkten für einen reibungslosen Übergang. Die Anrede richtet sich nach Ihren Angaben.</p></div><button class="secondary-button" data-action="tp-back">Zurück</button></div>
+    <div class="section-heading"><div><span class="eyebrow">Konzentrate &amp; Technik</span><h1>Testphase vorbereiten</h1><p>E-Mail an den Kunden mit den technischen Punkten für einen reibungslosen Übergang. Die Anrede richtet sich nach Ihren Angaben.</p></div><button class="secondary-button" data-action="tp-back">${tp.resume ? 'Weiter' : 'Zurück'}</button></div>
     <section class="advisor-card">
       <p class="notiz-baustein-label">Anrede</p>
       <div class="notiz-baustein-chips" style="margin-bottom:12px">${['Herr', 'Frau'].map(a => chip(tp.anrede === a, `data-tp-anrede="${a}"`, a)).join('')}</div>
@@ -6097,7 +6139,7 @@ function productTipsHtml(p) {
     const key = p.id + ':' + i;
     const links = (t.verweise || []).map(id => PRODUCTS.find(x => x.id === id)).filter(Boolean)
       .map(x => `<button type="button" class="tip-link" data-product="${x.id}">→ ${escapeHtml(x.name)}</button>`).join('');
-    return `<details class="tip-box" data-tip="${key}" ${state.tipOpen[key] ? 'open' : ''}><summary><span>💡 Tipp · ${escapeHtml(t.branche)}</span><small>${escapeHtml(t.titel)}</small></summary><p>${escapeHtml(t.text)}</p>${(links || t.testphase) ? `<div class="tip-links">${links ? `<span>Querverweis:</span>${links}` : ''}${t.testphase ? `<button type="button" class="tip-link" data-action="open-testphase" data-tp-product="${p.id}">✉ Testphase-E-Mail vorbereiten</button>` : ''}</div>` : ''}</details>`;
+    return `<details class="tip-box" data-tip="${key}" ${state.tipOpen[key] ? 'open' : ''}><summary><span>💡 Tipp · ${escapeHtml(t.branche)}</span><small>${escapeHtml(t.titel)}</small></summary><p>${escapeHtml(t.text)}</p>${links ? `<div class="tip-links"><span>Querverweis:</span>${links}</div>` : ''}</details>`;
   }).join('');
 }
 function dispenserFitHtml(p) {
@@ -6434,6 +6476,12 @@ function resolvePal(product, size='') {
   const row = state.priceByArt[resolveArtNr(product, size)];
   return (row && row.pal) || '';
 }
+function summaryTestaufstellungRelevant() {
+  if (!state.musterWanted) return false;
+  return favoriteEntries().some(({product, size}) => { const m = state.musterMengen[musterEntryKey(product, size)]; return isKonzentrat(product) && m && m.status && m.status !== 'skip'; });
+}
+// Letzter Schritt vor dem Angebot: bei gewünschter Testaufstellung zuerst die Technik-E-Mail anbieten.
+function nextAfterInnendienst() { return state.testaufstellung === true ? 'testphaseask' : 'angebotask'; }
 function musterEntryKey(product, size) { return product.id + '::' + (size || ''); }
 // Gilt jetzt für Bestandskunde genauso wie für Neukunde/Kaltakquise — beide sprechen im
 // Gespräch über Muster, nur die Bestellung selbst läuft immer über den Onlineshop des
@@ -6637,8 +6685,8 @@ function bind() {
     $('#tpBody')?.addEventListener('input', e => { tp.body = e.target.value; tp.subject = $('#tpSubject').value; tp.bodyTouched = true; tpPersist(); });
     $('[data-action="tp-regen"]')?.addEventListener('click', () => { tp.bodyTouched = false; tpPersist(); render(); });
     $('[data-action="tp-copy"]')?.addEventListener('click', e => { copyEmailText($('#tpSubject').value, $('#tpBody').value, e.currentTarget); });
-    $('[data-action="tp-send"]')?.addEventListener('click', () => { openMailto($('#tpSubject').value, $('#tpBody').value, tp.email.trim()); });
-    $('[data-action="tp-back"]')?.addEventListener('click', () => { state.screen = (tp.returnTo && tp.returnTo !== 'testphase') ? tp.returnTo : 'menu'; render(); });
+    $('[data-action="tp-send"]')?.addEventListener('click', () => { openMailto($('#tpSubject').value, $('#tpBody').value, tp.email.trim()); if (state.acq) state.acq.testphaseDone = true; });
+    $('[data-action="tp-back"]')?.addEventListener('click', () => { state.screen = (tp.returnTo && tp.returnTo !== 'testphase') ? tp.returnTo : 'menu'; if (tp.resume) state.summaryStep = tp.resume; tp.resume = ''; tpPersist(); render(); });
   }
   document.querySelectorAll('.tip-box[data-tip]').forEach(box => box.addEventListener('toggle', e => { state.tipOpen[box.dataset.tip] = e.target.open; }));
   document.querySelectorAll('.ez-box').forEach(box => box.addEventListener('toggle', e => { state[box.dataset.ez === 'fit' ? 'fitOpen' : 'ezOpen'] = e.target.open; }));
@@ -6994,6 +7042,10 @@ function bind() {
     localStorage.setItem('summaryAdditionalContacts', JSON.stringify(state.summaryAdditionalContacts));
     render();
   }));
+  document.querySelectorAll('[data-testaufstellung]').forEach(b => b.addEventListener('click', () => { state.testaufstellung = b.dataset.testaufstellung === 'ja'; state.summaryStep = 'notiz'; render(); }));
+  $('[data-action="testaufstellung-back"]')?.addEventListener('click', () => { state.summaryStep = 'musterzyklus'; render(); });
+  $('[data-action="testphase-ask-no"]')?.addEventListener('click', () => { state.summaryStep = 'angebotask'; render(); });
+  $('[data-action="testphase-ask-yes"]')?.addEventListener('click', () => { tpOpen(state.screen, '', 'angebotask'); render(); window.scrollTo(0, 0); });
   $('[data-action="occasion-back-musterfrage"]')?.addEventListener('click', () => { state.summaryStep = 'musterfrage'; render(); });
   document.querySelectorAll('[data-muster-wanted]').forEach(button => button.addEventListener('click', () => {
     const ja = button.dataset.musterWanted === 'ja';
@@ -7061,7 +7113,7 @@ function bind() {
     const entries = favoriteEntries();
     const idx = state.musterCycleIndex || 0;
     if (idx < entries.length - 1) state.musterCycleIndex = idx + 1;
-    else state.summaryStep = 'notiz';
+    else state.summaryStep = summaryTestaufstellungRelevant() ? 'testaufstellung' : 'notiz';
     render();
   });
   $('[data-action="occasion-back-notiz"]')?.addEventListener('click', () => { state.summaryStep = 'notiz'; render(); });
@@ -7183,13 +7235,13 @@ function bind() {
   $('#occasionBranche')?.addEventListener('change', e => { state.summaryBranche = e.target.value; });
   $('[data-action="occasion-back-salutation"]')?.addEventListener('click', () => { state.summaryStep = 'kundentyp'; render(); });
   $('[data-action="occasion-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'salutation'; render(); });
-  $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
-  $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
-  $('[data-action="kunde-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
+  $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : nextAfterInnendienst(); render(); });
+  $('[data-action="crm-entry-yes"]')?.addEventListener('click', () => { sendQuickCrmEntry(); state.summaryStep = newCustomerContact() ? 'innendienstask' : nextAfterInnendienst(); render(); });
+  $('[data-action="kunde-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : nextAfterInnendienst(); render(); });
   $('[data-action="kunde-entry-yes"]')?.addEventListener('click', () => {
     state.summarySent = true;
     sendCustomerSummaryEmail();
-    state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask';
+    state.summaryStep = newCustomerContact() ? 'innendienstask' : nextAfterInnendienst();
     render();
   });
   document.querySelectorAll('[data-kaltakquise-kontakt]').forEach(button => button.addEventListener('click', () => {
@@ -7204,14 +7256,14 @@ function bind() {
     state.summaryStep = 'kaltakquiseEmailAsk';
     render();
   }));
-  $('[data-action="kaltakquise-email-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask'; render(); });
+  $('[data-action="kaltakquise-email-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : nextAfterInnendienst(); render(); });
   $('[data-action="kaltakquise-email-yes"]')?.addEventListener('click', () => {
     sendKaltakquiseNachfassEmail();
-    state.summaryStep = newCustomerContact() ? 'innendienstask' : 'angebotask';
+    state.summaryStep = newCustomerContact() ? 'innendienstask' : nextAfterInnendienst();
     render();
   });
-  $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : 'angebotask'; render(); });
-  $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : 'angebotask'; render(); });
+  $('[data-action="innendienst-ask-no"]')?.addEventListener('click', () => { state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : nextAfterInnendienst(); render(); });
+  $('[data-action="innendienst-ask-yes"]')?.addEventListener('click', () => { sendNewCustomerInnendienstEmail(); state.summaryStep = state.summaryPurpose === 'angebot' ? 'angebotOptionen' : nextAfterInnendienst(); render(); });
   $('[data-action="occasion-back-innendienstask"]')?.addEventListener('click', () => { state.summaryStep = 'innendienstask'; render(); });
   // Nach der letzten Frage bleiben die Daten gespeichert: beim nächsten Start fragt die App, ob mit
   // diesem Kunden weitergemacht oder ein neuer Kunde (bei 0) begonnen wird.
@@ -7794,7 +7846,7 @@ function resetCustomerData(silent, clearFavorites, stay) {
   state.konzeptBereichFormOpen = false;
   state.konzeptBereichDraftName = '';
   state.selectedKonzeptBereich = null;
-  state.musterWanted = null; state.musterCycleIndex = 0; state.musterMengen = {};
+  state.musterWanted = null; state.musterCycleIndex = 0; state.musterMengen = {}; state.testaufstellung = null;
   state.crmWettbewerber = []; state.crmWettbewerberCustomOpen = false; state.crmWettbewerberCustomText = '';
   state.crmFeedback = ''; state.crmFeedbackSelected = []; state.crmSamples = 'Keine'; state.crmResult = 'Offen';
   state.crmFollowUpWanted = null; state.crmFollowUpDate = '';
