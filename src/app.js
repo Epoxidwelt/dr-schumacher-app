@@ -1845,6 +1845,7 @@ function acqPositionOptions(branche) {
   if (b.includes('tier')) return ['Praxisinhaber / Tierarzt', 'Praxismanager/in', 'Leitende/r TFA', 'Hygienebeauftragte/r', ...gemein];
   if (b.includes('augen')) return ['Praxisinhaber / Chefarzt', 'Hygienebeauftragte/r', 'OP-Leitung', 'Praxismanager/in', ...gemein];
   if (b.includes('reha')) return ['Hygienefachkraft', 'Pflegedienstleitung', 'Hygienebeauftragter Arzt', 'Verwaltungsleitung', ...gemein];
+  if (b.includes('feuerwehr')) return ['Gerätewart', 'Wehrleiter / Wachleiter', 'Atemschutzgerätewart', 'Hygienebeauftragte/r', ...gemein];
   if (b.includes('rettung')) return ['Desinfektor', 'Leiter der Wache', 'Rettungsdienstleitung', 'Hygienebeauftragte/r', 'Notfallsanitäter / Lehrrettungsassistent', ...gemein];
   if (b.includes('krankenhaus') || b.includes('klinik')) return ['Hygienefachkraft', 'Krankenhaushygieniker', 'Hygienebeauftragter Arzt', 'Pflegedienstleitung', 'Apotheke', 'Einkauf / Materialwirtschaft', 'Geschäftsführung'];
   if (b.includes('pflege')) return ['Pflegedienstleitung (PDL)', 'Hygienebeauftragte/r', 'Einrichtungsleitung', 'Qualitätsmanagement', ...gemein];
@@ -2010,6 +2011,8 @@ function buildAcqEmail() {
         const facts = productFactsForBranche(p, a.branche);
         if (!facts.length) return;
         body.push(`${p.name}:`);
+        const einsatz = brancheEinsatzLine(p, a.branche);
+        if (einsatz) body.push(einsatz);
         facts.forEach(f => body.push(`  ✓ ${f}`));
         body.push('');
       });
@@ -2942,7 +2945,7 @@ function newCustomerDraftDefault(){
   return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', handelspartner:'', kondition:'', notiz:'' };
 }
 const NEUKUNDE_BRANCHEN = [
-  'Rettungswache / Rettungsdienst', 'Pflegedienst / Pflegeeinrichtung', 'Krankenhaus / Klinik',
+  'Rettungswache / Rettungsdienst', 'Feuerwehr', 'Pflegedienst / Pflegeeinrichtung', 'Krankenhaus / Klinik',
   'Arztpraxis', 'Zahnarztpraxis', 'Augenklinik / Augenarztpraxis', 'Tierarztpraxis / Tierklinik',
   'Reha-Klinik', 'Sonstige'
 ];
@@ -4623,6 +4626,8 @@ function buildCustomerSummaryEmail(){
     // praktisches Argument und soll direkt auffallen — deshalb eine eigene Zeile direkt
     // unter Preis/Standzeit, noch vor den Vorteilen, statt irgendwo im Fließtext zu stehen.
     if (p.haltbarkeitHinweis) lines.push('', p.haltbarkeitHinweis);
+    const einsatz = brancheEinsatzLine(p, branche);
+    if (einsatz) lines.push('', einsatz);
     const facts = [...productFactsForBranche(p, branche), ...sizeBonusFacts(size)];
     if (facts.length) {
       lines.push('', 'Vorteile:');
@@ -4638,7 +4643,7 @@ function buildCustomerSummaryEmail(){
     aktionenGesprochen.forEach(ak => lines.push(...aktionMailLines(ak)));
   }
   lines.push(
-    'Kurz gesagt: Mit den genannten Produkten von Dr. Schumacher profitieren Sie von zuverlässiger Qualität, einfacher Anwendung und einem Höchstmaß an Sicherheit in Ihren Hygieneprozessen.',
+    'Kurz gesagt: Mit den genannten Produkten von Dr. Schumacher profitieren Sie von zuverlässiger Qualität, einfacher Anwendung und ' + brancheSchutzText(branche) + '.',
     '',
     'Gerne bespreche ich mit Ihnen die nächsten Schritte – ob Musterlieferung, ein unverbindliches Angebot oder ein Termin vor Ort.',
     '',
@@ -4711,6 +4716,8 @@ function buildKaltakquiseNachfassEmail(){
     entries.forEach(({product: p, size}) => {
       lines.push(`▸ ${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
       const facts = productFactsForBranche(p, currentSummaryBranche());
+      const einsatz = brancheEinsatzLine(p, currentSummaryBranche());
+      if (einsatz) lines.push(einsatz);
       if (facts.length) {
         lines.push('Vorteile:');
         facts.forEach(f => lines.push(`  ✓ ${f}`));
@@ -6234,6 +6241,54 @@ function productFacts(product) {
   const raw = (live && live.length) ? live : product.facts;
   return raw.map(factText);
 }
+// Textanpassung nach Branche: In Klinik/Praxis geht es um Patienten, bei Rettungsdienst und Feuerwehr
+// oft um Fahrzeuge, Geräte und Ausrüstung. Erkannt wird nur über den Branchennamen.
+function brancheTyp(branche) {
+  const b = (branche || '').toLowerCase();
+  if (b.includes('feuerwehr')) return 'feuerwehr';
+  if (b.includes('rettung')) return 'rettung';
+  if (b.includes('tier')) return 'vet';
+  if (b.includes('pflege')) return 'pflege';
+  if (b.includes('krankenhaus') || b.includes('klinik') || b.includes('reha')) return 'klinik';
+  if (b.includes('arzt') || b.includes('zahn')) return 'praxis';
+  return '';
+}
+const FACT_BRANCH_VARIANTS = {
+  'Größere Tücher für die Desinfektion großer Flächen im patientennahen Bereich': {einsatz: 'Größere Tücher für die Desinfektion großer Flächen – z. B. Fahrzeuginnenraum und Ausrüstung'},
+  'Große Tücher zur Desinfektion von Flächen in patientennahen Bereichen': {einsatz: 'Große Tücher zur Desinfektion von Flächen – z. B. im Fahrzeug und an Geräten'},
+  'Gebrauchsfertig und sofort einsatzbereit – ideal für die schnelle Flächendesinfektion im Rettungswagen oder auf der Isolierstation': {klinik: 'Gebrauchsfertig und sofort einsatzbereit – ideal für die schnelle Flächendesinfektion auf der Isolierstation und im Patientenzimmer', rettung: 'Gebrauchsfertig und sofort einsatzbereit – ideal für die schnelle Desinfektion von Fahrzeug, Liegen und Ausrüstung im Rettungswagen', feuerwehr: 'Gebrauchsfertig und sofort einsatzbereit – ideal für die schnelle Desinfektion von Fahrzeug und Ausrüstung'},
+  'Flexible Einsatzorte: Patienten- und Intensivbetten, Infusionsständer, Pflege- und Behandlungswagen, Handläufe und Rohrsysteme': {einsatz: 'Flexible Einsatzorte: Rohrrahmen, Wagen, Handläufe und Rohrsysteme – werkzeugfrei montierbar'}
+};
+function adaptFactForBranche(text, typ) {
+  const v = FACT_BRANCH_VARIANTS[text];
+  if (typ !== 'rettung' && typ !== 'feuerwehr') return (v && v[typ]) || text;
+  if (v) return v[typ] || v.einsatz || text;
+  // Aussagen, die nur für Patienten gelten (Betten, Patientenwaschung, Zertifizierung je Bett), entfallen.
+  if (/Patientenbett|Patientenwaschung|Patientenkomfort/.test(text)) return null;
+  return text;
+}
+// Kurzer Einsatz-Hinweis je Branche für Desinfektionsprodukte (Flächen) in den Kunden-E-Mails.
+function brancheEinsatzLine(p, branche) {
+  if (!p || p.category !== 'surface' || /spender|vliestuch|system/i.test(p.kind || '') || !(p.spectrum || []).length) return '';
+  const t = brancheTyp(branche);
+  if (t === 'rettung') return 'Einsatz bei Ihnen: Fahrzeuginnenraum, Liegen, Geräte und Ausrüstung';
+  if (t === 'feuerwehr') return 'Einsatz bei Ihnen: Fahrzeuge, Geräte und Ausrüstung';
+  if (t === 'klinik') return 'Einsatz bei Ihnen: patientennahe Flächen, Patientenzimmer und Medizinprodukte';
+  if (t === 'pflege') return 'Einsatz bei Ihnen: Flächen in Bewohner- und Patientenzimmern und Pflegehilfsmittel';
+  if (t === 'praxis') return 'Einsatz bei Ihnen: Behandlungsräume und Flächen am Patienten';
+  return '';
+}
+// Schlusssatz der Zusammenfassung: wen die Hygiene schützt, hängt von der Branche ab.
+function brancheSchutzText(branche) {
+  const t = brancheTyp(branche);
+  if (t === 'klinik') return 'einem Höchstmaß an Sicherheit für Ihre Patienten und Mitarbeitenden';
+  if (t === 'pflege') return 'einem Höchstmaß an Sicherheit für Bewohner, Patienten und Pflegekräfte';
+  if (t === 'praxis') return 'einem Höchstmaß an Sicherheit für Ihre Patientinnen und Patienten und Ihr Team';
+  if (t === 'vet') return 'einem Höchstmaß an Sicherheit für Tier und Team';
+  if (t === 'rettung') return 'einem Höchstmaß an Sicherheit für Ihre Einsatzkräfte und einer schnellen, sicheren Einsatzbereitschaft von Fahrzeugen und Ausrüstung';
+  if (t === 'feuerwehr') return 'einem Höchstmaß an Sicherheit für Ihre Einsatzkräfte und einsatzbereite Fahrzeuge und Ausrüstung';
+  return 'einem Höchstmaß an Sicherheit in Ihren Hygieneprozessen';
+}
 function productFactsForBranche(product, branche) {
   const live = state.liveFacts[product.id];
   const raw = (live && live.length) ? live : product.facts;
@@ -6244,7 +6299,7 @@ function productFactsForBranche(product, branche) {
     if (f.audience && f.audience !== category) return false;
     if (f.excludeAudience && f.excludeAudience.some(tag => excluded.includes(tag))) return false;
     return true;
-  }).map(factText);
+  }).map(factText).map(t => adaptFactForBranche(t, brancheTyp(branche))).filter(Boolean);
 }
 const VACU_BAG_ADVANTAGES = [
   '700 ml statt 500 ml bei bis zu 98,9 % Restentleerung – bis zu 33 % weniger Gebindewechsel',
