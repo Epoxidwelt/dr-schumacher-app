@@ -5740,9 +5740,24 @@ function copyOfferEmail(button) {
   copyEmailText(subject, body, button);
 }
 
+// Erinnerung in den Favoriten: Tipps und Warnhinweise zu den markierten Produkten (z. B. Edelstahlauslauf bei OPTISAL® PLUS).
+function favoritenHinweiseHtml(entries) {
+  if (state.customerMode || inMesseContext()) return '';
+  const typ = brancheTyp(state.aktBranche);
+  const seen = new Set();
+  const cards = [];
+  entries.forEach(({product: p}) => {
+    if (seen.has(p.id)) return; seen.add(p.id);
+    (PRODUCT_TIPS[p.id] || []).filter(t => !t.typen || t.typen.includes(typ)).forEach(t => {
+      cards.push(`<div class="fav-hinweis"><span class="eyebrow">${escapeHtml(p.name)}</span><strong>💡 ${escapeHtml(t.titel)}</strong><p>${escapeHtml(t.text)}</p><button type="button" class="tip-link" data-product="${p.id}">→ Zum Produkt</button></div>`);
+    });
+  });
+  if (!cards.length) return '';
+  return `<section class="fav-hinweise"><h2>Zur Erinnerung: Hinweise zu deinen Favoriten</h2>${cards.join('')}</section>`;
+}
 function favoritesScreen() {
   const entries = favoriteEntries();
-  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1><p>Mit dem Stern markierte Produkte landen automatisch auch in der Kundenzusammenfassung. Bei mehreren Gebindegrößen oder Tuchmengen können Sie jede Variante einzeln markieren – sie erscheint dann als eigener Eintrag.</p></div><div class="report-actions">${entries.length ? '<button class="secondary-button" data-action="clear-favorites">Favoriten leeren</button>' : ''}<button class="secondary-button" data-category="konzepte">${icon('konzept')}<span>Konzept erstellen</span></button></div></div><div class="product-list">${entries.map(e=>productCard(e.product, e.size)).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
+  return `<main class="page products-page"><div class="section-heading"><div><span class="eyebrow">Persönliche Auswahl</span><h1>Favoriten</h1><p>Mit dem Stern markierte Produkte landen automatisch auch in der Kundenzusammenfassung. Bei mehreren Gebindegrößen oder Tuchmengen können Sie jede Variante einzeln markieren – sie erscheint dann als eigener Eintrag.</p></div><div class="report-actions">${entries.length ? '<button class="secondary-button" data-action="clear-favorites">Favoriten leeren</button>' : ''}<button class="secondary-button" data-category="konzepte">${icon('konzept')}<span>Konzept erstellen</span></button></div></div>${favoritenHinweiseHtml(entries)}<div class="product-list">${entries.map(e=>productCard(e.product, e.size)).join('') || '<div class="empty-state"><h2>Noch keine Favoriten</h2><p>Tippen Sie bei einem Produkt auf den Stern.</p></div>'}</div></main>`;
 }
 
 function settingsScreen() {
@@ -6034,7 +6049,7 @@ const PRODUCT_TIPS = {
   'optisal-plus': [{
     branche: 'Konzentrate · Technik / Testphase',
     titel: 'Auslaufhahn der Dosieranlage auf Edelstahl umstellen',
-    text: 'Bei OPTISAL® PLUS muss der Auslaufhahn der Dosieranlage auf Edelstahl umgestellt werden – bei Ausläufen aus Kupfer oder Messing kann es zu Verfärbungen kommen. Kosten ca. 50 € zzgl. MwSt. (nur zur Info; in der Testphase wird der Edelstahlauslauf kostenfrei gestellt). Vor der Umstellung klären: aktuelles Produkt und Hersteller der Dosieranlage, Einsatzkonzentration (z. B. 1 %), Haustechniker oder unser Techniker. Die Technik-E-Mail an den Kunden gibt es im Kundenbesuch: Frage „Muster oder Testaufstellung?“ → Testaufstellung.',
+    text: 'Bei OPTISAL® PLUS muss der Auslaufhahn der Dosieranlage auf Edelstahl umgestellt werden – aufgrund der höheren Alkalität kann es bei Ausläufen aus Kupfer oder Messing zu möglichen Reaktionen und Farbveränderungen kommen. Kosten ca. 50 € zzgl. MwSt. (nur zur Info; in der Testphase wird der Edelstahlauslauf kostenfrei gestellt). Vor der Umstellung klären: aktuelles Produkt und Hersteller der Dosieranlage, Einsatzkonzentration (z. B. 1 %), Haustechniker oder unser Techniker. Die Technik-E-Mail an den Kunden gibt es im Kundenbesuch: Frage „Muster oder Testaufstellung?“ → Testaufstellung.',
     verweise: []
   }],
   'ultrasol-oxy-wipes': [{
@@ -6067,7 +6082,7 @@ const MATERIAL_TEXT = {"biguanid-fläche-nr":"Einsetzbar auf einer Vielzahl an M
 // Stelle testen); 4. Wert = Produktbeispiel bei nicht/bedingt empfohlen. Produkte ohne Tabelle haben (falls
 // vorhanden) den Fließtext der PIF in MATERIAL_TEXT. Alles Weitere steht in der verlinkten Produktinformation.
 const MATERIAL_WARNINGS = {
-  'optisal-plus': {text: 'Dosieranlage: Auslaufhahn aus Edelstahl erforderlich – bei Kupfer oder Messing drohen Verfärbungen.', intern: 'Umrüstung ca. 50 € zzgl. MwSt. (in der Testphase kostenfrei).'}
+  'optisal-plus': {text: 'Dosieranlage: Auslaufhahn aus Edelstahl erforderlich – aufgrund der höheren Alkalität drohen bei Kupfer oder Messing mögliche Reaktionen und Farbveränderungen.', intern: 'Umrüstung ca. 50 € zzgl. MwSt. (in der Testphase kostenfrei).'}
 };
 function matShort(l) { return l.replace(/\s*\((?:[^()]{7,}|[^()]*\([^()]*\)[^()]*)\)/, '').trim(); }
 function materialCompatHtml(p) {
