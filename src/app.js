@@ -4602,7 +4602,7 @@ function docLinkLines(products) {
   const sel = docLinksSelected();
   const list = [...new Map((products || []).filter(Boolean).map(p => [p.id, p])).values()];
   if (!sel.length || !list.length) return [];
-  const lines = ['Unterlagen zum Download:', ''];
+  const lines = [uBold('Unterlagen zum Download:'), ''];
   list.forEach(p => {
     lines.push(`▸ ${p.name}`);
     sel.forEach(([k, label]) => { const u = productDocUrl(p, k); lines.push(`  – ${label}: ${u || 'reiche ich Ihnen gerne nach'}`); });
@@ -4647,29 +4647,28 @@ function buildCustomerSummaryEmail(){
   ];
   const showPrices = state.summaryIncludePrices && !state.customerMode;
   entries.forEach(({product: p, size})=>{
-    lines.push(`▸ ${p.name.toUpperCase()}${size ? ' – ' + size : ''}`);
-    lines.push('─'.repeat(`${p.name}${size ? ' – ' + size : ''}`.length + 2));
+    const title = `${p.name.toUpperCase()}${size ? ' – ' + size : ''}`;
+    lines.push(`▸ ${uBold(p.name.toUpperCase())}${size ? ' – ' + size : ''}`);
+    lines.push('─'.repeat(title.length + 2));
+    // Kerninfos (Preis, Haltbarkeit, Einsatz) kompakt direkt unter dem Produktnamen, danach die Vorteile
+    // klar untereinander – so lässt sich jedes Produkt auf einen Blick erfassen.
+    const info = [];
     if (showPrices) {
       const price = resolvePrice(p, size);
-      if (price !== undefined && price !== null && price !== '') lines.push(`Ihr Preis (${state.priceList}): ${money(price)} zzgl. MwSt.`);
+      if (price !== undefined && price !== null && price !== '') info.push(`Ihr Preis${state.priceList === 'UVP' ? ' (UVP)' : ''}: ${money(price)} zzgl. MwSt.`);
     }
     // Standzeit direkt unter Produkt/Preis, noch vor den Vorteilen — das ist die praktisch
-    // wichtigste Zusatzinfo bei ONE SYSTEM PLUS/BASIC und soll nicht in der Vorteile-Liste
-    // untergehen. Die Vorteile bekommen danach eine eigene, klar beschriftete Gruppe.
+    // wichtigste Zusatzinfo bei ONE SYSTEM PLUS/BASIC und soll nicht in der Vorteile-Liste untergehen.
     const standzeitLines = oneSystemStandzeitLines(p.id);
-    if (standzeitLines.length) {
-      lines.push('', standzeitLines[0]);
-      standzeitLines.slice(1).forEach(l => lines.push('  ' + l));
-    }
-    // Haltbarkeit nach Anbruch (bzw. Standzeit der Gebrauchslösung) ist ein starkes,
-    // praktisches Argument und soll direkt auffallen — deshalb eine eigene Zeile direkt
-    // unter Preis/Standzeit, noch vor den Vorteilen, statt irgendwo im Fließtext zu stehen.
-    if (p.haltbarkeitHinweis) lines.push('', p.haltbarkeitHinweis);
+    if (standzeitLines.length) { info.push(standzeitLines[0]); standzeitLines.slice(1).forEach(l => info.push('  ' + l)); }
+    // Haltbarkeit nach Anbruch (bzw. Standzeit der Gebrauchslösung) ist ein starkes, praktisches Argument.
+    if (p.haltbarkeitHinweis) info.push(p.haltbarkeitHinweis);
     const einsatz = brancheEinsatzLine(p, branche);
-    if (einsatz) lines.push('', einsatz);
+    if (einsatz) info.push(einsatz);
+    if (info.length) lines.push(...info);
     const facts = [...productFactsForBranche(p, branche), ...sizeBonusFacts(size)];
     if (facts.length) {
-      lines.push('', 'Vorteile:');
+      lines.push('', uBold('Ihre Vorteile:'));
       facts.forEach(f => lines.push(`  ✓ ${f}`));
     }
     lines.push('');
@@ -4688,8 +4687,11 @@ function buildCustomerSummaryEmail(){
     '',
     'Für Rückfragen stehen wir Ihnen jederzeit gerne zur Verfügung.',
     '',
-    'Mit freundlichen Grüßen'
+    'Mit freundlichen Grüßen' + (state.repName ? ',\n' + state.repName : '')
   );
+  const rep = currentRepUser();
+  const kontakt = [rep && rep.telefon ? `Telefon: ${rep.telefon}` : '', myOwnEmail() ? `E-Mail: ${myOwnEmail()}` : ''].filter(Boolean);
+  if (state.repName && kontakt.length) lines.push(...kontakt);
   return {subject: summarySubject(), body:lines.join('\n')};
 }
 function sendCustomerSummaryEmail(){
@@ -5945,10 +5947,10 @@ function haccpKuecheLines(products, branche) {
   if (!hp.length || brancheExclusionTags(branche).length) return [];
   const names = hp.length <= 4 ? hp.map(p => p.name).join(', ') : `${hp.length} der besprochenen Produkte`;
   return [
-    'Ein Portfolio für Pflege und Küche:',
+    uBold(({klinik:'Ein Portfolio für Pflege und Küche', pflege:'Ein Portfolio für Pflege und Küche', rettung:'Ein Portfolio für Wache und Küche', feuerwehr:'Ein Portfolio für Wache und Küche', praxis:'Ein Portfolio für Praxis und Küche'})[brancheTyp(branche)] || 'Ein Portfolio – auch für die Küche') + ':',
     '',
     `  ✓ ${names}: HACCP-konform und damit auch im Lebensmittelbereich einsetzbar`,
-    '  ✓ Gibt es in Ihrer Einrichtung eine Küche, lässt sie sich mit demselben Sortiment abdecken – das hält Ihr Portfolio schlank',
+    `  ✓ Gibt es in ${['rettung','feuerwehr'].includes(brancheTyp(branche)) ? 'Ihrer Wache' : 'Ihrer Einrichtung'} eine Küche, lässt sie sich mit demselben Sortiment abdecken – das hält Ihr Portfolio schlank`,
     ''
   ];
 }
