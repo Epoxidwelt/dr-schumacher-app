@@ -443,6 +443,8 @@ const state = {
   fitOpen: false,
   tipOpen: {},
   matOpen: false,
+  aktBranche: (() => { try { return localStorage.getItem('aktBranche') || ''; } catch (e) { return ''; } })(),
+  brancheAsked: false,
   tp: (() => { try { return JSON.parse(localStorage.getItem('tpDraft') || 'null'); } catch (e) { return null; } })(),
   aktionOpen: null,
   wsSel: [],
@@ -652,6 +654,8 @@ function currentViewKey() {
 }
 
 function render() {
+  // Schritt 1 nach dem App-Start: erst die Branche abfragen, dann das Menü zeigen.
+  if (state.screen === 'menu' && !state.brancheAsked) state.screen = 'branche';
   const app = $('#app');
   const active = document.activeElement;
   const isTypingField = active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) && active.id;
@@ -676,7 +680,8 @@ function render() {
   if (state.screen === 'prices') html = priceScreen();
   if (state.screen === 'region') html = regionScreen();
   if (state.screen === 'one') html = oneRender();
-  if (state.screen === 'menu') html = header() + menuScreen() + bottomNav('home');
+  if (state.screen === 'branche') html = header() + brancheScreen();
+  if (state.screen === 'menu') html = header() + brancheBar() + menuScreen() + bottomNav('home');
   if (state.screen === 'products') html = header(true) + productsScreen() + (state.previousScreen === 'akquise-produkte' ? acqReturnBar() : bottomNav('search'));
   if (state.screen === 'detail') html = header(true) + detailScreen() + (state.previousScreen === 'akquise-produkte' ? acqReturnBar() : bottomNav('search'));
   if (state.screen === 'favorites') html = header(true) + favoritesScreen() + bottomNav('favorites');
@@ -889,6 +894,26 @@ function endTileDrag(e) {
   if (moved) { if (tileDrag.grid.dataset.arrangeStore === 'acqBranche') persistAcqBrancheOrder(order); else persistToolOrder(order); }
   tileDrag = null;
   render();
+}
+// Aktuelle Branche („In welchem Bereich bist du gerade?“): steuert Tipps und Texte der E-Mails.
+function setAktBranche(b) {
+  state.aktBranche = b || '';
+  try { localStorage.setItem('aktBranche', state.aktBranche); } catch (e) {}
+}
+function brancheTilesHtml(attr) {
+  return NEUKUNDE_BRANCHEN.map(b => `<button class="category-card akquise ${state.aktBranche === b ? 'selected' : ''}" ${attr}="${escapeHtml(b)}"><span class="category-icon">${icon('kundenbesuch')}</span><span><strong>${escapeHtml(b)}</strong></span><b>›</b></button>`).join('');
+}
+function brancheScreen() {
+  return `<main class="page advisor-page">
+    <div class="section-heading"><div><span class="eyebrow">Schritt 1</span><h1>In welchem Bereich bist du gerade?</h1><p>Die Auswahl passt Tipps und Texte an die Branche an – z. B. Patienten im Krankenhaus, Fahrzeuge und Ausrüstung bei der Rettungswache.</p></div></div>
+    <section class="advisor-card">
+      <div class="category-grid">${brancheTilesHtml('data-akt-branche')}</div>
+      <button type="button" class="secondary-button compact" data-akt-branche="" style="margin-top:14px">Überspringen</button>
+    </section>
+  </main>`;
+}
+function brancheBar() {
+  return `<div class="akt-branche-bar"><span>Bereich: <strong>${escapeHtml(state.aktBranche || 'nicht gewählt')}</strong></span><button type="button" class="secondary-button compact" data-action="branche-change">ändern</button></div>`;
 }
 function menuScreen() {
   let cards = [
@@ -1753,10 +1778,10 @@ function acqFormatTermin(value) {
 function acqReset() {
   state.acqArrangeMode = false;
   state.acq = {
-    branche:'', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
+    branche: state.aktBranche || '', firma:'', strasse:'', hausnummer:'', plz:'', ort:'',
     myPos:null, locating:false, locateError:'', handelspartner:'', konditionPL:'', konditionText:'', kueche:null, anrede:'', position:'', apName:'', anlass:'',
     wettbewerber:[], wettbewerberText:'', vertragBis:'', feedbackSel:[], feedbackText:'', result:'Offen', followUp:'', notiz:'', 
-    step:'branche', history:[],
+    step: state.aktBranche ? 'adresse' : 'branche', history:[],
     gespraech:null, vorname:'', nachname:'', telefon:'', email:'',
     produkteBesprochen:null, produktKategorie:null,
     interesse:null, interesseIds:[],
@@ -2224,7 +2249,7 @@ function acqScreenInner() {
   }
   if (a.step === 'adresse') {
     return `<main class="page advisor-page">
-      <div class="section-heading"><div><span class="eyebrow">Kaltakquise</span><h1>Adresse (optional)</h1><p>Per Standort übernehmen oder von Hand eintragen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
+      <div class="section-heading"><div><span class="eyebrow">Kaltakquise${a.branche ? ' · ' + escapeHtml(a.branche) : ''}</span><h1>Adresse (optional)</h1><p>Per Standort übernehmen oder von Hand eintragen.</p></div><button class="secondary-button" data-action="acq-back">Zurück</button></div>
       <section class="advisor-card">
         <div class="wide location-actions">
           <button type="button" class="secondary-button compact" data-action="acq-locate" ${a.locating?'disabled':''}>${icon('pin')}<span>${a.locating?'Standort wird ermittelt…':'Aktuellen Standort übernehmen'}</span></button>
@@ -2942,7 +2967,8 @@ function startAngebotFlow(){
   maybeAskSpeicherKunde();
 }
 function newCustomerDraftDefault(){
-  return { firma:'', branche:'', anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', handelspartner:'', kondition:'', notiz:'' };
+  let b0 = ''; try { b0 = state.aktBranche || ''; } catch (e) {}
+  return { firma:'', branche:b0, anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', handelspartner:'', kondition:'', notiz:'' };
 }
 const NEUKUNDE_BRANCHEN = [
   'Rettungswache / Rettungsdienst', 'Feuerwehr', 'Pflegedienst / Pflegeeinrichtung', 'Krankenhaus / Klinik',
@@ -3832,6 +3858,17 @@ function occasionPromptModal() {
       </div>
     </div>`;
   }
+  if (state.summaryStep === 'brancheask') {
+    return `<div class="modal-overlay">
+      <div class="modal-card" style="width:min(560px,100%)">
+        ${modalCloseBtn()}
+        <span class="eyebrow">Neuer Kunde</span>
+        <h2>In welchem Bereich bist du gerade?</h2>
+        <p class="muted-copy">Tipps und E-Mail-Texte werden an die Branche angepasst.</p>
+        <div class="category-grid">${brancheTilesHtml('data-brancheask-pick').replace(/data-brancheask-pick=/g, 'data-brancheask-pick=')}</div>
+      </div>
+    </div>`;
+  }
   if (state.summaryStep === 'kundentyp') {
     const neuLabel = state.summaryKundenbesuch ? 'Kaltakquise' : 'Neukunde';
     return `<div class="modal-overlay">
@@ -4550,9 +4587,9 @@ function currentSummaryBranche() {
   if (state.newCustomer) return state.newCustomer.draft.branche;
   if (state.summaryBranche) return state.summaryBranche;
   const kundenNr = state.summaryKundenNr.trim().toLowerCase();
-  if (!kundenNr) return '';
+  if (!kundenNr) return state.aktBranche || '';
   const contact = state.one.contacts.find(c => (c.kundenNr || '').trim().toLowerCase() === kundenNr);
-  return (contact && contact.branche) || '';
+  return (contact && contact.branche) || state.aktBranche || '';
 }
 // Unterlagen (Produktinformation / Sicherheitsdatenblatt / Betriebsanweisung) als Link in Kunden-E-Mails.
 // Gilt für alle markierten Produkte; fehlt ein Dokument beim Hersteller, steht ein Nachreichen-Hinweis.
@@ -5985,6 +6022,13 @@ const DISPENSER_PRODUCTS = ['ak-plus-500-wandspender','ak-plus-1000-wandspender'
 // Wächst nach und nach mit der Erfahrung im Alltag: einfach einen weiteren Eintrag unter der
 // Produkt-ID ergänzen. verweise = Produkt-IDs, die als Querverweis-Button unter dem Tipp erscheinen.
 const PRODUCT_TIPS = {
+  'descolind-care-wipes': [{
+    typen: ['rettung', 'feuerwehr'],
+    branche: 'Rettungswache / Feuerwehr',
+    titel: 'Reinigung nach dem Einsatz mit der 10er-Packung',
+    text: 'Die Packung mit 10 Tüchern ist handlich für Rettungswagen und Einsatzfahrzeug – zur Reinigung nach dem Einsatz, ohne Nachspülen mit Wasser (geeignet zur Ganzkörperwaschung). Optional: unsere DECONTAMAN für den Körper.',
+    verweise: ['desoderm-care-wipes', 'decontaman-pre-wipes', 'decontaman-pre-wash']
+  }],
   'optisal-plus': [{
     branche: 'Konzentrate · Technik / Testphase',
     titel: 'Auslaufhahn der Dosieranlage auf Edelstahl umstellen',
@@ -5992,12 +6036,20 @@ const PRODUCT_TIPS = {
     verweise: []
   }],
   'ultrasol-oxy-wipes': [{
+    typen: ['rettung'],
     branche: 'Rettungswache / Rettungsdienst',
     titel: 'Tücher und Flüssigkeit zusammen anbieten',
     text: 'Möchte die Wache die ULTRASOL OXY® WIPES nutzen, immer auch die Flüssigkeit anbieten: Tücher sind ideal für Kontaktflächen und die schnelle Zwischendesinfektion, für große Flächen (Fahrzeuginnenraum, Liegen, Boden, Fahrzeughalle) ist die Flüssigkeit praktischer. Neben dem Zusatzverkauf ist das der Mehrwert für den Kunden. Alternative: ULTRASOL® ACTIVE als Sachet – einfach beschrieben und einfach in der Anwendung.',
     verweise: ['ultrasol-oxy', 'ultrasol-active']
   }],
   'desoderm-care-wipes': [{
+    typen: ['rettung', 'feuerwehr'],
+    branche: 'Rettungswache / Feuerwehr',
+    titel: 'Reinigung nach dem Einsatz: auch die 10er-Packung DESCOLIND CARE WIPES',
+    text: 'Nach dem Einsatz geht es um schnelle Reinigung der Einsatzkräfte: DESCOLIND CARE WIPES gibt es in der handlichen Packung mit 10 Tüchern – ideal zum Mitführen im Fahrzeug. Optional kann zusätzlich unsere DECONTAMAN-Linie für den Körper angeboten werden.',
+    verweise: ['descolind-care-wipes', 'decontaman-pre-wipes', 'decontaman-pre-wash']
+  }, {
+    typen: ['feuerwehr'],
     branche: 'Feuerwehr',
     titel: 'Frisch machen im Einsatz',
     text: 'Im Einsatz gibt es keine Möglichkeit zu duschen. Die Pflegetücher eignen sich, um sich schnell zu reinigen und frisch zu machen – alkohol- und parfümfrei, extra weiches Vlies. Aktuell kommen vor Ort häufig die Waschlappen von Schülke zum Einsatz: als Gesprächseinstieg nach dem Wechsel auf die Tücher fragen.',
@@ -6183,9 +6235,10 @@ function testphaseScreen() {
   </main>`;
 }
 function productTipsHtml(p) {
-  const tips = PRODUCT_TIPS[p.id];
-  if (!tips || !tips.length || state.customerMode || inMesseContext()) return '';
-  return tips.map((t, i) => {
+  const typ = brancheTyp(state.aktBranche);
+  const tips = (PRODUCT_TIPS[p.id] || []).map((t, i) => ({t, i})).filter(({t}) => !t.typen || t.typen.includes(typ));
+  if (!tips.length || state.customerMode || inMesseContext()) return '';
+  return tips.map(({t, i}) => {
     const key = p.id + ':' + i;
     const links = (t.verweise || []).map(id => PRODUCTS.find(x => x.id === id)).filter(Boolean)
       .map(x => `<button type="button" class="tip-link" data-product="${x.id}">→ ${escapeHtml(x.name)}</button>`).join('');
@@ -6667,6 +6720,13 @@ function matchesQuery(haystack, query) {
 }
 
 function bind() {
+  document.querySelectorAll('[data-akt-branche]').forEach(b => b.addEventListener('click', () => { setAktBranche(b.dataset.aktBranche); state.brancheAsked = true; state.screen = 'menu'; render(); }));
+  $('[data-action="branche-change"]')?.addEventListener('click', () => { state.brancheAsked = false; state.screen = 'branche'; render(); });
+  document.querySelectorAll('[data-brancheask-pick]').forEach(b => b.addEventListener('click', () => {
+    setAktBranche(b.dataset.brancheaskPick);
+    state.summaryStep = state.summaryAfterSpeicher || 'kundentyp'; state.summaryAfterSpeicher = null;
+    render();
+  }));
   document.querySelectorAll('[data-profile]').forEach(button => button.onclick = () => {
     state.activeProfile=button.dataset.profile;
     localStorage.setItem('activeProfile',state.activeProfile);
@@ -6815,7 +6875,7 @@ function bind() {
   $('#ideaText')?.addEventListener('input', e => { state.idea.text = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && (state.idea.kategorie !== '__sonstiges__' || state.idea.kategorieSonstiges.trim())); });
   $('#ideaKategorieSonstiges')?.addEventListener('input', e => { state.idea.kategorieSonstiges = e.target.value; const btn = $('[data-action="idea-senden"]'); if (btn) btn.disabled = !(state.idea.text.trim() && state.idea.kategorieSonstiges.trim()); });
   document.querySelectorAll('[data-acq-field]').forEach(input => input.addEventListener('input', e => { state.acq[input.dataset.acqField] = e.target.value; }));
-  document.querySelectorAll('[data-acq-branche]').forEach(button => button.onclick = () => { state.acq.branche = button.dataset.acqBranche; acqGo('adresse'); render(); });
+  document.querySelectorAll('[data-acq-branche]').forEach(button => button.onclick = () => { state.acq.branche = button.dataset.acqBranche; setAktBranche(button.dataset.acqBranche); acqGo('adresse'); render(); });
   $('[data-action="acq-locate"]')?.addEventListener('click', async () => {
     const a = state.acq;
     a.locating = true; a.locateError = ''; render();
@@ -6996,8 +7056,8 @@ function bind() {
     if (wizardHasCustomerData()) resetCustomerData(true, false, true);
     state.ncStash = null; state.newCustomer = null; persistNcStash();
     state.summaryUseAcq = false;
-    state.summaryStep = state.summaryAfterSpeicher || 'kundentyp';
-    state.summaryAfterSpeicher = null;
+    // Anderer Kunde: zuerst die Branche abfragen, danach geht der Ablauf weiter.
+    state.summaryStep = 'brancheask';
     render();
   });
   document.querySelectorAll('[data-kundentyp-choice]').forEach(button => button.addEventListener('click', () => {
@@ -7065,6 +7125,7 @@ function bind() {
   document.querySelectorAll('[data-nc-field]').forEach(input => input.addEventListener('input', e => {
     const field = e.target.dataset.ncField;
     let val = e.target.value;
+    if (field === 'branche') setAktBranche(val);
     // PLZ und Hausnummer: nur Ziffern, keine von Spracheingabe eingefügten Kommas/Punkte —
     // beim Diktieren einer Zahl wie "41466" sollen die Ziffern einfach von links nach rechts
     // aneinandergereiht werden, PLZ zusätzlich auf 5 Stellen begrenzt.
@@ -7340,7 +7401,7 @@ function bind() {
   }));
   $('#occasionContact')?.addEventListener('input', e => { state.summaryCustomer=e.target.value; localStorage.setItem('summaryCustomer', e.target.value); });
   $('#occasionKundenNr')?.addEventListener('input', e => { state.summaryKundenNr=e.target.value; localStorage.setItem('summaryKundenNr', e.target.value); });
-  $('#occasionBranche')?.addEventListener('change', e => { state.summaryBranche = e.target.value; });
+  $('#occasionBranche')?.addEventListener('change', e => { state.summaryBranche = e.target.value; if (e.target.value) setAktBranche(e.target.value); });
   $('[data-action="occasion-back-salutation"]')?.addEventListener('click', () => { state.summaryStep = 'kundentyp'; render(); });
   $('[data-action="occasion-back-name"]')?.addEventListener('click', () => { state.summaryStep = 'salutation'; render(); });
   $('[data-action="crm-entry-no"]')?.addEventListener('click', () => { state.summaryStep = newCustomerContact() ? 'innendienstask' : nextAfterInnendienst(); render(); });

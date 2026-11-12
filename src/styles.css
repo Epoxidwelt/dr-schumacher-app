@@ -531,3 +531,7 @@
 .mat-box .ez-note{padding:0 16px 12px;margin:0}
 .mat-warning{margin:0 16px 12px;padding:10px 14px;border-radius:12px;background:#fde8e8;border:1px solid #f0b4b4;color:#7d1414;display:flex;flex-direction:column;gap:4px}
 .mat-warning small{font-weight:700;color:#8a3a3a}
+
+.akt-branche-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 16px 0;padding:8px 14px;border-radius:14px;background:#eef5fb;color:#173d65;font-size:14px}
+.akt-branche-bar .secondary-button{padding:6px 12px}
+.category-card.selected{outline:2px solid #0873c8}
