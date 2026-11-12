@@ -681,6 +681,7 @@ function render() {
   if (state.screen === 'region') html = regionScreen();
   if (state.screen === 'one') html = oneRender();
   if (state.screen === 'branche') html = header() + brancheScreen();
+  if (state.screen === 'tipps') html = header(true) + tippsScreen() + bottomNav('home');
   if (state.screen === 'menu') html = header() + brancheBar() + menuScreen() + bottomNav('home');
   if (state.screen === 'products') html = header(true) + productsScreen() + (state.previousScreen === 'akquise-produkte' ? acqReturnBar() : bottomNav('search'));
   if (state.screen === 'detail') html = header(true) + detailScreen() + (state.previousScreen === 'akquise-produkte' ? acqReturnBar() : bottomNav('search'));
@@ -957,6 +958,7 @@ function menuScreen() {
   return `<main class="page menu-page cockpit-page">
     <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.customerMode?'Preise ausgeblendet':state.priceList}</h1></div></section>
     ${(() => { const al = aktionenForCurrentUser(); if (!al.length) return ''; const a0 = al.find(x => !state.aktionStars.includes(x.id) && aktionenUnseen().some(u => u.id === x.id)) || al[0]; const neu = aktionenUnseen().length > 0; return `<button type="button" class="category-card aktion aktion-top" data-category="aktionen"><span class="category-icon">${icon('ideenschmiede')}</span><span><strong>${escapeHtml(a0.titel)}</strong><small>${neu ? 'NEU · ' : ''}Aktion${al.length > 1 ? ' · ' + al.length + ' aktuell' : ''}${state.aktionStars.includes(a0.id) ? ' · ★ besprochen' : ''}</small></span><b>›</b></button>`; })()}
+    ${tippsBanner()}
     ${coreCategoryGrid()}
     <label class="global-search">${icon('search')}<input id="globalSearch" value="${escapeHtml(state.globalQuery)}" placeholder="Produkt, Artikelnummer oder Anwendung suchen"><span>⌘ K</span></label>
     ${state.globalQuery.trim() ? `<section class="cockpit-search-results"><div class="section-heading"><div><span class="eyebrow">Sofortsuche</span><h2>${searchResults.length} Treffer</h2></div><button class="secondary-button" data-action="clear-global-search">Suche löschen</button></div><div class="product-list">${searchResults.map(productCard).join('') || '<div class="empty-state"><h2>Kein Produkt gefunden</h2><p>Versuchen Sie einen anderen Suchbegriff.</p></div>'}</div></section>` : ''}
@@ -6044,6 +6046,7 @@ const PRODUCT_TIPS = {
   }],
   'desoderm-care-wipes': [{
     typen: ['rettung', 'feuerwehr'],
+    nurProdukt: true,
     branche: 'Rettungswache / Feuerwehr',
     titel: 'Reinigung nach dem Einsatz: auch die 10er-Packung DESCOLIND CARE WIPES',
     text: 'Nach dem Einsatz geht es um schnelle Reinigung der Einsatzkräfte: DESCOLIND CARE WIPES gibt es in der handlichen Packung mit 10 Tüchern – ideal zum Mitführen im Fahrzeug. Optional kann zusätzlich unsere DECONTAMAN-Linie für den Körper angeboten werden.',
@@ -6232,6 +6235,33 @@ function testphaseScreen() {
       </div>
       ${!tp.email.trim() ? '<p class="muted-copy" style="margin-top:8px">Für den Versand wird eine E-Mail-Adresse des Kunden benötigt.</p>' : ''}
     </section>
+  </main>`;
+}
+// Alle Tipps der aktuellen Branche auf einen Blick (Button oben im Menü, nur Rettungswache/Rettungsdienst und Feuerwehr).
+function tippsBrancheAktiv() { const t = brancheTyp(state.aktBranche); return t === 'rettung' || t === 'feuerwehr'; }
+function allTipsForBranche() {
+  const typ = brancheTyp(state.aktBranche);
+  const out = [];
+  Object.keys(PRODUCT_TIPS).forEach(pid => {
+    const p = PRODUCTS.find(x => x.id === pid);
+    if (!p) return;
+    PRODUCT_TIPS[pid].forEach(t => { if (!t.nurProdukt && (!t.typen || t.typen.includes(typ))) out.push({p, t}); });
+  });
+  return out;
+}
+function tippsBanner() {
+  if (!tippsBrancheAktiv() || state.customerMode || inMesseContext()) return '';
+  const n = allTipsForBranche().length;
+  return `<button type="button" class="tipps-banner" data-action="open-tipps"><span class="tipps-icon">💡</span><span><strong>Tipps für ${escapeHtml(state.aktBranche)}</strong><small>${n} Praxis-Tipps auf einen Blick – mit Querverweisen</small></span><b>›</b></button>`;
+}
+function tippsScreen() {
+  const list = allTipsForBranche();
+  return `<main class="page advisor-page">
+    <div class="section-heading"><div><span class="eyebrow">Tipps aus der Praxis</span><h1>${escapeHtml(state.aktBranche || 'Tipps')}</h1><p>Hinweise zu Produkten, die in diesem Bereich besonders passen. Die Tipps wachsen mit der Erfahrung im Alltag.</p></div></div>
+    ${list.length ? list.map(({p, t}) => {
+      const links = (t.verweise || []).map(id => PRODUCTS.find(x => x.id === id)).filter(Boolean).map(x => `<button type="button" class="tip-link" data-product="${x.id}">→ ${escapeHtml(x.name)}</button>`).join('');
+      return `<section class="advisor-card tipps-card"><span class="eyebrow">${escapeHtml(t.branche)}</span><h2>💡 ${escapeHtml(t.titel)}</h2><p>${escapeHtml(t.text)}</p><div class="tip-links"><button type="button" class="tip-link" data-product="${p.id}">→ Zum Produkt: ${escapeHtml(p.name)}</button>${links ? `<span>Querverweis:</span>${links}` : ''}</div></section>`;
+    }).join('') : '<div class="empty-state"><h2>Keine Tipps für diesen Bereich</h2></div>'}
   </main>`;
 }
 function productTipsHtml(p) {
@@ -6721,6 +6751,7 @@ function matchesQuery(haystack, query) {
 
 function bind() {
   document.querySelectorAll('[data-akt-branche]').forEach(b => b.addEventListener('click', () => { setAktBranche(b.dataset.aktBranche); state.brancheAsked = true; state.screen = 'menu'; render(); }));
+  $('[data-action="open-tipps"]')?.addEventListener('click', () => { state.screen = 'tipps'; render(); window.scrollTo(0, 0); });
   $('[data-action="branche-change"]')?.addEventListener('click', () => { state.brancheAsked = false; state.screen = 'branche'; render(); });
   document.querySelectorAll('[data-brancheask-pick]').forEach(b => b.addEventListener('click', () => {
     setAktBranche(b.dataset.brancheaskPick);
@@ -6786,6 +6817,7 @@ function bind() {
   $('[data-action="back"]')?.addEventListener('click', () => {
     if (state.screen === 'detail') {
       if (state.previousScreen === 'konzept') { state.previousScreen = null; state.screen = 'konzept'; render(); return; }
+      if (state.previousScreen === 'tipps') { state.previousScreen = null; state.screen = 'tipps'; render(); return; }
       state.screen = 'products'; render(); return;
     }
     if (state.screen === 'konzept' && state.selectedKonzeptBereich) { state.selectedKonzeptBereich = null; render(); return; }
@@ -6810,7 +6842,7 @@ function bind() {
   document.querySelectorAll('[data-aroundme-save]').forEach(button => button.onclick = () => { aroundMeSaveAsContact(Number(button.dataset.aroundmeSave)); });
   $('#aroundmeRadius')?.addEventListener('input', e => { state.aroundMe.radiusKm = Number(e.target.value); render(); });
   $('[data-action="aroundme-search"]')?.addEventListener('click', () => aroundMeRun());
-  document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; if (state.screen === 'konzept') state.previousScreen = 'konzept'; else if (state.previousScreen === 'konzept') state.previousScreen = null; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
+  document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; if (state.screen === 'tipps') state.previousScreen = 'tipps'; else if (state.screen === 'konzept') state.previousScreen = 'konzept'; else if (state.previousScreen === 'konzept') state.previousScreen = null; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
   document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => {
     const size = button.dataset.size;

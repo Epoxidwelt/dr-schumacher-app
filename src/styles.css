@@ -535,3 +535,13 @@
 .akt-branche-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 16px 0;padding:8px 14px;border-radius:14px;background:#eef5fb;color:#173d65;font-size:14px}
 .akt-branche-bar .secondary-button{padding:6px 12px}
 .category-card.selected{outline:2px solid #0873c8}
+
+.tipps-banner{display:flex;align-items:center;gap:14px;width:100%;margin:0 0 14px;padding:14px 18px;border:1px solid #f1d98a;border-radius:18px;background:#fff9e3;color:#4a3d08;text-align:left;cursor:pointer}
+.tipps-banner strong{display:block;font-size:17px;color:#6b5200}
+.tipps-banner small{display:block;margin-top:2px;color:#7a6410;font-size:13px;font-weight:700}
+.tipps-banner .tipps-icon{font-size:28px}
+.tipps-banner>b{margin-left:auto;font-size:26px;color:#8a6d00}
+.tipps-card{margin-top:14px}
+.tipps-card h2{margin:4px 0 8px;font-size:19px}
+.tipps-card p{margin:0 0 12px;line-height:1.55}
+.tipps-card .tip-links{padding:0}
