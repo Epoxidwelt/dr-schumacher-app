@@ -2973,8 +2973,8 @@ function newCustomerDraftDefault(){
   return { firma:'', branche:b0, anrede:'', vorname:'', nachname:'', strasse:'', hausnummer:'', plz:'', ort:'', telefon:'', email:'', handelspartner:'', kondition:'', notiz:'' };
 }
 const NEUKUNDE_BRANCHEN = [
-  'Rettungswache / Rettungsdienst', 'Feuerwehr', 'Pflegedienst / Pflegeeinrichtung', 'Krankenhaus / Klinik',
-  'Arztpraxis', 'Zahnarztpraxis', 'Augenklinik / Augenarztpraxis', 'Tierarztpraxis / Tierklinik',
+  'Krankenhaus / Klinik', 'Feuerwehr', 'Rettungswache / Rettungsdienst',
+  'Pflegedienst / Pflegeeinrichtung', 'Arztpraxis', 'Zahnarztpraxis', 'Augenklinik / Augenarztpraxis', 'Tierarztpraxis / Tierklinik',
   'Reha-Klinik', 'Sonstige'
 ];
 function isValidEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v||'').trim()); }
