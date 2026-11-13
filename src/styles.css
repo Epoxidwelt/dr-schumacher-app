@@ -551,3 +551,4 @@
 .fav-hinweis{background:#fff;border:1px solid #f1e3ad;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .fav-hinweis strong{color:#4a3d08;font-size:15px}
 .fav-hinweis p{margin:0;font-size:14px;line-height:1.5;color:#4a3d08}
+a.tip-link{text-decoration:none;display:inline-block}
