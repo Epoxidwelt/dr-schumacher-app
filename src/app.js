@@ -1360,6 +1360,157 @@ function buildStarredProductsEmail() {
   return { subject, body: lines.join('\n') };
 }
 
+// ===== Kunden-E-Mails als formatierte HTML-Mail (Outlook am PC) =====
+// mailto: kann nur reinen Text übergeben – Outlook entfernt dabei Zeilenumbrüche, zeigt die fetten
+// Sonderzeichen in einer Ersatzschrift und kürzt lange Links. Deshalb wird der gleiche Mailtext in echte
+// HTML-Formatierung (fett, Häkchen-Listen, Links) umgewandelt: Am PC kommt der formatierte Text in die
+// Zwischenablage und Outlook öffnet den Entwurf mit Empfänger und Betreff; alternativ gibt es eine .eml-Datei.
+const MAIL_BLUE = '#0b5fa5';
+const MAIL_FONT = "font-family:'Aptos Display',Aptos,Calibri,Arial,sans-serif;font-size:10pt;color:#222;line-height:1.4";
+// Fette Unicode-Buchstaben (siehe uBold) zurück in normalen Text, Fettdruck als Marker \u0001 … \u0002.
+function mailBoldMarked(line) {
+  let out = '', open = false;
+  for (const ch of Array.from(line)) {
+    const c = ch.codePointAt(0);
+    let dec = null;
+    if (c >= 0x1D5D4 && c <= 0x1D5ED) dec = String.fromCharCode(65 + c - 0x1D5D4);
+    else if (c >= 0x1D5EE && c <= 0x1D607) dec = String.fromCharCode(97 + c - 0x1D5EE);
+    else if (c >= 0x1D7EC && c <= 0x1D7F5) dec = String.fromCharCode(48 + c - 0x1D7EC);
+    if (dec !== null) { if (!open) { out += '\u0001'; open = true; } out += dec; }
+    else if (ch === '̈' && open) out += ch;
+    else { if (open) { out += '\u0002'; open = false; } out += ch; }
+  }
+  if (open) out += '\u0002';
+  return out.replace(/\u0002([^\u0001\u0002A-Za-zÄÖÜäöüß0-9\n]{1,3})\u0001/g, '$1').normalize('NFC');
+}
+function mailPlainText(body) { return body.split('\n').map(l => mailBoldMarked(l).replace(/[\u0001\u0002]/g, '')).join('\n'); }
+function mailInlineHtml(markedText) {
+  const esc = escapeHtml(markedText).replace(/\u0001/g, '<b>').replace(/\u0002/g, '</b>');
+  return esc.replace(/(https?:\/\/[^\s<]+)|([\w.+-]+@[\w-]+(?:\.[\w-]+)+)/g, (m, url, mail) => url
+    ? `<a href="${url}" style="color:${MAIL_BLUE}">${url}</a>` : `<a href="mailto:${mail}" style="color:${MAIL_BLUE}">${mail}</a>`)
+    .replace(/^(Kurz gesagt:)/, '<b>$1</b>');
+}
+function plainMailToHtml(body) {
+  const P = `${MAIL_FONT};margin:0 0 8px 0`;
+  const lines = body.split('\n').map(mailBoldMarked);
+  const out = [];
+  let para = [], links = [];
+  const flush = () => {
+    if (para.length) { out.push(`<p style="${P}">${para.map(mailInlineHtml).join('<br>')}</p>`); para = []; }
+    if (links.length) { out.push(`<p style="${P};margin:0 0 6px 0">${links.join(' &nbsp;·&nbsp; ')}</p>`); links = []; }
+  };
+  const bullet = (sym, color, text) => out.push(`<p style="${P};margin:0 0 3px 18px;text-indent:-18px"><span style="color:${color}"><b>${sym}</b></span>&nbsp;&nbsp;${mailInlineHtml(text)}</p>`);
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t) { flush(); continue; }
+    if (/^─{3,}$/.test(t)) continue;
+    let m;
+    if ((m = /^▸\s+(.*)$/.exec(t))) {
+      flush();
+      const txt = m[1].replace(/[\u0001\u0002]/g, '');
+      if (/^─{3,}$/.test((lines[i + 1] || '').trim())) {
+        const k = txt.indexOf(' – ');
+        const name = k > 0 ? txt.slice(0, k) : txt, size = k > 0 ? txt.slice(k + 3) : '';
+        out.push(`<p style="${P};margin:18px 0 6px 0;border-bottom:1px solid ${MAIL_BLUE};padding-bottom:3px"><b style="font-size:11pt;color:${MAIL_BLUE}">${escapeHtml(name)}</b>${size ? ` &nbsp;<span style="color:#555">– ${escapeHtml(size)}</span>` : ''}</p>`);
+      } else out.push(`<p style="${P};margin:8px 0 2px 0"><b>${escapeHtml(txt)}</b></p>`);
+      continue;
+    }
+    if ((m = /^✓\s+(.*)$/.exec(t))) { flush(); bullet('✓', '#13964c', m[1]); continue; }
+    if ((m = /^•\s+(.*)$/.exec(t))) { flush(); bullet('•', MAIL_BLUE, m[1]); continue; }
+    if ((m = /^[–-]\s+(.+?):\s+(https?:\/\/\S+)$/.exec(t))) {
+      if (para.length) { out.push(`<p style="${P}">${para.map(mailInlineHtml).join('<br>')}</p>`); para = []; }
+      links.push(`<a href="${escapeHtml(m[2])}" style="color:${MAIL_BLUE}">${escapeHtml(m[1].replace(/[\u0001\u0002]/g, ''))}</a>`);
+      continue;
+    }
+    const plain = t.replace(/[\u0001\u0002]/g, '');
+    const allBold = t.startsWith('\u0001') && t.indexOf('\u0002') === t.length - 1;
+    const numBold = /^\d+\.\s+\u0001[^\u0002]*\u0002$/.test(t);
+    if (allBold || numBold || (/^\u0001[^\u0002]*\u0002:$/.test(t))) {
+      flush();
+      if (/^Ihre Vorteile/.test(plain)) out.push(`<p style="${P};margin:8px 0 3px 0"><b>${escapeHtml(plain)}</b></p>`);
+      else out.push(`<p style="${P};margin:16px 0 6px 0"><b style="font-size:11pt;color:${MAIL_BLUE}">${escapeHtml(plain.replace(/:$/, ''))}</b></p>`);
+      continue;
+    }
+    if (links.length) flush();
+    para.push(t);
+  }
+  flush();
+  return out.join('\n');
+}
+function mailHtmlDocument(body, subject) {
+  const head = subject ? `<p style="${MAIL_FONT};margin:0 0 10px 0;color:#555"><b>Betreff:</b> ${escapeHtml(subject)}</p>` : '';
+  return `<div style="${MAIL_FONT}">${head}${plainMailToHtml(body)}</div>`;
+}
+async function copyRichToClipboard(html, plain) {
+  try {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({'text/plain': new Blob([plain], {type:'text/plain'}), 'text/html': new Blob([html], {type:'text/html'})})]);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+function isMobileMailDevice() {
+  const ua = navigator.userAgent || '';
+  return /Android|iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+function emlWrapBase64(str) {
+  const raw = btoa(unescape(encodeURIComponent(str)));
+  return (raw.match(/.{1,76}/g) || []).join('\r\n');
+}
+function emlEncodeHeader(str) {
+  if (/^[\x20-\x7E]*$/.test(str)) return str;
+  const chars = Array.from(str), parts = [];
+  for (let i = 0; i < chars.length; i += 20) parts.push('=?UTF-8?B?' + btoa(unescape(encodeURIComponent(chars.slice(i, i + 20).join('')))) + '?=');
+  return parts.join('\r\n ');
+}
+// Entwurf als .eml (Outlook öffnet sie als neue, formatierte Nachricht mit Empfänger und Betreff).
+function downloadMailEml(subject, body, to, cc) {
+  const boundary = '----=_DrSchumacher_' + Date.now().toString(36);
+  const html = `<html><head><meta charset="utf-8"></head><body>${mailHtmlDocument(body)}</body></html>`;
+  const eml = ['X-Unsent: 1'];
+  if (to) eml.push('To: ' + to);
+  if (cc) eml.push('Cc: ' + cc);
+  eml.push('Subject: ' + emlEncodeHeader(subject), 'MIME-Version: 1.0', `Content-Type: multipart/alternative; boundary="${boundary}"`, '',
+    `--${boundary}`, 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: base64', '', emlWrapBase64(mailPlainText(body)),
+    `--${boundary}`, 'Content-Type: text/html; charset=utf-8', 'Content-Transfer-Encoding: base64', '', emlWrapBase64(html), `--${boundary}--`, '');
+  const blob = new Blob([eml.join('\r\n')], {type: 'message/rfc822'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'E-Mail-Entwurf-Dr-Schumacher.eml';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+function showMailHint(subject, body, to, cc) {
+  document.getElementById('mailHint')?.remove();
+  const el = document.createElement('div');
+  el.id = 'mailHint';
+  el.innerHTML = `<button type="button" class="mail-hint-close" data-mh="close" aria-label="Schließen">×</button>
+    <strong>Formatierte E-Mail ist in der Zwischenablage</strong>
+    <p>Im Outlook-Entwurf Empfänger und Betreff prüfen, in den Textbereich klicken und mit <b>Strg+V</b> (Mac: <b>Cmd+V</b>) einfügen.</p>
+    <div class="mail-hint-actions">
+      <button type="button" class="secondary-button compact" data-mh="again">Nochmals kopieren</button>
+      <button type="button" class="secondary-button compact" data-mh="eml">Als .eml-Entwurf speichern</button>
+      <button type="button" class="secondary-button compact" data-mh="plain">Als Text-Mail öffnen</button>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', async e => {
+    const act = e.target.closest('[data-mh]')?.dataset.mh;
+    if (!act) return;
+    if (act === 'close') el.remove();
+    if (act === 'again') { const ok = await copyRichToClipboard(mailHtmlDocument(body), mailPlainText(body)); e.target.textContent = ok ? 'Kopiert!' : 'Kopieren nicht möglich'; }
+    if (act === 'eml') downloadMailEml(subject, body, to, cc);
+    if (act === 'plain') openMailto(subject, body, to, cc);
+  });
+}
+// Kunden-E-Mail: am PC formatiert (Zwischenablage + Outlook-Entwurf), auf dem Handy wie bisher per mailto.
+async function openCustomerMail(subject, body, to = '', cc = '') {
+  if (isMobileMailDevice()) { openMailto(subject, body, to, cc); return; }
+  const ok = await copyRichToClipboard(mailHtmlDocument(body), mailPlainText(body));
+  openMailto(subject, ok ? '' : body, to, cc);
+  if (ok) showMailHint(subject, body, to, cc);
+}
+
 // Im privaten Modus, in eingebetteten/gesandboxten Ansichten (z. B. Artifact) oder ohne
 // eingerichtetes Mail-Programm blockiert der Browser mailto:-Links stillschweigend. Deshalb wird
 // nach dem Öffnen geprüft, ob das Fenster den Fokus verloren hat (= Mail-Programm hat sich
@@ -1423,9 +1574,9 @@ function sendStarredProductsEmail() {
 }
 
 async function copyEmailText(subject, body, button) {
-  const text = `Betreff: ${subject}\n\n${body}`;
-  // Zusätzlich als formatierter Text (Aptos Display, 10 pt) – wird beim Einfügen in Outlook übernommen.
-  const html = `<div style="font-family:'Aptos Display',Aptos,Calibri,Arial,sans-serif;font-size:10pt;line-height:1.4">${escapeHtml(text).replace(/\n/g, '<br>').replace(/ {2}/g, '&nbsp;&nbsp;')}</div>`;
+  const text = `Betreff: ${subject}\n\n${mailPlainText(body)}`;
+  // Formatierte Fassung (Aptos Display, 10 pt, fette Überschriften, Häkchen-Listen, Links) – wird beim Einfügen in Outlook übernommen.
+  const html = mailHtmlDocument(body, subject);
   try {
     if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
       await navigator.clipboard.write([new ClipboardItem({'text/plain': new Blob([text], {type:'text/plain'}), 'text/html': new Blob([html], {type:'text/html'})})]);
@@ -2127,7 +2278,7 @@ function acqSaveToHistory() {
 function sendAcqEmail() {
   const a = state.acq;
   if (!a.previewTo.trim()) return;
-  openMailto(a.previewSubject, a.previewBody, a.previewTo.trim());
+  openCustomerMail(a.previewSubject, a.previewBody, a.previewTo.trim());
   acqSaveToHistory();
   a.sentOk = true;
 }
@@ -4710,7 +4861,7 @@ function sendCustomerSummaryEmail(){
   }
   state.summaryPendingRecipient = null;
   const cc = (state.summaryAdditionalContacts || []).map(c => c.email).filter(Boolean).join(',');
-  openMailto(subject, body, to || '', cc);
+  openCustomerMail(subject, body, to || '', cc);
 }
 
 // Kaltakquise-Nachfass-E-Mail: anders als buildCustomerSummaryEmail() setzt diese Mail
@@ -4804,7 +4955,7 @@ function sendKaltakquiseNachfassEmail(){
   const {subject, body} = buildKaltakquiseNachfassEmail();
   const to = kaltakquiseNachfassRecipient();
   state.summaryPendingRecipient = null;
-  openMailto(subject, body, to);
+  openCustomerMail(subject, body, to);
 }
 
 function competitionScreen(){
@@ -5267,7 +5418,7 @@ function sendKonzeptEmail() {
   }
   if (konzept.pdfUrl) lines.push('Das vollständige Kernprogramm mit allen Produktdetails finden Sie hier zum Download:', konzept.pdfUrl, '');
   lines.push('Prüfen Sie das Konzept gerne in Ruhe. Wenn Sie es durchgesehen haben oder weitere Informationen brauchen, arbeite ich sehr gerne gemeinsam mit Ihnen an der Umsetzung – und begleite Sie auf Wunsch auch persönlich bei einem Test der Produkte vor Ort. Mir ist wichtig, dass Sie sich bei jedem Schritt voll unterstützt fühlen.', '', 'Beste Grüße');
-  openMailto(`Hygienekonzept ${konzept.branche} – Dr. Schumacher`, lines.join('\n'), to);
+  openCustomerMail(`Hygienekonzept ${konzept.branche} – Dr. Schumacher`, lines.join('\n'), to);
   if (customText) render();
 }
 function messeScreen() {
@@ -6901,7 +7052,7 @@ function bind() {
     $('#tpBody')?.addEventListener('input', e => { tp.body = e.target.value; tp.subject = $('#tpSubject').value; tp.bodyTouched = true; tpPersist(); });
     $('[data-action="tp-regen"]')?.addEventListener('click', () => { tp.bodyTouched = false; tpPersist(); render(); });
     $('[data-action="tp-copy"]')?.addEventListener('click', e => { copyEmailText($('#tpSubject').value, $('#tpBody').value, e.currentTarget); });
-    $('[data-action="tp-send"]')?.addEventListener('click', () => { openMailto($('#tpSubject').value, $('#tpBody').value, tp.email.trim()); if (state.acq) state.acq.testphaseDone = true; });
+    $('[data-action="tp-send"]')?.addEventListener('click', () => { openCustomerMail($('#tpSubject').value, $('#tpBody').value, tp.email.trim()); if (state.acq) state.acq.testphaseDone = true; });
     $('[data-action="tp-back"]')?.addEventListener('click', () => { state.screen = (tp.returnTo && tp.returnTo !== 'testphase') ? tp.returnTo : 'menu'; if (tp.resume) state.summaryStep = tp.resume; tp.resume = ''; tpPersist(); render(); });
   }
   document.querySelectorAll('.tip-box[data-tip]').forEach(box => box.addEventListener('toggle', e => { state.tipOpen[box.dataset.tip] = e.target.open; }));
@@ -6914,7 +7065,7 @@ function bind() {
   document.querySelectorAll('[data-aktion-gesprochen]').forEach(b => b.onclick = () => { const [id, v] = b.dataset.aktionGesprochen.split(':'); aktionSetStar(id, v === 'ja'); render(); });
   document.querySelectorAll('[data-aktion-open]').forEach(b => b.onclick = () => { state.aktionOpen = b.dataset.aktionOpen; render(); });
   $('[data-action="aktion-close"]')?.addEventListener('click', () => { state.aktionOpen = null; render(); });
-  document.querySelectorAll('[data-aktion-kunde]').forEach(b => b.onclick = () => { const a = state.one.aktionen.find(x => x.id === b.dataset.aktionKunde); if (a) { const m = buildAktionKundenEmail(a); openMailto(m.subject, m.body, ''); } });
+  document.querySelectorAll('[data-aktion-kunde]').forEach(b => b.onclick = () => { const a = state.one.aktionen.find(x => x.id === b.dataset.aktionKunde); if (a) { const m = buildAktionKundenEmail(a); openCustomerMail(m.subject, m.body, ''); } });
   document.querySelectorAll('[data-aktion-anfrage]').forEach(b => b.onclick = () => { const a = state.one.aktionen.find(x => x.id === b.dataset.aktionAnfrage); if (a) { const m = buildAktionAnfrageEmail(a); openMailto(m.subject, m.body, a.anfrageAn || OUTGOING_SENDER_EMAIL); } });
   $('[data-action="acq-toggle-arrange"]')?.addEventListener('click', () => { state.acqArrangeMode = !state.acqArrangeMode; render(); });
   if (state.acqArrangeMode && state.screen === 'akquise' && state.acq.step === 'branche') bindTileDrag();
