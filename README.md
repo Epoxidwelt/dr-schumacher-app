@@ -157,12 +157,12 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 
 ## Neu: Tagesquiz (Produktwissen)
 
-- Neue Kachel „Tagesquiz“ im Hauptmenü
-- Täglich 20 Multiple-Choice-Fragen mit je 3 Antwort-Buttons, automatisch aus den hinterlegten Produktdaten erzeugt
+- Kachel „Tagesquiz“ ganz oben im Hauptmenü (über den Aktionen)
+- Täglich 10 Multiple-Choice-Fragen mit je 3 Antwort-Buttons, automatisch aus den hinterlegten Produktdaten erzeugt
 - Themen: Anwendungsbereich, Wirkspektrum & Einwirkzeit, Wirkstoffe & Eigenschaften (ohne Zubehör)
 - Ein Durchgang pro Tag; nach jeder Antwort sofort richtig/falsch mit kurzer Erklärung
-- Falsch beantwortete Fragen werden an den Folgetagen wiederholt (bis zu 6 pro Tag), bis sie richtig beantwortet sind
+- Falsch beantwortete Fragen werden an den Folgetagen wiederholt (bis zu 3 pro Tag), bis sie richtig beantwortet sind
 - Fortschritt wird nur lokal auf dem Gerät gespeichert
 - Erscheint beim App-Start automatisch (einmal pro Tag), mit Button „Heute überspringen → zur App“
 - Schwierigkeit per Touch wählbar: Leicht (Bereiche, Produktarten, Eigenschaften), Mittel (dazu Wirkstoffe und Wirkspektren), Schwer (vor allem Einwirkzeiten und spezielle Wirkspektren). Wechsel vor der ersten Antwort gilt sofort, sonst ab dem nächsten Quiz.
-- „🔄 Neue Fragen“: beliebig viele Zusatzrunden am selben Tag (je 20 neue Fragen im gewählten Schwierigkeitsgrad), auch mitten in einer Runde
+- „🔄 Neue Fragen“: beliebig viele Zusatzrunden am selben Tag (je 10 neue Fragen im gewählten Schwierigkeitsgrad), auch mitten in einer Runde

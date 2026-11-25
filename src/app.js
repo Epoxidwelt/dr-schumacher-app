@@ -936,7 +936,6 @@ function menuScreen() {
     ['smartmailing','Smart Mailing','Viele Kunden gezielt und persönlich per E-Mail informieren'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
     ['wirkspektrum','Wirkspektrum-Finder','Produkte nach Wirkspektrum filtern – z. B. fungizid + viruzid'],
-    ['quiz','Tagesquiz', quizTileSubtitle()],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
     ['offer','Kundenübersicht','Markierte Produkte als Angebot oder PDF'],
@@ -965,6 +964,7 @@ function menuScreen() {
   const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind} ${p.sku} ${p.summary}`, state.globalQuery)).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
     <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.customerMode?'Preise ausgeblendet':state.priceList}</h1></div></section>
+    <button type="button" class="category-card quiz quiz-top" data-category="quiz"><span class="category-icon">${icon('quiz')}</span><span><strong>Tagesquiz</strong><small>${escapeHtml(quizTileSubtitle())}</small></span><b>›</b></button>
     ${(() => { const al = aktionenForCurrentUser(); if (!al.length) return ''; const a0 = al.find(x => !state.aktionStars.includes(x.id) && aktionenUnseen().some(u => u.id === x.id)) || al[0]; const neu = aktionenUnseen().length > 0; return `<button type="button" class="category-card aktion aktion-top" data-category="aktionen"><span class="category-icon">${icon('ideenschmiede')}</span><span><strong>${escapeHtml(a0.titel)}</strong><small>${neu ? 'NEU · ' : ''}Aktion${al.length > 1 ? ' · ' + al.length + ' aktuell' : ''}${state.aktionStars.includes(a0.id) ? ' · ★ besprochen' : ''}</small></span><b>›</b></button>`; })()}
     ${tippsBanner()}
     ${coreCategoryGrid()}
@@ -6982,18 +6982,18 @@ function matchesQuery(haystack, query) {
 }
 
 // ===================== Produktwissen-Quiz =====================
-// Täglich 20 Multiple-Choice-Fragen (je 3 Antworten), automatisch aus den hinterlegten
+// Täglich 10 Multiple-Choice-Fragen (je 3 Antworten), automatisch aus den hinterlegten
 // Produktdaten erzeugt: Anwendungsbereich, Wirkspektrum & Einwirkzeit, Wirkstoffe & Eigenschaften.
 // Zubehör (Spender, Halter, Vliestuchsysteme) ist ausgeschlossen. Pro Tag zählt ein Durchgang.
 // Falsch beantwortete Fragen werden ab dem Folgetag wiederholt, bis sie richtig beantwortet sind.
 // Alles bleibt lokal auf dem Gerät (localStorage).
-const QUIZ_COUNT = 20;
-const QUIZ_MAX_REPEATS = 6;
+const QUIZ_COUNT = 10;
+const QUIZ_MAX_REPEATS = 3;
 // Schwierigkeitsgrade: Anteil der Fragen je Stufe (1 = Grundwissen, 2 = Detailwissen, 3 = Expertenwissen).
 const QUIZ_LEVELS = {
-  leicht: { label:'Leicht', hint:'Bereiche, Produktarten und Produkteigenschaften', mix:{1:14, 2:6, 3:0} },
-  mittel: { label:'Mittel', hint:'Dazu Wirkstoffe und Wirkspektren', mix:{1:6, 2:10, 3:4} },
-  schwer: { label:'Schwer', hint:'Vor allem Einwirkzeiten und spezielle Wirkspektren', mix:{1:2, 2:7, 3:11} }
+  leicht: { label:'Leicht', hint:'Bereiche, Produktarten und Produkteigenschaften', mix:{1:7, 2:3, 3:0} },
+  mittel: { label:'Mittel', hint:'Dazu Wirkstoffe und Wirkspektren', mix:{1:3, 2:5, 3:2} },
+  schwer: { label:'Schwer', hint:'Vor allem Einwirkzeiten und spezielle Wirkspektren', mix:{1:1, 2:3, 3:6} }
 };
 const QUIZ_SPECIAL_TAGS = ['mykobakterizid','sporizid','cdiff','noro','adeno','corona','fungizid'];
 function quizLevel() { const l = quizLoad('quizLevel', 'mittel'); return QUIZ_LEVELS[l] ? l : 'mittel'; }
@@ -7179,7 +7179,7 @@ function quizCreateDay(date, level, round = 0) {
 function quizState() {
   const today = quizToday();
   let day = quizLoad('quizDay', null);
-  if (!day || day.date !== today || !Array.isArray(day.questions) || !day.questions.length) {
+  if (!day || day.date !== today || !Array.isArray(day.questions) || !day.questions.length || (day.questions.length !== QUIZ_COUNT && !day.answers.length && !day.done)) {
     day = quizCreateDay(today);
     quizSave('quizDay', day);
   }
@@ -7200,7 +7200,7 @@ function quizShouldAutoOpen() {
   const day = quizLoad('quizDay', null);
   return !(day && day.date === today && day.done);
 }
-// Beliebig viele Zusatzrunden am selben Tag – jeweils 20 neue Fragen im gewählten Schwierigkeitsgrad.
+// Beliebig viele Zusatzrunden am selben Tag – jeweils 10 neue Fragen im gewählten Schwierigkeitsgrad.
 function quizNewRound() {
   const day = quizState();
   quizSave('quizDay', quizCreateDay(quizToday(), quizLevel(), (day.round || 0) + 1));
@@ -7288,7 +7288,7 @@ function quizBind() {
   $('[data-action="quiz-leave"]')?.addEventListener('click', () => { quizLeave(); render(); });
   document.querySelectorAll('[data-action="quiz-new-round"]').forEach(b => b.addEventListener('click', () => {
     const day = quizState();
-    if (!day.done && day.answers.length && !confirm('Aktuelle Runde verwerfen und 20 neue Fragen starten?')) return;
+    if (!day.done && day.answers.length && !confirm('Aktuelle Runde verwerfen und ' + QUIZ_COUNT + ' neue Fragen starten?')) return;
     quizNewRound(); state.quizAuto = false; render(); window.scrollTo(0, 0);
   }));
 }
@@ -7300,7 +7300,7 @@ function quizTileSubtitle() {
       if (day.answers.length) return `Weiter bei Frage ${Math.min(day.idx + 1, day.questions.length)} von ${day.questions.length}`;
     }
   } catch (e) {}
-  return 'Täglich 20 Fragen zum Produktwissen';
+  return `Täglich ${QUIZ_COUNT} Fragen zum Produktwissen`;
 }
 // ===================== Ende Produktwissen-Quiz =====================
 

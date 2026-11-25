@@ -594,3 +594,4 @@ a.tip-link{text-decoration:none;display:inline-block}
 .quiz-skip{display:block;width:100%;max-width:760px;min-height:52px;margin:4px 0 8px;border:2px dashed #b9c8d6;background:transparent;border-radius:16px;color:#5c7084;font-size:15px;font-weight:800;cursor:pointer;touch-action:manipulation}
 .quiz-option{touch-action:manipulation}
 .quiz-result .primary-button{margin-top:14px}.quiz-leave-btn{width:100%;justify-content:center;margin:10px 0 0;max-width:760px}
+.quiz-top{width:100%;margin:0 0 14px;min-height:0;padding-top:16px;padding-bottom:16px}.quiz-top .category-icon{width:52px;height:52px}.quiz-top strong{font-size:21px}
