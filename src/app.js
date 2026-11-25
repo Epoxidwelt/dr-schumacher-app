@@ -656,6 +656,11 @@ function currentViewKey() {
 
 function render() {
   // Schritt 1 nach dem App-Start: erst die Branche abfragen, dann das Menü zeigen.
+  if (!quizStartChecked && (state.screen === 'menu' || state.screen === 'branche')) {
+    quizStartChecked = true;
+    if (quizShouldAutoOpen()) { state.quizReturn = state.screen; state.quizAuto = true; state.screen = 'quiz'; }
+  }
+  if (state.screen !== 'quiz') state.quizAuto = false;
   if (state.screen === 'menu' && !state.brancheAsked) state.screen = 'branche';
   const app = $('#app');
   const active = document.activeElement;
@@ -705,7 +710,7 @@ function render() {
   if (state.screen === 'ideenschmiede') html = header(true) + ideenschmiedeScreen() + bottomNav('home');
   if (state.screen === 'aktionen') html = header(true) + aktionenScreen() + bottomNav('home');
   if (state.screen === 'wirkspektrum') html = header(true) + wirkspektrumScreen() + bottomNav('home');
-  if (state.screen === 'quiz') html = header(true) + quizScreen() + bottomNav('home');
+  if (state.screen === 'quiz') html = header(!state.quizAuto) + quizScreen() + (state.quizAuto ? '' : bottomNav('home'));
   if (state.screen === 'akquise') html = header(true) + acqScreen();
   if (state.screen === 'reklamation') html = header(true) + reklScreen();
   if (state.screen === 'testphase') html = header(true) + testphaseScreen() + bottomNav('home');
@@ -6984,6 +6989,21 @@ function matchesQuery(haystack, query) {
 // Alles bleibt lokal auf dem Gerät (localStorage).
 const QUIZ_COUNT = 20;
 const QUIZ_MAX_REPEATS = 6;
+// Schwierigkeitsgrade: Anteil der Fragen je Stufe (1 = Grundwissen, 2 = Detailwissen, 3 = Expertenwissen).
+const QUIZ_LEVELS = {
+  leicht: { label:'Leicht', hint:'Bereiche, Produktarten und Produkteigenschaften', mix:{1:14, 2:6, 3:0} },
+  mittel: { label:'Mittel', hint:'Dazu Wirkstoffe und Wirkspektren', mix:{1:6, 2:10, 3:4} },
+  schwer: { label:'Schwer', hint:'Vor allem Einwirkzeiten und spezielle Wirkspektren', mix:{1:2, 2:7, 3:11} }
+};
+const QUIZ_SPECIAL_TAGS = ['mykobakterizid','sporizid','cdiff','noro','adeno','corona','fungizid'];
+function quizLevel() { const l = quizLoad('quizLevel', 'mittel'); return QUIZ_LEVELS[l] ? l : 'mittel'; }
+function quizQuestionLevel(q) {
+  const t = q.key.split(':')[0];
+  if (t === 'bereich' || t === 'art' || t === 'fakt') return 1;
+  if (t === 'zeit') return 3;
+  if (t === 'spektrum') return QUIZ_SPECIAL_TAGS.includes(q.key.split(':')[2]) ? 3 : 2;
+  return 2;
+}
 const QUIZ_ACCESSORY_KINDS = ['Halter, Dosierhilfen & Zubehör','Spender und Applikation','Vliestuchspender & Deckel','Vliestuchspendersysteme','Wandspender & Zubehör'];
 const QUIZ_AREA_LABELS = { surface:'Fläche', hands:'Hände & Haut', instruments:'Instrumente' };
 const QUIZ_KIND_GROUPS = [
@@ -7122,8 +7142,9 @@ function quizBuildPool(rnd) {
 }
 
 // Stellt das Tagesquiz zusammen: zuerst fällige Wiederholungen, dann neue Fragen gemischt nach Themen.
-function quizCreateDay(date) {
-  const rnd = quizRng('quiz-' + date);
+function quizCreateDay(date, level) {
+  level = QUIZ_LEVELS[level] ? level : quizLevel();
+  const rnd = quizRng('quiz-' + date + '-' + level);
   const pool = quizBuildPool(rnd);
   const validIds = new Set(quizProducts().map(p => p.id));
   const mistakes = quizLoad('quizMistakes', []).filter(m => validIds.has(m.productId));
@@ -7134,22 +7155,25 @@ function quizCreateDay(date) {
   const usedKeys = new Set(repeats.map(r => r.key));
   const usedProducts = new Set(repeats.map(r => r.productId));
   const need = QUIZ_COUNT - repeats.length;
-  const quota = { bereich: Math.round(need / 3), spektrum: Math.round(need / 3) };
-  quota.wirkstoff = need - quota.bereich - quota.spektrum;
+  // Kontingent je Schwierigkeitsstufe, anteilig auf die verbleibenden Plätze umgerechnet.
+  const mix = QUIZ_LEVELS[level].mix;
+  const quota = {};
+  let rest = need;
+  [3, 2, 1].forEach(l => { quota[l] = l === 1 ? rest : Math.round(mix[l] * need / QUIZ_COUNT); rest -= quota[l]; });
   const picked = [];
   // Zuerst lange nicht gesehene Fragen, jedes Produkt höchstens einmal am Tag.
   const ordered = quizShuffle(pool, rnd).sort((a, b) => ((seen[a.key] || '') >= recentCut) - ((seen[b.key] || '') >= recentCut));
   for (const pass of [true, false]) {
     for (const q of ordered) {
       if (picked.length >= need) break;
-      if (usedKeys.has(q.key) || quota[q.topic] <= 0) continue;
+      if (usedKeys.has(q.key) || quota[quizQuestionLevel(q)] <= 0) continue;
       if (pass && usedProducts.has(q.productId)) continue;
-      picked.push(q); usedKeys.add(q.key); usedProducts.add(q.productId); quota[q.topic]--;
+      picked.push(q); usedKeys.add(q.key); usedProducts.add(q.productId); quota[quizQuestionLevel(q)]--;
     }
   }
-  // Falls ein Thema zu wenig Fragen hatte: mit beliebigen weiteren Fragen auffüllen.
+  // Falls eine Stufe zu wenig Fragen hatte: mit beliebigen weiteren Fragen auffüllen.
   for (const q of ordered) { if (picked.length >= need) break; if (!usedKeys.has(q.key)) { picked.push(q); usedKeys.add(q.key); } }
-  return { date, questions: [...repeats, ...quizShuffle(picked, rnd)], idx: 0, answers: [], done: false };
+  return { date, level, questions: [...repeats, ...quizShuffle(picked, rnd)], idx: 0, answers: [], done: false };
 }
 
 function quizState() {
@@ -7160,6 +7184,24 @@ function quizState() {
     quizSave('quizDay', day);
   }
   return day;
+}
+function quizSetLevel(level) {
+  if (!QUIZ_LEVELS[level]) return;
+  quizSave('quizLevel', level);
+  const day = quizLoad('quizDay', null);
+  if (day && day.date === quizToday() && !day.answers.length && !day.done) quizSave('quizDay', quizCreateDay(day.date, level));
+}
+// Beim App-Start einmal pro Tag automatisch zeigen – außer schon erledigt oder heute übersprungen.
+var quizStartChecked = false;
+function quizShouldAutoOpen() {
+  const today = quizToday();
+  if (quizLoad('quizSkipped', '') === today) return false;
+  const day = quizLoad('quizDay', null);
+  return !(day && day.date === today && day.done);
+}
+function quizLeave() {
+  state.screen = state.quizReturn || 'menu';
+  state.quizAuto = false; state.quizReturn = null;
 }
 function quizAnswer(choice) {
   const day = quizState();
@@ -7186,7 +7228,11 @@ function quizScreen() {
   const total = day.questions.length;
   const score = day.answers.filter(a => a.ok).length;
   const openMistakes = quizLoad('quizMistakes', []).length;
-  const head = `<div class="section-heading"><div><span class="eyebrow">Produktwissen</span><h1>Tagesquiz</h1><p>${total} Fragen zu Anwendungsbereichen, Wirkspektren, Einwirkzeiten und Wirkstoffen. Jeden Tag neu – falsch beantwortete Fragen kommen an den Folgetagen wieder.</p></div></div>`;
+  const lvl = quizLevel();
+  const started = day.answers.length > 0 && !day.done;
+  const levelBar = `<div class="quiz-level"><span class="quiz-level-label">Schwierigkeit</span><div class="quiz-level-buttons">${Object.entries(QUIZ_LEVELS).map(([k, v]) => `<button type="button" class="quiz-level-btn ${lvl === k ? 'active' : ''}" data-quiz-level="${k}">${v.label}</button>`).join('')}</div><small>${escapeHtml(QUIZ_LEVELS[lvl].hint)}${started && day.level && day.level !== lvl ? ' · Gilt ab dem nächsten Quiz.' : ''}</small></div>`;
+  const head = `<div class="section-heading"><div><span class="eyebrow">Produktwissen${state.quizAuto ? ' · Guten Start!' : ''}</span><h1>Tagesquiz</h1><p>${state.quizAuto ? 'Jeden Tag ein paar Minuten Produktwissen – danach geht es direkt zur App.' : `${total} Fragen zu Anwendungsbereichen, Wirkspektren, Einwirkzeiten und Wirkstoffen. Jeden Tag neu – falsch beantwortete Fragen kommen an den Folgetagen wieder.`}</p></div></div>${levelBar}`;
+  const skipBtn = !day.done && state.quizAuto ? `<button type="button" class="quiz-skip" data-action="quiz-skip">Heute überspringen → zur App</button>` : '';
   if (day.done) {
     const wrong = day.questions.map((q, i) => ({ q, a: day.answers[i] })).filter(x => x.a && !x.a.ok);
     const pct = Math.round(score / total * 100);
@@ -7197,6 +7243,7 @@ function quizScreen() {
         ${openMistakes ? `<p class="muted-copy">${openMistakes} Frage${openMistakes === 1 ? '' : 'n'} ${openMistakes === 1 ? 'steht' : 'stehen'} zur Wiederholung an.</p>` : ''}
       </section>
       ${wrong.length ? `<section class="advisor-card"><h2>Zum Nachlesen: deine Fehler von heute</h2>${wrong.map(({ q, a }) => `<div class="quiz-review"><strong>${escapeHtml(q.question)}</strong><span class="quiz-review-wrong">Deine Antwort: ${escapeHtml(a.choice)}</span><span class="quiz-review-right">Richtig: ${escapeHtml(q.correct)}</span><small>${escapeHtml(q.explain)}</small></div>`).join('')}</section>` : ''}
+      ${state.quizAuto ? '<button type="button" class="primary-button" data-action="quiz-leave">Weiter zur App</button>' : ''}
       <p class="advisor-note">Fragen werden automatisch aus den in der App hinterlegten Produktdaten erzeugt. Verbindlich sind immer die aktuellen offiziellen Produktinformationen.</p>
     </main>`;
   }
@@ -7216,6 +7263,7 @@ function quizScreen() {
       ${answered ? `<div class="quiz-feedback ${answered.ok ? 'ok' : 'bad'}"><strong>${answered.ok ? '✓ Richtig!' : '✗ Leider falsch.'}</strong> ${escapeHtml(q.explain)}</div>
         <button type="button" class="primary-button" data-action="quiz-next">${day.idx + 1 >= total ? 'Ergebnis anzeigen' : 'Weiter'}</button>` : ''}
     </section>
+    ${skipBtn}
   </main>`;
 }
 function quizBind() {
@@ -7227,6 +7275,9 @@ function quizBind() {
     render();
   }));
   $('[data-action="quiz-next"]')?.addEventListener('click', () => { quizNext(); render(); window.scrollTo(0, 0); });
+  document.querySelectorAll('[data-quiz-level]').forEach(b => b.addEventListener('click', () => { quizSetLevel(b.dataset.quizLevel); render(); }));
+  $('[data-action="quiz-skip"]')?.addEventListener('click', () => { quizSave('quizSkipped', quizToday()); quizLeave(); render(); });
+  $('[data-action="quiz-leave"]')?.addEventListener('click', () => { quizLeave(); render(); });
 }
 function quizTileSubtitle() {
   try {

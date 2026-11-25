@@ -163,3 +163,5 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 - Ein Durchgang pro Tag; nach jeder Antwort sofort richtig/falsch mit kurzer Erklärung
 - Falsch beantwortete Fragen werden an den Folgetagen wiederholt (bis zu 6 pro Tag), bis sie richtig beantwortet sind
 - Fortschritt wird nur lokal auf dem Gerät gespeichert
+- Erscheint beim App-Start automatisch (einmal pro Tag), mit Button „Heute überspringen → zur App“
+- Schwierigkeit per Touch wählbar: Leicht (Bereiche, Produktarten, Eigenschaften), Mittel (dazu Wirkstoffe und Wirkspektren), Schwer (vor allem Einwirkzeiten und spezielle Wirkspektren). Wechsel vor der ersten Antwort gilt sofort, sonst ab dem nächsten Quiz.
