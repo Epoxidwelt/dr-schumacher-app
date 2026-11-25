@@ -7142,13 +7142,13 @@ function quizBuildPool(rnd) {
 }
 
 // Stellt das Tagesquiz zusammen: zuerst fällige Wiederholungen, dann neue Fragen gemischt nach Themen.
-function quizCreateDay(date, level) {
+function quizCreateDay(date, level, round = 0) {
   level = QUIZ_LEVELS[level] ? level : quizLevel();
-  const rnd = quizRng('quiz-' + date + '-' + level);
+  const rnd = quizRng('quiz-' + date + '-' + level + (round ? '-r' + round : ''));
   const pool = quizBuildPool(rnd);
   const validIds = new Set(quizProducts().map(p => p.id));
   const mistakes = quizLoad('quizMistakes', []).filter(m => validIds.has(m.productId));
-  const repeats = mistakes.filter(m => m.lastDate < date).slice(0, QUIZ_MAX_REPEATS)
+  const repeats = mistakes.filter(m => !round && m.lastDate < date).slice(0, QUIZ_MAX_REPEATS)
     .map(m => ({ ...m, options: quizShuffle(m.options, rnd), repeat: true }));
   const seen = quizLoad('quizSeen', {});
   const recentCut = (() => { const d = new Date(date); d.setDate(d.getDate() - 14); return d.toISOString().slice(0, 10); })();
@@ -7173,7 +7173,7 @@ function quizCreateDay(date, level) {
   }
   // Falls eine Stufe zu wenig Fragen hatte: mit beliebigen weiteren Fragen auffüllen.
   for (const q of ordered) { if (picked.length >= need) break; if (!usedKeys.has(q.key)) { picked.push(q); usedKeys.add(q.key); } }
-  return { date, level, questions: [...repeats, ...quizShuffle(picked, rnd)], idx: 0, answers: [], done: false };
+  return { date, level, round, questions: [...repeats, ...quizShuffle(picked, rnd)], idx: 0, answers: [], done: false };
 }
 
 function quizState() {
@@ -7189,15 +7189,21 @@ function quizSetLevel(level) {
   if (!QUIZ_LEVELS[level]) return;
   quizSave('quizLevel', level);
   const day = quizLoad('quizDay', null);
-  if (day && day.date === quizToday() && !day.answers.length && !day.done) quizSave('quizDay', quizCreateDay(day.date, level));
+  if (day && day.date === quizToday() && !day.answers.length && !day.done) quizSave('quizDay', quizCreateDay(day.date, level, day.round || 0));
 }
 // Beim App-Start einmal pro Tag automatisch zeigen – außer schon erledigt oder heute übersprungen.
 var quizStartChecked = false;
 function quizShouldAutoOpen() {
   const today = quizToday();
   if (quizLoad('quizSkipped', '') === today) return false;
+  if (quizLoad('quizDailyDone', '') === today) return false;
   const day = quizLoad('quizDay', null);
   return !(day && day.date === today && day.done);
+}
+// Beliebig viele Zusatzrunden am selben Tag – jeweils 20 neue Fragen im gewählten Schwierigkeitsgrad.
+function quizNewRound() {
+  const day = quizState();
+  quizSave('quizDay', quizCreateDay(quizToday(), quizLevel(), (day.round || 0) + 1));
 }
 function quizLeave() {
   state.screen = state.quizReturn || 'menu';
@@ -7219,7 +7225,7 @@ function quizAnswer(choice) {
 function quizNext() {
   const day = quizState();
   if (day.answers.length <= day.idx) return;
-  if (day.idx + 1 >= day.questions.length) day.done = true; else day.idx++;
+  if (day.idx + 1 >= day.questions.length) { day.done = true; quizSave('quizDailyDone', day.date); } else day.idx++;
   quizSave('quizDay', day);
 }
 
@@ -7239,11 +7245,12 @@ function quizScreen() {
     return `<main class="page advisor-page quiz-page">${head}
       <section class="advisor-card quiz-result">
         <div class="quiz-score">${score} / ${total}</div>
-        <p class="quiz-score-text">${pct >= 90 ? 'Hervorragend!' : pct >= 70 ? 'Gut gemacht!' : pct >= 50 ? 'Solide – morgen geht noch mehr.' : 'Dranbleiben – Übung macht den Profi.'} Das heutige Quiz ist abgeschlossen. Morgen gibt es 20 neue Fragen.</p>
+        <p class="quiz-score-text">${pct >= 90 ? 'Hervorragend!' : pct >= 70 ? 'Gut gemacht!' : pct >= 50 ? 'Solide – morgen geht noch mehr.' : 'Dranbleiben – Übung macht den Profi.'} ${day.round ? `Zusatzrunde ${day.round} abgeschlossen.` : 'Das heutige Quiz ist abgeschlossen.'} Du kannst jederzeit weiterüben.</p>
+        <button type="button" class="primary-button" data-action="quiz-new-round">🔄 Neue Fragen</button>
+        ${state.quizAuto ? '<button type="button" class="secondary-button quiz-leave-btn" data-action="quiz-leave">Weiter zur App</button>' : ''}
         ${openMistakes ? `<p class="muted-copy">${openMistakes} Frage${openMistakes === 1 ? '' : 'n'} ${openMistakes === 1 ? 'steht' : 'stehen'} zur Wiederholung an.</p>` : ''}
       </section>
       ${wrong.length ? `<section class="advisor-card"><h2>Zum Nachlesen: deine Fehler von heute</h2>${wrong.map(({ q, a }) => `<div class="quiz-review"><strong>${escapeHtml(q.question)}</strong><span class="quiz-review-wrong">Deine Antwort: ${escapeHtml(a.choice)}</span><span class="quiz-review-right">Richtig: ${escapeHtml(q.correct)}</span><small>${escapeHtml(q.explain)}</small></div>`).join('')}</section>` : ''}
-      ${state.quizAuto ? '<button type="button" class="primary-button" data-action="quiz-leave">Weiter zur App</button>' : ''}
       <p class="advisor-note">Fragen werden automatisch aus den in der App hinterlegten Produktdaten erzeugt. Verbindlich sind immer die aktuellen offiziellen Produktinformationen.</p>
     </main>`;
   }
@@ -7251,7 +7258,7 @@ function quizScreen() {
   const answered = day.answers[day.idx];
   return `<main class="page advisor-page quiz-page">${head}
     <section class="advisor-card quiz-card">
-      <div class="quiz-meta"><span>Frage ${day.idx + 1} von ${total}</span><span>${score} richtig</span></div>
+      <div class="quiz-meta"><span>${day.round ? `Zusatzrunde ${day.round} · ` : ''}Frage ${day.idx + 1} von ${total}</span><span>${score} richtig</span></div>
       <div class="quiz-progress"><span style="width:${Math.round(day.idx / total * 100)}%"></span></div>
       ${q.repeat ? '<span class="quiz-repeat-badge">Wiederholung</span>' : ''}
       <h2 class="quiz-question">${escapeHtml(q.question)}</h2>
@@ -7264,6 +7271,7 @@ function quizScreen() {
         <button type="button" class="primary-button" data-action="quiz-next">${day.idx + 1 >= total ? 'Ergebnis anzeigen' : 'Weiter'}</button>` : ''}
     </section>
     ${skipBtn}
+    ${state.quizAuto ? '' : '<button type="button" class="quiz-skip" data-action="quiz-new-round">🔄 Neue Fragen (aktuelle Runde verwerfen)</button>'}
   </main>`;
 }
 function quizBind() {
@@ -7278,6 +7286,11 @@ function quizBind() {
   document.querySelectorAll('[data-quiz-level]').forEach(b => b.addEventListener('click', () => { quizSetLevel(b.dataset.quizLevel); render(); }));
   $('[data-action="quiz-skip"]')?.addEventListener('click', () => { quizSave('quizSkipped', quizToday()); quizLeave(); render(); });
   $('[data-action="quiz-leave"]')?.addEventListener('click', () => { quizLeave(); render(); });
+  document.querySelectorAll('[data-action="quiz-new-round"]').forEach(b => b.addEventListener('click', () => {
+    const day = quizState();
+    if (!day.done && day.answers.length && !confirm('Aktuelle Runde verwerfen und 20 neue Fragen starten?')) return;
+    quizNewRound(); state.quizAuto = false; render(); window.scrollTo(0, 0);
+  }));
 }
 function quizTileSubtitle() {
   try {

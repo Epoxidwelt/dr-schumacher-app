@@ -593,3 +593,4 @@ a.tip-link{text-decoration:none;display:inline-block}
 .quiz-level small{display:block;margin-top:8px;color:#5c7084;font-size:13px}
 .quiz-skip{display:block;width:100%;max-width:760px;min-height:52px;margin:4px 0 8px;border:2px dashed #b9c8d6;background:transparent;border-radius:16px;color:#5c7084;font-size:15px;font-weight:800;cursor:pointer;touch-action:manipulation}
 .quiz-option{touch-action:manipulation}
+.quiz-result .primary-button{margin-top:14px}.quiz-leave-btn{width:100%;justify-content:center;margin:10px 0 0;max-width:760px}

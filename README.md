@@ -165,3 +165,4 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 - Fortschritt wird nur lokal auf dem Gerät gespeichert
 - Erscheint beim App-Start automatisch (einmal pro Tag), mit Button „Heute überspringen → zur App“
 - Schwierigkeit per Touch wählbar: Leicht (Bereiche, Produktarten, Eigenschaften), Mittel (dazu Wirkstoffe und Wirkspektren), Schwer (vor allem Einwirkzeiten und spezielle Wirkspektren). Wechsel vor der ersten Antwort gilt sofort, sonst ab dem nächsten Quiz.
+- „🔄 Neue Fragen“: beliebig viele Zusatzrunden am selben Tag (je 20 neue Fragen im gewählten Schwierigkeitsgrad), auch mitten in einer Runde
