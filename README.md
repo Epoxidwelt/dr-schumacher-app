@@ -154,3 +154,12 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 
 - Benutzerrolle und Preisliste werden dauerhaft auf dem Gerät gespeichert und nach einem Neustart automatisch übernommen (vorher: erneute Abfrage bei jeder neuen Browsersitzung)
 - Außendienst wählt einmalig die Team-Region (Nord/Süd/Ost/West); interne E-Mails werden automatisch an das passende Innendienst-Team adressiert
+
+## Neu: Tagesquiz (Produktwissen)
+
+- Neue Kachel „Tagesquiz“ im Hauptmenü
+- Täglich 20 Multiple-Choice-Fragen mit je 3 Antwort-Buttons, automatisch aus den hinterlegten Produktdaten erzeugt
+- Themen: Anwendungsbereich, Wirkspektrum & Einwirkzeit, Wirkstoffe & Eigenschaften (ohne Zubehör)
+- Ein Durchgang pro Tag; nach jeder Antwort sofort richtig/falsch mit kurzer Erklärung
+- Falsch beantwortete Fragen werden an den Folgetagen wiederholt (bis zu 6 pro Tag), bis sie richtig beantwortet sind
+- Fortschritt wird nur lokal auf dem Gerät gespeichert

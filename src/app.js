@@ -604,6 +604,7 @@ function icon(name) {
     smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>',
     kol:'<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c0-4 3.1-7 7-7s7 3 7 7"/><path d="m18.5 2 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z"/></svg>',
     konzept:'<svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6M4 12h16"/></svg>',
+    quiz:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><path d="M12 17h.01"/></svg>',
     wirkspektrum:'<svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4Z"/></svg>',
     ideenschmiede:'<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.3V17h6v-1.2c0-.9.4-1.7 1-2.3A6 6 0 0 0 12 3Z"/></svg>'
   };
@@ -704,6 +705,7 @@ function render() {
   if (state.screen === 'ideenschmiede') html = header(true) + ideenschmiedeScreen() + bottomNav('home');
   if (state.screen === 'aktionen') html = header(true) + aktionenScreen() + bottomNav('home');
   if (state.screen === 'wirkspektrum') html = header(true) + wirkspektrumScreen() + bottomNav('home');
+  if (state.screen === 'quiz') html = header(true) + quizScreen() + bottomNav('home');
   if (state.screen === 'akquise') html = header(true) + acqScreen();
   if (state.screen === 'reklamation') html = header(true) + reklScreen();
   if (state.screen === 'testphase') html = header(true) + testphaseScreen() + bottomNav('home');
@@ -804,7 +806,7 @@ function coreCategoryGrid() {
 // "Anordnen"-Modus selbst zurechtlegen (lokal auf dem eigenen Gerät gespeichert). Diese Liste
 // ist nur der Ausgangszustand; neu hinzukommende Kacheln werden an bestehende Reihenfolgen
 // automatisch hinten angehängt.
-const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','reklamation','meinekontakte','smartmailing','advisor','wirkspektrum','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
+const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','reklamation','meinekontakte','smartmailing','advisor','wirkspektrum','quiz','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
 function orderedToolCards(toolCards) {
   const order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder : DASHBOARD_TOOL_KEYS_DEFAULT;
   const byKey = new Map(toolCards.map(c => [c[0], c]));
@@ -929,6 +931,7 @@ function menuScreen() {
     ['smartmailing','Smart Mailing','Viele Kunden gezielt und persönlich per E-Mail informieren'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
     ['wirkspektrum','Wirkspektrum-Finder','Produkte nach Wirkspektrum filtern – z. B. fungizid + viruzid'],
+    ['quiz','Tagesquiz', quizTileSubtitle()],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
     ['offer','Kundenübersicht','Markierte Produkte als Angebot oder PDF'],
@@ -6973,7 +6976,272 @@ function matchesQuery(haystack, query) {
   return words.every(w => h.includes(w));
 }
 
+// ===================== Produktwissen-Quiz =====================
+// Täglich 20 Multiple-Choice-Fragen (je 3 Antworten), automatisch aus den hinterlegten
+// Produktdaten erzeugt: Anwendungsbereich, Wirkspektrum & Einwirkzeit, Wirkstoffe & Eigenschaften.
+// Zubehör (Spender, Halter, Vliestuchsysteme) ist ausgeschlossen. Pro Tag zählt ein Durchgang.
+// Falsch beantwortete Fragen werden ab dem Folgetag wiederholt, bis sie richtig beantwortet sind.
+// Alles bleibt lokal auf dem Gerät (localStorage).
+const QUIZ_COUNT = 20;
+const QUIZ_MAX_REPEATS = 6;
+const QUIZ_ACCESSORY_KINDS = ['Halter, Dosierhilfen & Zubehör','Spender und Applikation','Vliestuchspender & Deckel','Vliestuchspendersysteme','Wandspender & Zubehör'];
+const QUIZ_AREA_LABELS = { surface:'Fläche', hands:'Hände & Haut', instruments:'Instrumente' };
+const QUIZ_KIND_GROUPS = [
+  ['Flächendesinfektion – gebrauchsfertig', ['Alkoholfreie Flächendesinfektion','Gebrauchsfertige Flächendesinfektion','Gebrauchsfertige Desinfektionsmittel']],
+  ['Flächendesinfektion – Konzentrat', ['Desinfektionsmittelkonzentrate','Desinfektionsmittel-Konzentrat']],
+  ['Desinfektions- und Reinigungstücher', ['Gebrauchsfertige Desinfektionstücher','Reinigungs- und Desinfektionstücher']],
+  ['Händedesinfektion', ['Händedesinfektion','Händedesinfektionsmittel','Händedesinfektionsgel']],
+  ['Hautdesinfektion (Antiseptik)', ['Hautdesinfektion','Alkoholisches Hautdesinfektionsmittel']],
+  ['Hautschutz & Hautpflege', ['Hautschutz, Hände- und Hautpflege / Haut- und Körperpflege']],
+  ['Sanierung / Dekontamination', ['Sanierung']],
+  ['Manuelle Instrumentenaufbereitung', ['Manuelle Aufbereitung','Manuelle Instrumentenaufbereitung','Instrumentendesinfektion']],
+  ['Maschinelle Instrumentenaufbereitung', ['Maschinelle Aufbereitung','Mildalkalisch-enzymatischer Reiniger zur maschinellen Aufbereitung']]
+];
+// Wirkstoffe: Erkennung im Wirkstofftext → Anzeigename (2-Propanol = Isopropanol usw. zusammengefasst)
+const QUIZ_SUBSTANCES = [
+  ['Ethanol', /ethanol/i],
+  ['2-Propanol (Isopropanol)', /2-propanol|isopropanol/i],
+  ['1-Propanol', /(^|[^-\d])1-propanol/i],
+  ['Benzalkoniumchlorid (Alkyl-dimethylbenzylammoniumchlorid)', /dimethylbenzyl/i],
+  ['Didecyldimethylammoniumchlorid', /didecyldimethylammonium/i],
+  ['Wasserstoffperoxid', /wasserstoffperoxid/i],
+  ['Peressigsäure', /peressigsäure/i],
+  ['Glyoxal', /glyoxal|ethandial/i],
+  ['Glutaraldehyd', /glutar|pentandial/i],
+  ['Kaliumhydroxid', /kaliumhydroxid/i]
+];
+const QUIZ_SPEKTRUM_PHRASE = {
+  bakterizid:'bakterizid', levurozid:'levurozid', fungizid:'fungizid', tuberkulozid:'tuberkulozid', mykobakterizid:'mykobakterizid',
+  begrenzt:'begrenzt viruzid', plus:'begrenzt viruzid PLUS', viruzid:'voll viruzid', sporizid:'sporizid',
+  cdiff:'wirksam gegen Clostridioides difficile', noro:'wirksam gegen Noroviren', adeno:'wirksam gegen Adenoviren', corona:'wirksam gegen Coronaviren'
+};
+// Falsche Antworten bei Aussagen stammen immer aus einem klar anderen Bereich (Haut ↔ Fläche/Instrumente).
+// Allgemeine Aussagen, die auch auf andere Produkte zutreffen könnten – nie als falsche Antwort verwenden.
+const QUIZ_GENERIC_FACT = /frei von|ohne |parfümfrei|farbstoff|duft|verträglich|dermatolog|vah|rki|listung|biozid|wirksam|viruzid|bakterizid|levurozid|fungizid|einwirkzeit|sek|min\b|minute|europa|made in|hergestellt|nachhaltig|plastikfrei|reinig|schmutz|sauber|gebrauchsfertig|dosier|material|schnell|einfach|praktisch|anwend|sicher|zuverlässig|wirtschaft|ergiebig|sparsam|rückstand|trocknet|pflege|tensid|enthält|aldehyd|phenol|alkohol|schaum|wirkspektrum|effizien|ph-|ph |zertifiz|norm|haccp|lebensmittel|sprechstunden|siegel|daab|allergi|recycl|folie|verpackung/i;
+
+function quizToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function quizRng(seedText) {
+  let h = 1779033703 ^ seedText.length;
+  for (let i = 0; i < seedText.length; i++) { h = Math.imul(h ^ seedText.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  let a = h >>> 0;
+  return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function quizShuffle(arr, rnd) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function quizPick(arr, n, rnd) { return quizShuffle(arr, rnd).slice(0, n); }
+function quizLoad(key, fallback) { try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; } catch (e) { return fallback; } }
+function quizSave(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+
+function quizProducts() {
+  return PRODUCTS.filter(p => QUIZ_AREA_LABELS[p.category] && !QUIZ_ACCESSORY_KINDS.includes(p.kind));
+}
+function quizKindGroup(p) { const g = QUIZ_KIND_GROUPS.find(([, kinds]) => kinds.includes(p.kind)); return g ? g[0] : null; }
+function quizSubstances(p) { const txt = p.ingredients || ''; return QUIZ_SUBSTANCES.filter(([, re]) => re.test(txt)).map(([name]) => name); }
+// Nur allgemeingültige Aussagen (zielgruppenspezifische Hinweise wie Vet/Dental bleiben außen vor).
+function quizFacts(p) { return (p.facts || []).map(f => typeof f === 'string' ? f : (f && f.text && !f.audience && !f.excludeAudience ? f.text : null)).filter(Boolean); }
+function quizSpektrum(p) { return typeof productSpektrum === 'function' ? productSpektrum(p) : new Set(); }
+// Einwirkzeiten wie in der Produktdetailansicht: zuerst die PIF-Tabelle, sonst die Kurzangaben.
+function quizContactTimes(p) {
+  const rows = (typeof EINWIRKZEITEN !== 'undefined' && EINWIRKZEITEN[p.id])
+    ? EINWIRKZEITEN[p.id].filter(r => !r[2]).map(r => [r[0], r[1]])
+    : (p.einwirkzeitEntries || []).map(e => [e.label, e.time]);
+  const clean = rows.filter(([l, t]) => l && /^\d+(,\d+)?\s*(Sek|Min|Std)\.?$/.test(String(t).trim()));
+  const byLabel = new Map();
+  clean.forEach(([l, t]) => { if (!byLabel.has(l)) byLabel.set(l, new Set()); byLabel.get(l).add(t.trim()); });
+  return [...byLabel].filter(([, ts]) => ts.size === 1).map(([l, ts]) => [l, [...ts][0]]);
+}
+function quizTimeSeconds(t) { const m = String(t).match(/([\d,]+)\s*(Sek|Min|Std)/); if (!m) return 0; const v = parseFloat(m[1].replace(',', '.')); return m[2] === 'Sek' ? v : m[2] === 'Min' ? v * 60 : v * 3600; }
+
+// Erzeugt den kompletten Fragenpool (deterministisch in der Reihenfolge, gemischt wird später).
+function quizBuildPool(rnd) {
+  const prods = quizProducts();
+  const pool = [];
+  const add = (topic, key, productId, question, correct, wrong, explain) => {
+    const w = [...new Set(wrong)].filter(x => x && x !== correct);
+    if (w.length < 2) return;
+    const opts = quizShuffle([correct, ...quizPick(w, 2, rnd)], rnd);
+    pool.push({ key, topic, productId, question, options: opts, correct, explain });
+  };
+  const areas = Object.keys(QUIZ_AREA_LABELS);
+
+  prods.forEach(p => {
+    const area = QUIZ_AREA_LABELS[p.category];
+    // --- Anwendungsbereich ---
+    add('bereich', `bereich:${p.id}`, p.id, `In welchem Bereich wird ${p.name} eingesetzt?`, area,
+      areas.filter(a => a !== p.category).map(a => QUIZ_AREA_LABELS[a]),
+      `${p.name} gehört zum Bereich „${area}“ (${p.kind}).`);
+    const group = quizKindGroup(p);
+    if (group) {
+      add('bereich', `art:${p.id}`, p.id, `Was ist ${p.name}?`, group,
+        QUIZ_KIND_GROUPS.map(g => g[0]).filter(g => g !== group && !(g.startsWith('Flächendesinfektion') && group.startsWith('Desinfektions-')) && !(group.startsWith('Flächendesinfektion') && g.startsWith('Desinfektions-'))),
+        `${p.name}: ${p.kind}${p.summary && !/von Dr\. Schumacher\.$/.test(p.summary) ? ' – ' + p.summary : ''}.`);
+    }
+    // --- Wirkspektrum ---
+    const sp = quizSpektrum(p);
+    if (sp.size) {
+      [...sp].forEach(tag => {
+        if (!QUIZ_SPEKTRUM_PHRASE[tag]) return;
+        if (tag === 'begrenzt' && (sp.has('plus') || sp.has('viruzid'))) return;
+        if (tag === 'plus' && sp.has('viruzid')) return;
+        if (tag === 'bakterizid') return; // fast alle Desinfektionsmittel – wenig Lerneffekt
+        const others = prods.filter(o => o.id !== p.id && o.category === p.category && quizSpektrum(o).size && !quizSpektrum(o).has(tag)).map(o => o.name);
+        add('spektrum', `spektrum:${p.id}:${tag}`, p.id, `Welches dieser Produkte ist ${QUIZ_SPEKTRUM_PHRASE[tag]}?`, p.name, others,
+          `${p.name} ist laut Produktdaten ${QUIZ_SPEKTRUM_PHRASE[tag]}. Bei den anderen beiden ist dieses Wirkspektrum nicht hinterlegt.`);
+      });
+    }
+    // --- Einwirkzeit ---
+    const times = quizContactTimes(p);
+    const allTimes = [...new Set(prods.flatMap(o => quizContactTimes(o).map(r => r[1])))];
+    times.forEach(([label, time]) => {
+      const sec = quizTimeSeconds(time);
+      const wrong = allTimes.filter(t => quizTimeSeconds(t) !== sec).sort((a, b) => Math.abs(Math.log(quizTimeSeconds(a) / sec)) - Math.abs(Math.log(quizTimeSeconds(b) / sec))).slice(0, 4);
+      add('spektrum', `zeit:${p.id}:${label}`, p.id, `Welche Einwirkzeit hat ${p.name} für „${label}“?`, time, wrong,
+        `${p.name}: ${label} in ${time} (laut Produktinformation).`);
+    });
+    // --- Wirkstoffe ---
+    const subs = quizSubstances(p);
+    if (subs.length) {
+      const sub = subs[Math.floor(rnd() * subs.length)];
+      add('wirkstoff', `wirkstoff:${p.id}`, p.id, `Welcher Wirkstoff ist in ${p.name} enthalten?`, sub,
+        QUIZ_SUBSTANCES.map(s => s[0]).filter(s => !subs.includes(s)),
+        `Wirkstoffe von ${p.name}: ${p.ingredients}.`);
+    }
+    // --- Eigenschaften (Aussagen aus der Produktinfo) ---
+    const pFacts = quizFacts(p);
+    pFacts.forEach((fact, i) => {
+      if (fact.length < 18 || /dosierung gemäß|siehe|produktinformation/i.test(fact) || fact.length > 110 || fact.toUpperCase().includes(p.name.split(' ')[0].toUpperCase())) return;
+      const wrong = prods.filter(o => p.category === 'hands' ? o.category !== 'hands' : o.category === 'hands').flatMap(o => quizFacts(o))
+        .filter(f => f.length <= 110 && !QUIZ_GENERIC_FACT.test(f) && !pFacts.includes(f) && !prods.some(o => f.toUpperCase().includes(o.name.split(' ')[0].toUpperCase())));
+      add('wirkstoff', `fakt:${p.id}:${i}`, p.id, `Welche Aussage trifft auf ${p.name} zu?`, fact, wrong,
+        `Aus der Produktinfo von ${p.name}: „${fact}“`);
+    });
+  });
+  return pool;
+}
+
+// Stellt das Tagesquiz zusammen: zuerst fällige Wiederholungen, dann neue Fragen gemischt nach Themen.
+function quizCreateDay(date) {
+  const rnd = quizRng('quiz-' + date);
+  const pool = quizBuildPool(rnd);
+  const validIds = new Set(quizProducts().map(p => p.id));
+  const mistakes = quizLoad('quizMistakes', []).filter(m => validIds.has(m.productId));
+  const repeats = mistakes.filter(m => m.lastDate < date).slice(0, QUIZ_MAX_REPEATS)
+    .map(m => ({ ...m, options: quizShuffle(m.options, rnd), repeat: true }));
+  const seen = quizLoad('quizSeen', {});
+  const recentCut = (() => { const d = new Date(date); d.setDate(d.getDate() - 14); return d.toISOString().slice(0, 10); })();
+  const usedKeys = new Set(repeats.map(r => r.key));
+  const usedProducts = new Set(repeats.map(r => r.productId));
+  const need = QUIZ_COUNT - repeats.length;
+  const quota = { bereich: Math.round(need / 3), spektrum: Math.round(need / 3) };
+  quota.wirkstoff = need - quota.bereich - quota.spektrum;
+  const picked = [];
+  // Zuerst lange nicht gesehene Fragen, jedes Produkt höchstens einmal am Tag.
+  const ordered = quizShuffle(pool, rnd).sort((a, b) => ((seen[a.key] || '') >= recentCut) - ((seen[b.key] || '') >= recentCut));
+  for (const pass of [true, false]) {
+    for (const q of ordered) {
+      if (picked.length >= need) break;
+      if (usedKeys.has(q.key) || quota[q.topic] <= 0) continue;
+      if (pass && usedProducts.has(q.productId)) continue;
+      picked.push(q); usedKeys.add(q.key); usedProducts.add(q.productId); quota[q.topic]--;
+    }
+  }
+  // Falls ein Thema zu wenig Fragen hatte: mit beliebigen weiteren Fragen auffüllen.
+  for (const q of ordered) { if (picked.length >= need) break; if (!usedKeys.has(q.key)) { picked.push(q); usedKeys.add(q.key); } }
+  return { date, questions: [...repeats, ...quizShuffle(picked, rnd)], idx: 0, answers: [], done: false };
+}
+
+function quizState() {
+  const today = quizToday();
+  let day = quizLoad('quizDay', null);
+  if (!day || day.date !== today || !Array.isArray(day.questions) || !day.questions.length) {
+    day = quizCreateDay(today);
+    quizSave('quizDay', day);
+  }
+  return day;
+}
+function quizAnswer(choice) {
+  const day = quizState();
+  if (day.done || day.answers.length > day.idx) return;
+  const q = day.questions[day.idx];
+  const ok = choice === q.correct;
+  day.answers.push({ choice, ok });
+  // Fehlerliste pflegen: falsch → (wieder) aufnehmen, richtig bei Wiederholung → entfernen.
+  let mistakes = quizLoad('quizMistakes', []).filter(m => m.key !== q.key);
+  if (!ok) mistakes.push({ key: q.key, topic: q.topic, productId: q.productId, question: q.question, options: q.options, correct: q.correct, explain: q.explain, lastDate: day.date });
+  quizSave('quizMistakes', mistakes);
+  const seen = quizLoad('quizSeen', {}); seen[q.key] = day.date; quizSave('quizSeen', seen);
+  quizSave('quizDay', day);
+}
+function quizNext() {
+  const day = quizState();
+  if (day.answers.length <= day.idx) return;
+  if (day.idx + 1 >= day.questions.length) day.done = true; else day.idx++;
+  quizSave('quizDay', day);
+}
+
+function quizScreen() {
+  const day = quizState();
+  const total = day.questions.length;
+  const score = day.answers.filter(a => a.ok).length;
+  const openMistakes = quizLoad('quizMistakes', []).length;
+  const head = `<div class="section-heading"><div><span class="eyebrow">Produktwissen</span><h1>Tagesquiz</h1><p>${total} Fragen zu Anwendungsbereichen, Wirkspektren, Einwirkzeiten und Wirkstoffen. Jeden Tag neu – falsch beantwortete Fragen kommen an den Folgetagen wieder.</p></div></div>`;
+  if (day.done) {
+    const wrong = day.questions.map((q, i) => ({ q, a: day.answers[i] })).filter(x => x.a && !x.a.ok);
+    const pct = Math.round(score / total * 100);
+    return `<main class="page advisor-page quiz-page">${head}
+      <section class="advisor-card quiz-result">
+        <div class="quiz-score">${score} / ${total}</div>
+        <p class="quiz-score-text">${pct >= 90 ? 'Hervorragend!' : pct >= 70 ? 'Gut gemacht!' : pct >= 50 ? 'Solide – morgen geht noch mehr.' : 'Dranbleiben – Übung macht den Profi.'} Das heutige Quiz ist abgeschlossen. Morgen gibt es 20 neue Fragen.</p>
+        ${openMistakes ? `<p class="muted-copy">${openMistakes} Frage${openMistakes === 1 ? '' : 'n'} ${openMistakes === 1 ? 'steht' : 'stehen'} zur Wiederholung an.</p>` : ''}
+      </section>
+      ${wrong.length ? `<section class="advisor-card"><h2>Zum Nachlesen: deine Fehler von heute</h2>${wrong.map(({ q, a }) => `<div class="quiz-review"><strong>${escapeHtml(q.question)}</strong><span class="quiz-review-wrong">Deine Antwort: ${escapeHtml(a.choice)}</span><span class="quiz-review-right">Richtig: ${escapeHtml(q.correct)}</span><small>${escapeHtml(q.explain)}</small></div>`).join('')}</section>` : ''}
+      <p class="advisor-note">Fragen werden automatisch aus den in der App hinterlegten Produktdaten erzeugt. Verbindlich sind immer die aktuellen offiziellen Produktinformationen.</p>
+    </main>`;
+  }
+  const q = day.questions[day.idx];
+  const answered = day.answers[day.idx];
+  return `<main class="page advisor-page quiz-page">${head}
+    <section class="advisor-card quiz-card">
+      <div class="quiz-meta"><span>Frage ${day.idx + 1} von ${total}</span><span>${score} richtig</span></div>
+      <div class="quiz-progress"><span style="width:${Math.round(day.idx / total * 100)}%"></span></div>
+      ${q.repeat ? '<span class="quiz-repeat-badge">Wiederholung</span>' : ''}
+      <h2 class="quiz-question">${escapeHtml(q.question)}</h2>
+      <div class="quiz-options">${q.options.map((o, i) => {
+        let cls = '';
+        if (answered) cls = o === q.correct ? 'correct' : (o === answered.choice ? 'wrong' : 'dim');
+        return `<button type="button" class="quiz-option ${cls}" data-quiz-option="${i}" ${answered ? 'disabled' : ''}><span class="quiz-letter">${'ABC'[i]}</span><span>${escapeHtml(o)}</span></button>`;
+      }).join('')}</div>
+      ${answered ? `<div class="quiz-feedback ${answered.ok ? 'ok' : 'bad'}"><strong>${answered.ok ? '✓ Richtig!' : '✗ Leider falsch.'}</strong> ${escapeHtml(q.explain)}</div>
+        <button type="button" class="primary-button" data-action="quiz-next">${day.idx + 1 >= total ? 'Ergebnis anzeigen' : 'Weiter'}</button>` : ''}
+    </section>
+  </main>`;
+}
+function quizBind() {
+  if (state.screen !== 'quiz') return;
+  document.querySelectorAll('[data-quiz-option]').forEach(b => b.addEventListener('click', () => {
+    const day = quizState();
+    const q = day.questions[day.idx];
+    quizAnswer(q.options[Number(b.dataset.quizOption)]);
+    render();
+  }));
+  $('[data-action="quiz-next"]')?.addEventListener('click', () => { quizNext(); render(); window.scrollTo(0, 0); });
+}
+function quizTileSubtitle() {
+  try {
+    const day = quizLoad('quizDay', null);
+    if (day && day.date === quizToday()) {
+      if (day.done) return `Heute erledigt: ${day.answers.filter(a => a.ok).length} / ${day.questions.length} richtig`;
+      if (day.answers.length) return `Weiter bei Frage ${Math.min(day.idx + 1, day.questions.length)} von ${day.questions.length}`;
+    }
+  } catch (e) {}
+  return 'Täglich 20 Fragen zum Produktwissen';
+}
+// ===================== Ende Produktwissen-Quiz =====================
+
 function bind() {
+  quizBind();
   document.querySelectorAll('[data-akt-branche]').forEach(b => b.addEventListener('click', () => { setAktBranche(b.dataset.aktBranche); state.brancheAsked = true; state.screen = 'menu'; render(); }));
   $('[data-action="open-tipps"]')?.addEventListener('click', () => { state.screen = 'tipps'; render(); window.scrollTo(0, 0); });
   $('[data-action="branche-change"]')?.addEventListener('click', () => { state.brancheAsked = false; state.screen = 'branche'; render(); });
@@ -7058,7 +7326,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='reklamation'){ if (!reklHasData()) reklReset(); state.previousScreen = null; state.screen='reklamation'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='reklamation'){ if (!reklHasData()) reklReset(); state.previousScreen = null; state.screen='reklamation'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','quiz','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
