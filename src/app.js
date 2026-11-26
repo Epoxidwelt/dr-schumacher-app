@@ -7575,6 +7575,28 @@ const COMPETITOR_EQUIV = {
   'thermo-alka-clear': [['bb-helimatic-latriniser','a']]
 };
 const COMPETITOR_LEVEL_LABEL = { d:'Direktes Äquivalent', a:'Ähnliche Anwendung' };
+// Link zur Herstellerseite: direkte Produktseite, wo geprüft vorhanden; sonst eine auf die
+// Hersteller-Website beschränkte Suche nach dem exakten Produktnamen (bleibt auch bei
+// geänderten Hersteller-URLs funktionsfähig).
+const COMPETITOR_DOMAINS = { schuelke:['schuelke.com'], bode:['hartmann.info','bode-chemie.com'], bbraun:['bbraun.de','bbraun.com'], ecolab:['ecolab.com'] };
+const COMPETITOR_DIRECT_URLS = {
+  'sch-desderman-care':'https://www.schuelke.com/intl-en/products/desderman-care.php',
+  'sch-desderman-care-gel':'https://www.schuelke.com/intl-en/products/desderman-care-gel.php',
+  'sch-mikrozid-sensitive-liquid':'https://www.schuelke.com/intl-en/products/mikrozid-sensitive-liquid.php',
+  'sch-mikrozid-universal-liquid':'https://www.schuelke.com/intl-en/products/mikrozid-universal-liquid.php',
+  'sch-mikrozid-af-wipes':'https://www.schuelke.com/intl-en/products/mikrozid-AF-wipes.php',
+  'bb-stabimed-fresh':'https://catalogs.bbraun.com/p/PRID00007686/stabimed-fresh-disinfectant'
+};
+function competitorLink(c) {
+  if (COMPETITOR_DIRECT_URLS[c.key]) return { url: COMPETITOR_DIRECT_URLS[c.key], direct: true };
+  const name = c.name.replace(/[®™]/g, '').trim();
+  const sites = (COMPETITOR_DOMAINS[c.company] || []).map(d => 'site:' + d).join(' OR ');
+  return { url: 'https://www.google.com/search?q=' + encodeURIComponent(`${sites} "${name}"`), direct: false };
+}
+function competitorLinkHtml(c) {
+  const l = competitorLink(c);
+  return `<a class="cmp-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${l.direct ? 'Produktseite beim Hersteller' : 'Beim Hersteller ansehen'} ↗</a>`;
+}
 
 function competitorVisible() { return state.activeProfile === 'sales' && !state.customerMode && !inMesseContext(); }
 function competitorCompany(id) { return COMPETITOR_COMPANIES.find(c => c.id === id) || { name:id, short:id }; }
@@ -7634,6 +7656,7 @@ function competitorCardHtml(c, p, level) {
     <div class="cmp-row"><b>Wirkspektrum</b><div class="ws-chips">${competitorTagsHtml(c.tags)}</div></div>
     ${c.extra ? `<small class="cmp-extra">${escapeHtml(c.extra)}</small>` : ''}
     ${diff.length ? `<ul class="cmp-diff">${diff.map(d => `<li class="${d.cls}">${escapeHtml(d.text)}</li>`).join('')}</ul>` : ''}
+    ${competitorLinkHtml(c)}
   </div>`;
 }
 function competitorNoteHtml() {
@@ -7679,7 +7702,7 @@ function competitorResultHtml(c) {
   const top = direct[0] || similar[0];
   const diff = top ? competitorDiff(top.p, c) : [];
   return `<div class="cmpf-result">
-    <div class="cmpf-from"><span class="cmp-company">${escapeHtml(competitorCompany(c.company).short)}</span><strong>${escapeHtml(c.name)}</strong><small>${escapeHtml(c.kind)}</small></div>
+    <div class="cmpf-from"><span class="cmp-company">${escapeHtml(competitorCompany(c.company).short)}</span><strong>${escapeHtml(c.name)}</strong><small>${escapeHtml(c.kind)}</small>${competitorLinkHtml(c)}</div>
     <div class="cmpf-arrow">↓ Dr. Schumacher</div>
     ${ours.length ? `
       ${direct.map(o => `<button type="button" class="cmpf-our direct" data-product="${o.p.id}"><span><strong>${escapeHtml(o.p.name)}</strong><small>Direktes Äquivalent · ${escapeHtml(o.p.kind)}</small></span><b>›</b></button>`).join('')}

@@ -632,3 +632,4 @@ a.tip-link{text-decoration:none;display:inline-block}
 .cmpf-our-small{border:1px solid var(--border);background:#fff;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:800;color:#294c69;cursor:pointer;min-height:36px}
 .cmpf-diff summary{cursor:pointer;font-size:13px;font-weight:800;color:#5b2a86;padding:4px 0}.cmpf-diff[open]{display:flex;flex-direction:column;gap:6px}
 .cmpf-global{background:#fff;border:2px solid #8e4fc2;border-radius:18px;padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
+.cmp-link{align-self:flex-start;display:inline-flex;align-items:center;min-height:36px;margin-top:2px;padding:6px 12px;border-radius:10px;background:#f1e9f8;color:#5b2a86;font-size:13px;font-weight:800;text-decoration:none}

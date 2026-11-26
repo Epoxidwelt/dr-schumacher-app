@@ -174,3 +174,4 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 - Kachel „Äquivalent finden“: Wettbewerbsprodukt eintippen (tippfehlertolerant, z. B. „sterilium“, „softaman“) → unser Äquivalent groß darunter; Schnellauswahl häufiger Marken; Hersteller-Filter. Auch die Sofortsuche im Hauptmenü erkennt Wettbewerbsprodukte.
 - Wettbewerbsvergleich schlägt die recherchierten Äquivalente zuerst vor
 - Nur Rolle Außendienst, im Kunden-/Messemodus ausgeblendet; Daten aus öffentlichen Herstellerangaben, Stand 11/2026, ohne Gewähr
+- Bei jedem Wettbewerbsprodukt Link „Beim Hersteller ansehen“ (direkte Produktseite, wo geprüft; sonst auf die Hersteller-Website beschränkte Suche nach dem Produktnamen). Keine Herstellerbilder in der App (Urheberrecht).
