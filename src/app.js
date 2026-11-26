@@ -7329,7 +7329,7 @@ const COMPETITOR_PRODUCT_ROWS = [
   // ---------- Schülke & Mayr ----------
   ['sch-desderman-care','schuelke','desderman® care','hands','Händedesinfektion','Ethanol',['bakterizid','tuberkulozid','viruzid','noro']],
   ['sch-desderman-care-gel','schuelke','desderman® care gel','hands','Händedesinfektionsgel','',['viruzid','noro']],
-  ['sch-desderman-pure','schuelke','desderman® pure','hands','Händedesinfektion','78,2 g Ethanol 96 %, 0,1 g Biphenyl-2-ol',['bakterizid','mykobakterizid','begrenzt']],
+  ['sch-desderman','schuelke','desderman®','hands','Händedesinfektion','78,2 g Ethanol 96 %',['bakterizid','levurozid','mykobakterizid','begrenzt','plus','viruzid','noro','adeno']],
   ['sch-desmanol-care','schuelke','desmanol® care','hands','Händedesinfektion','70,0 g Propan-2-ol, 9,9 g Ethanol 96 %',['bakterizid','mykobakterizid','begrenzt']],
   ['sch-desmanol-pure','schuelke','desmanol® pure','hands','Händedesinfektion','',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
   ['sch-kodan-farblos','schuelke','kodan® Tinktur forte farblos','hands','Hautantiseptik','45,0 g Propan-2-ol, 10,0 g Propan-1-ol, 0,2 g Biphenyl-2-ol',[]],
@@ -7348,13 +7348,12 @@ const COMPETITOR_PRODUCT_ROWS = [
   ['sch-mikrozid-af-liquid','schuelke','mikrozid® AF liquid','surface','Alkoholische Schnelldesinfektion','alkoholisch',['bakterizid','begrenzt','plus']],
   ['sch-mikrozid-af-wipes','schuelke','mikrozid® AF wipes','surface','Alkoholische Desinfektionstücher','Ethanol, Propan-1-ol',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
   ['sch-mikrozid-universal-liquid','schuelke','mikrozid® universal liquid','surface','Gering-alkoholische Schnelldesinfektion','17,4 g Propan-2-ol, 12,47 g Ethanol',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
-  ['sch-mikrozid-universal-wipes','schuelke','mikrozid® universal wipes','surface','Gering-alkoholische Desinfektionstücher','Ethanol, Propan-2-ol',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
+  ['sch-mikrozid-universal-wipes','schuelke','mikrozid® universal wipes premium','surface','Gering-alkoholische Desinfektionstücher','Ethanol, Propan-2-ol',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
   ['sch-mikrozid-sensitive-liquid','schuelke','mikrozid® sensitive liquid','surface','Alkoholfreie Schnelldesinfektion','je 0,25 g ADBAC, DDAC, ADEBAC (QAV)',['bakterizid','levurozid','begrenzt','noro']],
   ['sch-mikrozid-sensitive-wipes','schuelke','mikrozid® sensitive wipes','surface','Alkoholfreie Desinfektionstücher','QAV',['bakterizid','levurozid','begrenzt']],
-  ['sch-mikrozid-paa-wipes','schuelke','mikrozid® PAA wipes','surface','Sporizide Desinfektionstücher','Peressigsäure',['bakterizid','tuberkulozid','viruzid','noro','sporizid','cdiff']],
-  ['sch-mikrozid-paaplus-wipes','schuelke','mikrozid® PAA+ wipes','surface','Sporizide Desinfektionstücher','',['sporizid']],
+  ['sch-mikrozid-paaplus-wipes','schuelke','mikrozid® PAA+ wipes','surface','Sporizide Desinfektionstücher','0,06 g Peressigsäure',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','plus','viruzid','sporizid','cdiff']],
   ['sch-terralin-protect','schuelke','terralin® protect','surface','Flächendesinfektion – Konzentrat (aldehydfrei)','aldehydfrei',['bakterizid','tuberkulozid','levurozid','begrenzt','adeno','noro']],
-  ['sch-perform','schuelke','perform®','surface','Flächendesinfektion – Konzentrat (Aktivsauerstoff)','Aktivsauerstoff',['bakterizid','tuberkulozid','viruzid','sporizid']],
+  ['sch-perform','schuelke','perform® pro','surface','Flächendesinfektion – Pulverkonzentrat (Aktivsauerstoff)','49,5 g Pentakaliumbis(peroxymonosulfat)bis(sulfat)',['tuberkulozid','viruzid','sporizid','cdiff']],
   ['sch-terralin-paa','schuelke','terralin® PAA','surface','Flächendesinfektion – Konzentrat (sporizid)','Peressigsäure',['sporizid']],
   ['sch-gigazyme','schuelke','gigazyme® X-tra','instruments','Enzymatischer Instrumentenreiniger','Enzyme',[]],
   ['sch-gigasept-instru-af','schuelke','gigasept® instru AF','instruments','Instrumentendesinfektion (aldehydfrei)','aldehydfrei',['bakterizid','tuberkulozid']],
@@ -7365,7 +7364,7 @@ const COMPETITOR_PRODUCT_ROWS = [
   ['sch-rotasept','schuelke','rotasept®','instruments','Bohrerbad (rotierende Instrumente)','',['bakterizid','viruzid']],
   ['sch-aspirmatic','schuelke','aspirmatic®','instruments','Desinfektion von Absauganlagen','aldehydfrei',['bakterizid','begrenzt']],
   ['sch-aspirmatic-cleaner','schuelke','aspirmatic® cleaner','instruments','Reiniger für Absauganlagen','',[]],
-  ['sch-dentavon','schuelke','dentavon®','instruments','Desinfektion von Abformungen/Prothetik','Aktivsauerstoff',['bakterizid','tuberkulozid','begrenzt','viruzid']],
+  ['sch-dentavon','schuelke','dentavon® ID','instruments','Desinfektion von Abformungen (Aktivsauerstoff)','49,5 g Pentakaliumbis(peroxymonosulfat)bis(sulfat)',['bakterizid','levurozid','begrenzt','plus']],
   ['sch-thermodent-alka','schuelke','thermodent® alka clean','instruments','Alkalischer Reiniger (maschinell)','alkalisch',[]],
   ['sch-thermodent-neutr','schuelke','thermodent® neutralizer','instruments','Neutralisator (maschinell)','Citronensäure',[]],
   ['sch-thermodent-clear','schuelke','thermodent® clear','instruments','Klarspüler (maschinell)','',[]],
@@ -7382,14 +7381,13 @@ const COMPETITOR_PRODUCT_ROWS = [
   ['bode-stellisept-gloves','bode','Stellisept® med gloves','hands','Antimikrobielle Waschhandschuhe','',[],'Reduktion von Bakterien inkl. MRSA und VRE (lt. Hersteller)'],
   ['bode-baktolin-pure','bode','Baktolin® pure','hands','Waschlotion','',[]],
   ['bode-baktolin-sensitive','bode','Baktolin® sensitive','hands','Waschlotion (sensible Haut)','',[]],
-  ['bode-baktolan-protect','bode','Baktolan® protect','hands','Hautschutz','',[]],
+  ['bode-baktolan-protect','bode','Baktolan® protect + pure','hands','Hautschutz','',[]],
   ['bode-baktolan-balm','bode','Baktolan® balm','hands','Hautpflege (reichhaltig)','',[]],
-  ['bode-baktolan-lotion','bode','Baktolan® lotion','hands','Hautpflege (leicht)','',[]],
   ['bode-baktolan-vital','bode','Baktolan® vital','hands','Durchblutungsförderndes Hydrogel','',[]],
   ['bode-bacillol-af','bode','Bacillol® AF','surface','Alkoholische Schnelldesinfektion','450 mg/g Propan-1-ol, 250 mg/g Propan-2-ol, 47 mg/g Ethanol',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','plus']],
   ['bode-bacillol-30-foam','bode','Bacillol® 30 Sensitive Foam','surface','Gering-alkoholische Schnelldesinfektion (Schaum)','140 mg/g Ethanol, 100 mg/g Propan-2-ol, 60 mg/g Propan-1-ol',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
   ['bode-bacillol-af-tissues','bode','Bacillol® AF Tissues','surface','Alkoholische Desinfektionstücher','Tränklösung Bacillol® AF',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','plus']],
-  ['bode-bacillol-30-tissues','bode','Bacillol® 30 Sensitive Tissues','surface','Gering-alkoholische Desinfektionstücher','Tränklösung Bacillol® 30 Sensitive Foam',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
+  ['bode-bacillol-30-tissues','bode','Bacillol® 30 Sensitive Green Tissues','surface','Gering-alkoholische Desinfektionstücher','Tränklösung Bacillol® 30 Sensitive Foam',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
   ['bode-bacillol-zero','bode','Bacillol® Zero Tissues','surface','Alkoholfreie Desinfektionstücher','5 mg/g Weinsäure, 5 mg/g Natriumbenzoat',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus','viruzid']],
   ['bode-mikrobac-tissues','bode','Mikrobac® Tissues','surface','Alkoholfreie Desinfektionstücher','4 mg/g Benzalkoniumchlorid, 4 mg/g DDAC (QAV)',['bakterizid','levurozid','begrenzt','noro']],
   ['bode-mikrobac-virucidal','bode','Mikrobac® Virucidal Tissues','surface','Alkoholfreie Desinfektionstücher','2,45 mg/g Benzalkoniumchlorid, 2,45 mg/g DDAC (QAV)',['bakterizid','levurozid','fungizid','begrenzt','plus','viruzid']],
@@ -7434,7 +7432,7 @@ const COMPETITOR_PRODUCT_ROWS = [
   ['bb-tiutol-dent','bbraun','Tiutol® dent','instruments','Desinfektion von Absauganlagen','',['bakterizid','tuberkulozid','begrenzt','viruzid']],
   ['bb-helimatic-alcaline','bbraun','Helimatic® Cleaner alcaline','instruments','Alkalischer Reiniger (maschinell)','alkalisch (pH > 10), Tenside',[]],
   ['bb-helimatic-ma','bbraun','Helimatic® Cleaner MA','instruments','Mildalkalisch-enzymatischer Reiniger (maschinell)','Alkalien, Tenside, Enzyme',[]],
-  ['bb-helimatic-enzymatic','bbraun','Helimatic® Cleaner enzymatic NF','instruments','Enzymatischer Reiniger (maschinell)','Enzyme',[]],
+  ['bb-helimatic-enzymatic','bbraun','Helimatic® Cleaner enzymatic','instruments','Enzymatischer Reiniger (maschinell)','Enzyme',[]],
   ['bb-helimatic-neutral','bbraun','Helimatic® Cleaner neutral','instruments','Neutraler Reiniger (maschinell)','Tenside, pH-neutral',[]],
   ['bb-helimatic-neutralizer','bbraun','Helimatic® Neutralizer C','instruments','Neutralisator (maschinell)','Citronensäure',[]],
   ['bb-helimatic-disinfectant','bbraun','Helimatic® Disinfectant','instruments','Desinfektion (maschinell, Endoskope)','',['bakterizid','fungizid','tuberkulozid','begrenzt','viruzid']],
@@ -7443,62 +7441,51 @@ const COMPETITOR_PRODUCT_ROWS = [
   // ---------- Ecolab ----------
   ['eco-skinman-soft-protect','ecolab','Skinman™ Soft Protect','hands','Händedesinfektion','89 g Ethanol',['bakterizid','levurozid','mykobakterizid','begrenzt','plus','viruzid','noro','adeno']],
   ['eco-skinman-soft-protect-ff','ecolab','Skinman™ Soft Protect FF','hands','Händedesinfektion (parfümfrei)','Ethanol',['bakterizid','levurozid','mykobakterizid','begrenzt','plus','viruzid','noro','adeno']],
-  ['eco-spirigel-complete','ecolab','Spirigel™ Complete','hands','Händedesinfektionsgel','alkoholisch',['viruzid']],
-  ['eco-skinsept-pur','ecolab','Skinsept™ Pur','hands','Hautantiseptik','alkoholisch',[]],
-  ['eco-skinsept-color','ecolab','Skinsept™ Color','hands','Hautantiseptik (gefärbt)','alkoholisch',[]],
-  ['eco-skinsan-scrub','ecolab','Skinsan™ Scrub N','hands','Antimikrobielle Ganzkörperwaschung','',[]],
-  ['eco-seraman-sensitive','ecolab','Seraman™ Sensitive','hands','Waschlotion (farb- und parfümfrei)','',[]],
+  ['eco-skinsan','ecolab','Skinsan™ 2% / Foam','hands','Antimikrobielle Waschlotion (Dekolonisation)','2 g Chlorhexidin',[]],
   ['eco-manisoft','ecolab','Manisoft™','hands','Waschlotion','',[]],
-  ['eco-silonda-lipid','ecolab','Silonda™ Lipid','hands','Hautpflege (reichhaltig)','',[]],
+  ['eco-silonda-care','ecolab','Silonda™ Care','hands','Hautpflege','',[]],
+  ['eco-silonda-protect','ecolab','Silonda™ Protect','hands','Hautschutz-Lotion','',[]],
   ['eco-silonda-sensitive','ecolab','Silonda™ Sensitive','hands','Hautpflege (leicht)','',[]],
   ['eco-incidin-liquid','ecolab','Incidin™ Liquid','surface','Alkoholische Schnelldesinfektion','35 g 2-Propanol, 25 g 1-Propanol',['bakterizid','levurozid','tuberkulozid','begrenzt','noro','adeno']],
-  ['eco-incides-n','ecolab','Incides™ N Tücher','surface','Alkoholische Desinfektionstücher','alkoholisch',[]],
+  ['eco-incidin-alcohol-wipe','ecolab','Incidin™ Alcohol Wipe','surface','Alkoholische Desinfektionstücher','35 g 2-Propanol, 25 g 1-Propanol',['noro'],'Breites Wirkspektrum einschließlich Norovirus (lt. Hersteller)'],
   ['eco-incidin-oxyfoam-s','ecolab','Incidin™ OxyFoam S','surface','Sporizide Schnelldesinfektion','Wasserstoffperoxid',['viruzid','sporizid']],
   ['eco-incidin-oxywipe-s','ecolab','Incidin™ OxyWipe S','surface','Sporizide Desinfektionstücher','Wasserstoffperoxid',['viruzid','sporizid']],
   ['eco-incidin-pro','ecolab','Incidin™ Pro','surface','Flächendesinfektion – Konzentrat (aldehydfrei)','10 g Phenoxyethanol, 8 g Diamin, 7,5 g ADBAC',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus','noro','adeno']],
-  ['eco-incidin-rapid','ecolab','Incidin™ Rapid','surface','Flächendesinfektion – Konzentrat (Aldehyd)','QAV, Glutaraldehyd',['bakterizid','levurozid','viruzid','sporizid','cdiff']],
   ['eco-incidin-active','ecolab','Incidin™ Active','surface','Flächendesinfektion – Konzentrat (Aktivsauerstoff)','Peressigsäure (Aktivsauerstoff)',['viruzid','sporizid']],
   ['eco-sekusept-multienzyme','ecolab','Sekusept™ MultiEnzyme','instruments','Enzymatischer Instrumentenreiniger','Tenside, Enzyme',[]],
   ['eco-sekusept-pure-clean','ecolab','Sekusept™ Pure Clean','instruments','Instrumentenreiniger (enzymfrei)','Tenside',[]],
-  ['eco-sekusept-extra-n','ecolab','Sekusept™ Extra N','instruments','Instrumentendesinfektion (Aldehyd)','Glutaraldehyd',[]],
-  ['eco-sekusept-plus','ecolab','Sekusept™ PLUS','instruments','Instrumentendesinfektion (aldehydfrei)','25 g Glucoprotamin',['bakterizid','levurozid','tuberkulozid','begrenzt']],
   ['eco-sekusept-aktiv','ecolab','Sekusept™ Aktiv','instruments','Instrumentendesinfektion (Peressigsäure, Pulver)','Peressigsäure',['sporizid']],
-  ['eco-sekumatic-proclean','ecolab','Sekumatic™ ProClean','instruments','Mildalkalischer Reiniger (maschinell)','mildalkalisch, tensidfrei',[]],
-  ['eco-sekumatic-fr','ecolab','Sekumatic™ FR','instruments','Alkalischer Reiniger (maschinell)','hochalkalisch',[]],
-  ['eco-sekumatic-fre','ecolab','Sekumatic™ FRE','instruments','Enzymatischer Reiniger (maschinell)','Tenside, Protease, pH-neutral',[]],
-  ['eco-sekumatic-fdr','ecolab','Sekumatic™ FDR','instruments','Reiniger-Desinfektion (maschinell)','Glucoprotamin',[]],
   ['eco-sekumatic-fnz','ecolab','Sekumatic™ FNZ','instruments','Neutralisator (maschinell)','Citronensäure',[]],
-  ['eco-sekumatic-fkn','ecolab','Sekumatic™ FKN','instruments','Klarspüler (maschinell)','pH-neutral',[]]
 ];
 const COMPETITOR_PRODUCTS = Object.fromEntries(COMPETITOR_PRODUCT_ROWS.map(([key, company, name, area, kind, wirkstoff, tags, extra]) => [key, { key, company, name, area, kind, wirkstoff, tags, extra: extra || '' }]));
 
 // Zuordnung: unser Produkt → [Wettbewerbsprodukt, Stufe] mit d = direktes Äquivalent
 // (gleiche Produktart + vergleichbare Wirkstoffbasis), a = ähnliche Anwendung.
 const _ALC_SURFACE = [['sch-mikrozid-af-liquid','d'],['bode-bacillol-af','d'],['bb-meliseptol','d'],['eco-incidin-liquid','d'],['sch-mikrozid-universal-liquid','a'],['bode-bacillol-30-foam','a'],['bb-meliseptol-rapid','a'],['bb-meliseptol-foam-pure','a']];
-const _ALC_WIPES = [['sch-mikrozid-af-wipes','d'],['bode-bacillol-af-tissues','d'],['bb-meliseptol-hbv-tuecher','d'],['eco-incides-n','d'],['sch-mikrozid-universal-wipes','a'],['bode-bacillol-30-tissues','a'],['bb-meliseptol-wipes-sensitive','a']];
+const _ALC_WIPES = [['sch-mikrozid-af-wipes','d'],['bode-bacillol-af-tissues','d'],['bb-meliseptol-hbv-tuecher','d'],['eco-incidin-alcohol-wipe','d'],['sch-mikrozid-universal-wipes','a'],['bode-bacillol-30-tissues','a'],['bb-meliseptol-wipes-sensitive','a']];
 const _QAV_WIPES = [['sch-mikrozid-sensitive-wipes','d'],['bode-mikrobac-tissues','d'],['bb-meliseptol-wipes-ultra','d'],['bode-bacillol-zero','a']];
 const _QAV_WIPES_VIRUZID = [['bode-mikrobac-virucidal','d'],['bb-meliseptol-wipes-ultra','d'],['bode-bacillol-zero','d'],['sch-mikrozid-sensitive-wipes','a'],['bode-mikrobac-tissues','a']];
-const _OXY_WIPES = [['eco-incidin-oxywipe-s','d'],['sch-mikrozid-paa-wipes','d'],['sch-mikrozid-paaplus-wipes','d'],['bb-meliseptol-wipes-ultra','a'],['bode-bacillol-zero','a']];
+const _OXY_WIPES = [['eco-incidin-oxywipe-s','d'],['sch-mikrozid-paaplus-wipes','d'],['bb-meliseptol-wipes-ultra','a'],['bode-bacillol-zero','a']];
 const _QAV_CONC = [['bb-hexaquart-pure','d'],['bode-mikrobac-forte','d'],['sch-terralin-protect','d'],['eco-incidin-pro','d'],['bb-hexaquart-xl','a']];
 const _AMIN_CONC = [['bode-mikrobac-forte','d'],['bb-hexaquart-xl','d'],['eco-incidin-pro','d'],['sch-terralin-protect','a'],['bb-hexaquart-pure','a']];
-const _ALDEHYD_CONC = [['bode-kohrsolin-ff','d'],['bb-melsept-sf','d'],['eco-incidin-rapid','d'],['sch-perform','a']];
+const _ALDEHYD_CONC = [['bode-kohrsolin-ff','d'],['bb-melsept-sf','d'],['sch-perform','a']];
 const _OXY_CONC = [['sch-perform','d'],['sch-terralin-paa','d'],['bode-dismozon-plus','d'],['eco-incidin-active','d']];
 const _HAND_PROPANOL = [['bode-sterillium','d'],['bode-sterillium-pure','d'],['sch-desmanol-care','d'],['bb-promanum-pure','a'],['bb-softa-man','a'],['eco-skinman-soft-protect','a']];
-const _HAND_PROPANOL_PURE = [['bode-sterillium-classic-pure','d'],['bode-sterillium-pure','d'],['sch-desmanol-care','d'],['bb-softa-man-pure','a'],['sch-desderman-pure','a'],['eco-skinman-soft-protect-ff','a']];
+const _HAND_PROPANOL_PURE = [['bode-sterillium-classic-pure','d'],['bode-sterillium-pure','d'],['sch-desmanol-care','d'],['bb-softa-man-pure','a'],['eco-skinman-soft-protect-ff','a']];
 const _HAND_PLUS = [['bode-sterillium','d'],['bode-sterillium-classic-pure','d'],['sch-desmanol-pure','d'],['bb-softa-man','d'],['bb-promanum-pure','d'],['eco-skinman-soft-protect','a']];
-const _HAND_VIRUZID = [['bode-sterillium-med','d'],['bode-sterillium-virugard','d'],['sch-desderman-care','d'],['bb-softa-man-acute','d'],['eco-skinman-soft-protect','d']];
-const _HAND_GEL = [['bode-sterillium-gel-pure','d'],['sch-desderman-care-gel','d'],['eco-spirigel-complete','d'],['bb-softa-man-viscorub','a']];
-const _SKIN = [['bode-cutasept-f','d'],['sch-kodan-farblos','d'],['bb-softasept-n','d'],['eco-skinsept-pur','d'],['sch-octeniderm','a']];
-const _SKIN_COLOR = [['bode-cutasept-g','d'],['sch-kodan-gefaerbt','d'],['eco-skinsept-color','d'],['bb-braunoderm','a']];
+const _HAND_VIRUZID = [['bode-sterillium-med','d'],['bode-sterillium-virugard','d'],['sch-desderman-care','d'],['sch-desderman','d'],['bb-softa-man-acute','d'],['eco-skinman-soft-protect','d']];
+const _HAND_GEL = [['bode-sterillium-gel-pure','d'],['sch-desderman-care-gel','d'],['bb-softa-man-viscorub','a']];
+const _SKIN = [['bode-cutasept-f','d'],['sch-kodan-farblos','d'],['bb-softasept-n','d'],['sch-octeniderm','a']];
+const _SKIN_COLOR = [['bode-cutasept-g','d'],['sch-kodan-gefaerbt','d'],['bb-braunoderm','a']];
 const _WASH = [['bode-baktolin-pure','d'],['sch-esemtan-wash','d'],['bb-lifosan-soft','d'],['eco-manisoft','d']];
-const _WASH_SENS = [['bode-baktolin-sensitive','d'],['sch-sensiva-wash','d'],['bb-lifosan-pure','d'],['eco-seraman-sensitive','d']];
-const _CARE_LIGHT = [['bode-baktolan-lotion','d'],['sch-esemtan-skin','d'],['bb-trixo','d'],['eco-silonda-sensitive','d']];
-const _CARE_RICH = [['bode-baktolan-balm','d'],['sch-esemtan-balm','d'],['sch-sensiva-regen','a'],['bb-trixo-lind','a'],['eco-silonda-lipid','d']];
-const _PROTECT = [['bode-baktolan-protect','d'],['sch-sensiva-protect','d']];
-const _DECON = [['sch-octenisan-wash','d'],['bode-stellisept-med','d'],['bb-prontoderm','a'],['eco-skinsan-scrub','a']];
+const _WASH_SENS = [['bode-baktolin-sensitive','d'],['sch-sensiva-wash','d'],['bb-lifosan-pure','d'],['eco-manisoft','a']];
+const _CARE_LIGHT = [['sch-esemtan-skin','d'],['bb-trixo','d'],['eco-silonda-sensitive','d']];
+const _CARE_RICH = [['bode-baktolan-balm','d'],['sch-esemtan-balm','d'],['sch-sensiva-regen','a'],['bb-trixo-lind','a'],['eco-silonda-care','a']];
+const _PROTECT = [['bode-baktolan-protect','d'],['sch-sensiva-protect','d'],['eco-silonda-protect','d']];
+const _DECON = [['sch-octenisan-wash','d'],['bode-stellisept-med','d'],['bb-prontoderm','a'],['eco-skinsan','a']];
 const _DECON_WIPES = [['sch-octenisan-gloves','d'],['bode-stellisept-gloves','d'],['bb-prontoderm','a']];
-const _INST_AF = [['bode-bomix-plus','d'],['sch-gigasept-instru-af','d'],['bb-stabimed-fresh','d'],['eco-sekusept-plus','d'],['bb-helipur','a'],['sch-gigasept-af-forte','a']];
-const _INST_ALDEHYD = [['bode-korsolex-basic','d'],['bode-korsolex-extra','d'],['sch-gigasept-ff','d'],['bb-helipur-h-plus-n','d'],['eco-sekusept-extra-n','d']];
+const _INST_AF = [['bode-bomix-plus','d'],['sch-gigasept-instru-af','d'],['bb-stabimed-fresh','d'],['bb-helipur','a'],['sch-gigasept-af-forte','a']];
+const _INST_ALDEHYD = [['bode-korsolex-basic','d'],['bode-korsolex-extra','d'],['sch-gigasept-ff','d'],['bb-helipur-h-plus-n','d']];
 const _INST_PAA = [['sch-gigasept-paa','d'],['sch-gigasept-pearls','d'],['bb-stabimed-ultra','d'],['eco-sekusept-aktiv','d']];
 const _INST_ENZYM = [['sch-gigazyme','d'],['bb-helizyme','d'],['eco-sekusept-multienzyme','d'],['bode-bodedex-forte','a']];
 const _INST_CLEANER = [['bode-bodedex-forte','d'],['bb-cleaner-n','d'],['eco-sekusept-pure-clean','d'],['sch-gigazyme','a'],['bb-helizyme','a']];
@@ -7506,7 +7493,7 @@ const COMPETITOR_EQUIV = {
   'descosept-spezial': [['sch-mikrozid-sensitive-liquid','d'],['bode-bacillol-30-foam','a'],['bb-meliseptol-foam-pure','a']],
   'descosept-sensitive': _ALC_SURFACE,
   'descosept-pur': _ALC_SURFACE,
-  'ultrasol-oxy': [['eco-incidin-oxyfoam-s','d'],['bb-meliseptol-acute','a'],['sch-mikrozid-paa-wipes','a']],
+  'ultrasol-oxy': [['eco-incidin-oxyfoam-s','d'],['bb-meliseptol-acute','a'],['sch-mikrozid-paaplus-wipes','a']],
   'cleanisept': _QAV_CONC,
   'biguanid-fläche-nr': _QAV_CONC,
   'optisal-n': [['sch-terralin-protect','a'],['bode-mikrobac-forte','a'],['bb-hexaquart-pure','a'],['eco-incidin-pro','a']],
@@ -7546,7 +7533,7 @@ const COMPETITOR_EQUIV = {
   'descolind-pure-intensive-cream': _CARE_RICH,
   'descolind-expert-intensive-cream': _CARE_RICH,
   'descolind-expert-protect-cream': _PROTECT,
-  'descomed-barrierecreme': [['bode-baktolan-protect','a'],['sch-sensiva-protect','a']],
+  'descomed-barrierecreme': [['bode-baktolan-protect','a'],['sch-sensiva-protect','a'],['eco-silonda-protect','a']],
   'desco-vital-gel': [['bode-baktolan-vital','d'],['sch-esemtan-gel','d']],
   'descolind-care-wipes': [['sch-esemtan-mitts','d']],
   'plurazyme-extra': _INST_ENZYM,
@@ -7562,30 +7549,143 @@ const COMPETITOR_EQUIV = {
   'descosuc-cleaner': [['sch-aspirmatic-cleaner','d']],
   'desco-bohrerbad': [['sch-rotasept','d']],
   'descoprent': [['sch-dentavon','d']],
-  'desinfektant': [['bode-korsolex-endo-disinfectant','d'],['bb-helimatic-disinfectant','d'],['eco-sekumatic-fdr','a']],
-  'thermoshield': [['bode-korsolex-endo-disinfectant','d'],['bb-helimatic-disinfectant','d'],['eco-sekumatic-fdr','a']],
-  'thermoshield-flex': [['bode-korsolex-endo-cleaner','d'],['bb-helimatic-enzymatic','d'],['eco-sekumatic-fre','d']],
-  'thermoshield-nr': [['bb-helimatic-neutral','d'],['eco-sekumatic-fre','a']],
-  'thermoshield-xtreme': [['bb-helimatic-ma','d'],['eco-sekumatic-proclean','a']],
-  'thermoshield-basix': [['bb-helimatic-alcaline','d'],['eco-sekumatic-fr','d'],['sch-thermodent-alka','d'],['eco-sekumatic-proclean','a']],
+  'desinfektant': [['bode-korsolex-endo-disinfectant','d'],['bb-helimatic-disinfectant','d']],
+  'thermoshield': [['bode-korsolex-endo-disinfectant','d'],['bb-helimatic-disinfectant','d']],
+  'thermoshield-flex': [['bode-korsolex-endo-cleaner','d'],['bb-helimatic-enzymatic','d']],
+  'thermoshield-nr': [['bb-helimatic-neutral','d']],
+  'thermoshield-xtreme': [['bb-helimatic-ma','d']],
+  'thermoshield-basix': [['bb-helimatic-alcaline','d'],['sch-thermodent-alka','d']],
   'thermoshield-c': [['bb-helimatic-neutralizer','d'],['eco-sekumatic-fnz','d'],['sch-thermodent-neutr','d']],
   'thermoshield-p': [['bb-helimatic-neutralizer','a'],['eco-sekumatic-fnz','a']],
-  'thermoshield-shine': [['bb-helimatic-rinse','d'],['eco-sekumatic-fkn','d'],['sch-thermodent-clear','d']],
+  'thermoshield-shine': [['bb-helimatic-rinse','d'],['sch-thermodent-clear','d']],
   'thermo-clear': [['bb-helimatic-latriniser','d']],
   'thermo-alka-clear': [['bb-helimatic-latriniser','a']]
 };
 const COMPETITOR_LEVEL_LABEL = { d:'Direktes Äquivalent', a:'Ähnliche Anwendung' };
-// Link zur Herstellerseite: direkte Produktseite, wo geprüft vorhanden; sonst eine auf die
-// Hersteller-Website beschränkte Suche nach dem exakten Produktnamen (bleibt auch bei
-// geänderten Hersteller-URLs funktionsfähig).
+// Link zur Herstellerseite: direkte Produktseite (deutscher Webauftritt, sonst internationaler
+// Katalog des Herstellers; geprüft 11/2026). Nur wo keine Produktseite auffindbar war, öffnet eine
+// auf die Hersteller-Website beschränkte Suche nach dem exakten Produktnamen.
 const COMPETITOR_DOMAINS = { schuelke:['schuelke.com'], bode:['hartmann.info','bode-chemie.com'], bbraun:['bbraun.de','bbraun.com'], ecolab:['ecolab.com'] };
 const COMPETITOR_DIRECT_URLS = {
-  'sch-desderman-care':'https://www.schuelke.com/intl-en/products/desderman-care.php',
-  'sch-desderman-care-gel':'https://www.schuelke.com/intl-en/products/desderman-care-gel.php',
-  'sch-mikrozid-sensitive-liquid':'https://www.schuelke.com/intl-en/products/mikrozid-sensitive-liquid.php',
-  'sch-mikrozid-universal-liquid':'https://www.schuelke.com/intl-en/products/mikrozid-universal-liquid.php',
-  'sch-mikrozid-af-wipes':'https://www.schuelke.com/intl-en/products/mikrozid-AF-wipes.php',
-  'bb-stabimed-fresh':'https://catalogs.bbraun.com/p/PRID00007686/stabimed-fresh-disinfectant'
+  'sch-desderman-care':'https://www.schuelke.com/de-de/produkte/913295/desderman-care/',
+  'sch-desderman-care-gel':'https://www.schuelke.com/de-de/produkte/913296/desderman-care-gel/',
+  'sch-desderman':'https://www.schuelke.com/de-de/produkte/913516/desderman/',
+  'sch-desmanol-care':'https://www.schuelke.com/de-de/produkte/913251/desmanol-care/',
+  'sch-desmanol-pure':'https://www.schuelke.com/de-de/produkte/914099/desmanol-pure/',
+  'sch-kodan-farblos':'https://www.schuelke.com/de-de/produkte/910021/kodan-tinktur-forte-farblos/',
+  'sch-kodan-gefaerbt':'https://www.schuelke.com/de-de/produkte/910020/kodan-tinktur-forte-gefaerbt/',
+  'sch-octeniderm':'https://www.schuelke.com/de-de/produkte/912844/octeniderm-farblos/',
+  'sch-octenisan-wash':'https://www.schuelke.com/de-de/produkte/910042/octenisan-wash-lotion/',
+  'sch-octenisan-gloves':'https://www.schuelke.com/de-de/produkte/911861/octenisan-waschhandschuhe/',
+  'sch-esemtan-wash':'https://www.schuelke.com/de-de/produkte/913906/esemtan-wash-lotion/',
+  'sch-sensiva-wash':'https://www.schuelke.com/de-de/produkte/913907/sensiva-wash-lotion/',
+  'sch-esemtan-skin':'https://www.schuelke.com/de-de/produkte/913181/esemtan-skin-lotion/',
+  'sch-esemtan-balm':'https://www.schuelke.com/de-de/produkte/913172/esemtan-dry-skin-balm/',
+  'sch-esemtan-gel':'https://www.schuelke.com/de-de/produkte/910045/esemtan-active-gel/',
+  'sch-esemtan-mitts':'https://www.schuelke.com/de-de/produkte/912710/esemtan-wash-mitts/',
+  'sch-sensiva-protect':'https://www.schuelke.com/de-de/produkte/912765/sensiva-protective-cream/',
+  'sch-sensiva-regen':'https://www.schuelke.com/de-de/produkte/910052/sensiva-regeneration-cream/',
+  'sch-mikrozid-af-liquid':'https://www.schuelke.com/de-de/produkte/910107/mikrozid-af-liquid/',
+  'sch-mikrozid-af-wipes':'https://www.schuelke.com/de-de/produkte/910112/mikrozid-af-wipes/',
+  'sch-mikrozid-universal-liquid':'https://www.schuelke.com/de-de/produkte/913231/mikrozid-universal-liquid/',
+  'sch-mikrozid-universal-wipes':'https://www.schuelke.com/de-de/produkte/912944/mikrozid-universal-wipes-premium/',
+  'sch-mikrozid-sensitive-liquid':'https://www.schuelke.com/de-de/produkte/910932/mikrozid-sensitive-liquid/',
+  'sch-mikrozid-sensitive-wipes':'https://www.schuelke.com/de-de/produkte/910931/mikrozid-sensitive-wipes/',
+  'sch-mikrozid-paaplus-wipes':'https://www.schuelke.com/de-de/produkte/914000/mikrozid-paa-wipes/',
+  'sch-terralin-protect':'https://www.schuelke.com/de-de/produkte/910692/terralin-protect/',
+  'sch-perform':'https://www.schuelke.com/de-de/produkte/913813/perform-pro/',
+  'sch-terralin-paa':'https://www.schuelke.com/de-de/produkte/911450/terralin-paa/',
+  'sch-gigazyme':'https://www.schuelke.com/de-de/produkte/912530/gigazyme-x-tra/',
+  'sch-gigasept-instru-af':'https://www.schuelke.com/de-de/produkte/910420/gigasept-instru-af/',
+  'sch-gigasept-af-forte':'https://www.schuelke.com/de-de/produkte/910940/gigasept-af-forte/',
+  'sch-gigasept-ff':'https://www.schuelke.com/de-de/produkte/910941/gigasept-ff-neu/',
+  'sch-gigasept-pearls':'https://www.schuelke.com/de-de/produkte/912920/gigasept-pearls/',
+  'sch-gigasept-paa':'https://www.schuelke.com/de-de/produkte/911393/gigasept-paa-concentrate/',
+  'sch-rotasept':'https://www.schuelke.com/de-de/produkte/910061/rotasept/',
+  'sch-aspirmatic':'https://www.schuelke.com/de-de/produkte/910068/aspirmatic/',
+  'sch-aspirmatic-cleaner':'https://www.schuelke.com/de-de/produkte/910737/aspirmatic-cleaner/',
+  'sch-dentavon':'https://www.schuelke.com/de-de/produkte/913893/dentavon-id/',
+  'sch-thermodent-alka':'https://www.schuelke.com/de-de/produkte/911032/thermodent-alka-clean/',
+  'sch-thermodent-neutr':'https://www.schuelke.com/de-de/produkte/910191/thermodent-neutralizer/',
+  'sch-thermodent-clear':'https://www.schuelke.com/de-de/produkte/910101/thermodent-clear/',
+  'bode-sterillium':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händedesinfektion/sterillium®',
+  'bode-sterillium-classic-pure':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händedesinfektion/sterillium®-classic-pure',
+  'bode-sterillium-pure':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händedesinfektion/sterillium®-pure',
+  'bode-sterillium-med':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händedesinfektion/sterillium®-med',
+  'bode-sterillium-virugard':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händedesinfektion/sterillium®-virugard®',
+  'bode-sterillium-gel-pure':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händedesinfektion/sterillium®-gel-pure',
+  'bode-cutasept-f':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/haut/hautantiseptik/cutasept®-f',
+  'bode-cutasept-g':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/haut/hautantiseptik/cutasept®-g',
+  'bode-stellisept-med':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/haut/antimikrobielle-körperwaschung/stellisept®-med',
+  'bode-stellisept-gloves':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/haut/antimikrobielle-körperwaschung/stellisept®-med-gloves',
+  'bode-baktolin-pure':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händereinigung/baktolin®-pure',
+  'bode-baktolin-sensitive':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händereinigung/baktolin®-sensitive',
+  'bode-baktolan-protect':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händepflege-und-hautschutz/baktolan®-protect-,-pl-,-pure',
+  'bode-baktolan-balm':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/hände/händepflege-und-hautschutz/baktolan®-balm',
+  'bode-baktolan-vital':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/haut/spezialprodukte-haut/baktolan®-vital',
+  'bode-bacillol-af':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-gebrauchsfertige-lösungen/bacillol®-af',
+  'bode-bacillol-30-foam':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-gebrauchsfertige-lösungen/bacillol®-30-sensitive-foam',
+  'bode-bacillol-af-tissues':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-vorgetränkte-tücher/bacillol®-af-tissues',
+  'bode-bacillol-30-tissues':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-vorgetränkte-tücher/bacillol®-30-sensitive-green-tissues',
+  'bode-bacillol-zero':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-vorgetränkte-tücher/bacillol®-zero-tissues',
+  'bode-mikrobac-tissues':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-vorgetränkte-tücher/mikrobac®-tissues',
+  'bode-mikrobac-virucidal':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-vorgetränkte-tücher/mikrobac®-virucidal-tissues',
+  'bode-kohrsolin-ff':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-konzentrate/kohrsolin®-ff',
+  'bode-mikrobac-forte':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-konzentrate/mikrobac®-forte',
+  'bode-dismozon-plus':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/fläche/flächendesinfektion-konzentrate/dismozon®-plus',
+  'bode-bodedex-forte':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/instrumente/manuelle-instrumentenreinigung/bodedex®-forte',
+  'bode-bomix-plus':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/instrumente/manuelle-desinfizierende-instrumentenreinigung/bomix®-plus',
+  'bode-korsolex-extra':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/instrumente/manuelle-instrumenten-abschlussdesinfektion-(inkl,-d-,-viruzidie)/korsolex®-extra',
+  'bode-korsolex-basic':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/instrumente/manuelle-instrumenten-abschlussdesinfektion-(inkl,-d-,-viruzidie)/korsolex®-basic',
+  'bode-korsolex-endo-cleaner':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/instrumente/chemo-thermische-aufbereitung-von-endoskopen/korsolex®-endo-cleaner',
+  'bode-korsolex-endo-disinfectant':'https://www.hartmann.info/de-de/produkte/desinfektion-und-hygiene/instrumente/chemo-thermische-aufbereitung-von-endoskopen/korsolex®-endo-disinfectant',
+  'bb-softa-man':'https://www.bbraun.de/de/products/b/softa-man.html',
+  'bb-softa-man-acute':'https://www.bbraun.de/de/products/b/softa-man-acute.html',
+  'bb-softa-man-pure':'https://www.bbraun.de/de/products/b/softa-man-pure.html',
+  'bb-softa-man-viscorub':'https://www.bbraun.de/de/products/b/softa-man-viscorub.html',
+  'bb-promanum-pure':'https://www.bbraun.de/de/products/b/promanum-pure.html',
+  'bb-softasept-n':'https://www.bbraun.de/de/products/b/softasept-n.html',
+  'bb-braunoderm':'https://www.bbraun.de/de/products/b/braunoderm.html',
+  'bb-prontoderm':'https://www.bbraun.de/de/products/b/prontoderm-loesung.html',
+  'bb-trixo-lind':'https://www.bbraun.de/de/products/b/trixo-lind.html',
+  'bb-meliseptol-rapid':'https://www.bbraun.de/de/products/b/meliseptol-rapid.html',
+  'bb-meliseptol-acute':'https://www.bbraun.de/de/products/b225/meliseptol-acute.html',
+  'bb-meliseptol-wipes-sensitive':'https://www.bbraun.de/de/products/b/meliseptol-wipessensitive.html',
+  'bb-meliseptol-wipes-ultra':'https://www.bbraun.de/de/products/b58/meliseptol-wipesultra.html',
+  'bb-meliseptol-hbv-tuecher':'https://www.bbraun.de/de/products/b/meliseptol-hbv-tuecher.html',
+  'bb-meliseptol-foam-pure':'https://catalogs.bbraun.com/en-01/p/PRID00004695/meliseptol-foam-pure-surface-disinfection',
+  'bb-hexaquart-pure':'https://www.bbraun.de/de/products/b64/hexaquart-pure.html',
+  'bb-hexaquart-xl':'https://catalogs.bbraun.com/en-01/p/PRID00010958/hexaquart-xl',
+  'bb-helipur':'https://catalogs.bbraun.com/en-01/p/PRID00000777/helipur',
+  'bb-helipur-h-plus-n':'https://catalogs.bbraun.com/en-01/p/PRID00000778/helipur-h-plus-n',
+  'bb-stabimed-fresh':'https://www.bbraun.de/de/products/b63/stabimed-fresh.html',
+  'bb-stabimed-ultra':'https://catalogs.bbraun.de/de-DE/p/PRID00009000/stabimed-ultra',
+  'bb-helizyme':'https://catalogs.bbraun.de/de-DE/p/PRID00000794/helizyme',
+  'bb-helimatic-alcaline':'https://catalogs.bbraun.de/de-DE/p/PRID00000855/helimatic-cleaner-alcaline',
+  'bb-helimatic-ma':'https://catalogs.bbraun.com/en-01/p/PRID00007687/helimatic-cleaner-ma',
+  'bb-helimatic-enzymatic':'https://catalogs.bbraun.com/en-01/p/PRID00000290/helimatic-cleaner-enzymatic',
+  'bb-helimatic-neutral':'https://www.bbraun.de/de/products/b/helimatic-cleanerneutral.html',
+  'bb-helimatic-neutralizer':'https://catalogs.bbraun.de/de-DE/p/000000000000018732/helimatic-neutralizer-c-kanister-5-l',
+  'bb-helimatic-disinfectant':'https://www.bbraun.de/de/products/b/helimatic-disinfectant.html',
+  'bb-helimatic-rinse':'https://www.bbraun-vetcare.de/de/products/b/helimatic-rinse-neutralnf.html',
+  'bb-helimatic-latriniser':'https://www.bbraun.de/de/products/b/helimatic-latriniser.html',
+  'eco-skinman-soft-protect':'https://www.ecolabhealthcare.de/website/seiten/produkte/haende_und_haut/haendedesinfektion/skinman_soft_protect.php',
+  'eco-skinman-soft-protect-ff':'https://www.ecolabhealthcare.de/website/seiten/produkte/haende_und_haut/haendedesinfektion/skinman_soft_protect_ff.php',
+  'eco-skinsan':'https://www.ecolabhealthcare.de/website/seiten/produkte/haende_und_haut/waschlotionen/skinsan_2_foam.php',
+  'eco-manisoft':'https://www.ecolabhealthcare.de/website/seiten/produkte/haende_und_haut/waschlotionen/manisoft.php',
+  'eco-silonda-sensitive':'https://www.ecolabhealthcare.de/website/seiten/produkte/haende_und_haut/pflege/silonda_sensitive.php',
+  'eco-silonda-care':'https://www.ecolabhealthcare.de/website/seiten/produkte/haende_und_haut/pflege/silonda_care.php',
+  'eco-silonda-protect':'https://www.ecolabhealthcare.de/website/seiten/produkte/haende_und_haut/pflege/silonda_protect.php',
+  'eco-incidin-liquid':'https://www.ecolabhealthcare.de/website/seiten/produkte/flaechendesinfektion/fertigloesungen/incidin_liquid.php',
+  'eco-incidin-alcohol-wipe':'https://www.ecolabhealthcare.de/website/seiten/produkte/flaechendesinfektion/tuecher/incidin_alcohol_wipe.php',
+  'eco-incidin-oxyfoam-s':'https://www.ecolabhealthcare.de/website/seiten/produkte/flaechendesinfektion/fertigloesungen/incidin_oxy_foam_s.php',
+  'eco-incidin-oxywipe-s':'https://www.ecolabhealthcare.de/website/seiten/produkte/flaechendesinfektion/tuecher/incidin_oxy_wipe_s.php',
+  'eco-incidin-pro':'https://www.ecolabhealthcare.de/website/seiten/produkte/flaechendesinfektion/konzentrate_aldehydfrei/incidin_pro.php',
+  'eco-incidin-active':'https://www.ecolabhealthcare.de/website/seiten/produkte/flaechendesinfektion/konzentrate_aldehydfrei/incidin_active.php',
+  'eco-sekusept-multienzyme':'https://www.ecolabhealthcare.de/website/seiten/produkte/instrumentenaufbereitung/manuelle_aufbereitung/sekusept_multienzyme.php',
+  'eco-sekusept-pure-clean':'https://www.ecolabhealthcare.de/website/seiten/produkte/instrumentenaufbereitung/manuelle_aufbereitung/sekusept_pure_clean.php',
+  'eco-sekusept-aktiv':'https://www.ecolabhealthcare.de/website/seiten/produkte/instrumentenaufbereitung/manuelle_aufbereitung/sekusept_aktiv.php',
+  'eco-sekumatic-fnz':'https://www.ecolabhealthcare.de/website/seiten/produkte/instrumentenaufbereitung/maschinelle_aufbereitung/sekumatic_fnz.php'
 };
 function competitorLink(c) {
   if (COMPETITOR_DIRECT_URLS[c.key]) return { url: COMPETITOR_DIRECT_URLS[c.key], direct: true };
@@ -7595,7 +7695,7 @@ function competitorLink(c) {
 }
 function competitorLinkHtml(c) {
   const l = competitorLink(c);
-  return `<a class="cmp-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${l.direct ? 'Produktseite beim Hersteller' : 'Beim Hersteller ansehen'} ↗</a>`;
+  return `<a class="cmp-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${l.direct ? 'Produktseite beim Hersteller' : 'Beim Hersteller suchen'} ↗</a>`;
 }
 
 function competitorVisible() { return state.activeProfile === 'sales' && !state.customerMode && !inMesseContext(); }
