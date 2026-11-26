@@ -171,6 +171,6 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 
 - Wettbewerbsdaten zu Schülke & Mayr, Bode/Hartmann, B. Braun und Ecolab – Fläche, Hände & Haut, Instrumente
 - Produktseite: Abschnitt „Wettbewerbsprodukte“ mit „Direktes Äquivalent“ und „Ähnliche Anwendung“, inkl. Wirkstoff, Wirkspektrum und automatisch erzeugtem Unterschied (nur aus hinterlegten Daten)
-- Neue Kachel „Wettbewerber“: Sortiment je Firma, Suche (z. B. „Sterillium“) und unser Gegenstück per Antippen
+- Kachel „Äquivalent finden“: Wettbewerbsprodukt eintippen (tippfehlertolerant, z. B. „sterilium“, „softaman“) → unser Äquivalent groß darunter; Schnellauswahl häufiger Marken; Hersteller-Filter. Auch die Sofortsuche im Hauptmenü erkennt Wettbewerbsprodukte.
 - Wettbewerbsvergleich schlägt die recherchierten Äquivalente zuerst vor
 - Nur Rolle Außendienst, im Kunden-/Messemodus ausgeblendet; Daten aus öffentlichen Herstellerangaben, Stand 11/2026, ohne Gewähr

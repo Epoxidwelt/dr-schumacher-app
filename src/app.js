@@ -940,7 +940,7 @@ function menuScreen() {
     ['wirkspektrum','Wirkspektrum-Finder','Produkte nach Wirkspektrum filtern – z. B. fungizid + viruzid'],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
-    ['wettbewerber','Wettbewerber','Sortimente von Schülke, Bode/Hartmann, B. Braun, Ecolab mit unseren Äquivalenten'],
+    ['wettbewerber','Äquivalent finden','Wettbewerbsprodukt eintippen – passendes Dr. Schumacher Produkt sofort sehen'],
     ['offer','Kundenübersicht','Markierte Produkte als Angebot oder PDF'],
     ['angebot','Angebot anfragen','Mit ★ markierte Produkte als Angebotsanfrage an den Innendienst senden'],
     ['summary','Kundenzusammenfassung','Mit ★ markierte Produkte per E-Mail an den Kunden'],
@@ -973,7 +973,7 @@ function menuScreen() {
     ${tippsBanner()}
     ${coreCategoryGrid()}
     <label class="global-search">${icon('search')}<input id="globalSearch" value="${escapeHtml(state.globalQuery)}" placeholder="Produkt, Artikelnummer oder Anwendung suchen"><span>⌘ K</span></label>
-    ${state.globalQuery.trim() ? `<section class="cockpit-search-results"><div class="section-heading"><div><span class="eyebrow">Sofortsuche</span><h2>${searchResults.length} Treffer</h2></div><button class="secondary-button" data-action="clear-global-search">Suche löschen</button></div><div class="product-list">${searchResults.map(productCard).join('') || '<div class="empty-state"><h2>Kein Produkt gefunden</h2><p>Versuchen Sie einen anderen Suchbegriff.</p></div>'}</div></section>` : ''}
+    ${state.globalQuery.trim() ? `<section class="cockpit-search-results"><div class="section-heading"><div><span class="eyebrow">Sofortsuche</span><h2>${searchResults.length} Treffer</h2></div><button class="secondary-button" data-action="clear-global-search">Suche löschen</button></div>${competitorGlobalSearchHtml(state.globalQuery)}<div class="product-list">${searchResults.map(productCard).join('') || '<div class="empty-state"><h2>Kein Produkt gefunden</h2><p>Versuchen Sie einen anderen Suchbegriff.</p></div>'}</div></section>` : ''}
     <section class="cockpit-columns">
       <div class="cockpit-panel"><div class="panel-title"><div><span class="eyebrow">Schnellzugriff</span><h2>Zuletzt angesehen</h2></div><button data-category="recent">Alle</button></div><div class="mini-products">${recentProducts.map(miniProductCard).join('') || '<p class="muted-copy">Noch keine Produkte geöffnet.</p>'}</div></div>
       <div class="cockpit-panel"><div class="panel-title"><div><span class="eyebrow">Persönlich</span><h2>Favoriten</h2></div><button data-nav="favorites">Alle</button></div><div class="mini-products">${favoriteProducts.map(miniProductCard).join('') || '<p class="muted-copy">Noch keine Favoriten gespeichert.</p>'}</div></div>
@@ -7649,35 +7649,88 @@ function competitorDetailHtml(p) {
     ${competitorNoteHtml()}
   </section>`;
 }
+// Suche: tolerant gegenüber ®/™, Groß-/Kleinschreibung, Bindestrichen, Leerzeichen und doppelten
+// Buchstaben (z. B. „sterilium“ findet „Sterillium®“, „softaman“ findet „Softa-Man®“).
+function cmpNorm(t) { return String(t || '').toLowerCase().replace(/[®™]/g, '').replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').replace(/[^a-z0-9]+/g, ' ').trim(); }
+function cmpVariants(t) { const n = cmpNorm(t); const c = n.replace(/ /g, ''); return [n, c, c.replace(/(.)\1+/g, '$1')]; }
+function competitorSearch(query) {
+  const q = cmpNorm(query);
+  if (q.length < 2) return [];
+  const qTokens = q.split(' ');
+  const qv = cmpVariants(query);
+  const hits = [];
+  COMPETITOR_PRODUCT_ROWS.forEach(r => {
+    const c = COMPETITOR_PRODUCTS[r[0]];
+    const nameV = cmpVariants(c.name);
+    const hay = cmpNorm(`${c.name} ${competitorCompany(c.company).name} ${competitorCompany(c.company).short}`);
+    let score = null;
+    if (nameV[0].startsWith(qv[0]) || nameV[1].startsWith(qv[1]) || nameV[2].startsWith(qv[2])) score = 0;
+    else if (nameV.some((v, i) => v.includes(qv[i]))) score = 1;
+    else if (qTokens.every(t => hay.includes(t))) score = 2;
+    if (score !== null) hits.push({ c, score });
+  });
+  return hits.sort((a, b) => a.score - b.score || a.c.name.length - b.c.name.length).map(h => h.c);
+}
+const CMP_QUICK = ['Sterillium','Bacillol','Cutasept','Mikrobac','Korsolex','desderman','desmanol','mikrozid','kodan','gigasept','Softa-Man','Meliseptol','Hexaquart','Skinman','Incidin','Sekusept'];
+function competitorResultHtml(c) {
+  const ours = competitorOurFor(c.key);
+  const direct = ours.filter(o => o.level === 'd');
+  const similar = ours.filter(o => o.level !== 'd');
+  const top = direct[0] || similar[0];
+  const diff = top ? competitorDiff(top.p, c) : [];
+  return `<div class="cmpf-result">
+    <div class="cmpf-from"><span class="cmp-company">${escapeHtml(competitorCompany(c.company).short)}</span><strong>${escapeHtml(c.name)}</strong><small>${escapeHtml(c.kind)}</small></div>
+    <div class="cmpf-arrow">↓ Dr. Schumacher</div>
+    ${ours.length ? `
+      ${direct.map(o => `<button type="button" class="cmpf-our direct" data-product="${o.p.id}"><span><strong>${escapeHtml(o.p.name)}</strong><small>Direktes Äquivalent · ${escapeHtml(o.p.kind)}</small></span><b>›</b></button>`).join('')}
+      ${similar.length ? `<div class="cmpf-similar"><span>${direct.length ? 'Auch passend:' : 'Ähnliche Anwendung:'}</span>${similar.map(o => `<button type="button" class="cmpf-our-small" data-product="${o.p.id}">${escapeHtml(o.p.name)}</button>`).join('')}</div>` : ''}
+      ${diff.length ? `<details class="cmpf-diff"><summary>Vergleich mit ${escapeHtml(top.p.name)}</summary><div class="cmp-row"><b>Wirkstoff Wettbewerber</b><span>${escapeHtml(c.wirkstoff || 'nicht angegeben')}</span></div><div class="cmp-row"><b>Wirkspektrum Wettbewerber</b><div class="ws-chips">${competitorTagsHtml(c.tags)}</div></div><ul class="cmp-diff">${diff.map(d => `<li class="${d.cls}">${escapeHtml(d.text)}</li>`).join('')}</ul></details>` : ''}`
+    : '<span class="cmp-na">Kein passendes Dr. Schumacher Produkt hinterlegt – bitte beim Produktmanagement nachfragen.</span>'}
+  </div>`;
+}
 function wettbewerberScreen() {
   if (state.activeProfile !== 'sales') return `<main class="page"><div class="empty-state"><h2>Nur für den Außendienst</h2><p>Die Wettbewerbsübersicht ist der Rolle Außendienst vorbehalten.</p></div></main>`;
   if (state.customerMode) return `<main class="page"><div class="empty-state"><h2>Im Kundenmodus ausgeblendet</h2><p>Bitte den Kundengespräch-Modus beenden, um die Wettbewerbsübersicht zu sehen.</p></div></main>`;
-  const f = state.cmpFilter || (state.cmpFilter = { company:'schuelke', area:'all', q:'' });
-  const comp = competitorCompany(f.company);
-  const q = (f.q || '').trim().toLowerCase();
-  const rows = COMPETITOR_PRODUCT_ROWS.map(r => COMPETITOR_PRODUCTS[r[0]])
-    .filter(c => (q ? true : c.company === f.company) && (f.area === 'all' || c.area === f.area))
-    .filter(c => !q || `${c.name} ${c.kind} ${competitorCompany(c.company).name}`.toLowerCase().includes(q));
-  const areas = [['all','Alle'],['surface','Fläche'],['hands','Hände & Haut'],['instruments','Instrumente']];
+  const f = state.cmpFilter || (state.cmpFilter = { company:'', q:'' });
+  const q = (f.q || '').trim();
+  const results = competitorSearch(q);
+  let body;
+  if (q.length >= 2) {
+    body = results.length
+      ? `<p class="cmpf-count">${results.length} Treffer</p><div class="cmpf-list">${results.slice(0, 30).map(competitorResultHtml).join('')}</div>`
+      : `<div class="empty-state"><h2>„${escapeHtml(q)}“ nicht gefunden</h2><p>Nur den Markennamen eintippen (z. B. „Sterillium“) oder unten den Hersteller antippen. Fehlt das Produkt in der Liste, hilft der Wirkspektrum-Finder weiter.</p><button type="button" class="secondary-button" data-category="wirkspektrum">Zum Wirkspektrum-Finder</button></div>`;
+  } else if (f.company) {
+    const list = COMPETITOR_PRODUCT_ROWS.map(r => COMPETITOR_PRODUCTS[r[0]]).filter(c => c.company === f.company);
+    body = `<div class="cmpf-list">${list.map(competitorResultHtml).join('')}</div>`;
+  } else {
+    body = `<div class="cmpf-quick"><span class="eyebrow">Häufig gesucht</span><div class="cmpf-chips">${CMP_QUICK.map(t => `<button type="button" class="cmpf-chip" data-cmp-quick="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}</div></div>`;
+  }
   return `<main class="page cmp-page">
-    <div class="section-heading"><div><span class="eyebrow">Intern · Außendienst</span><h1>Wettbewerber</h1><p>Sortimente der Wettbewerber mit dem passenden Dr. Schumacher Produkt. Antippen öffnet unser Produkt.</p></div></div>
-    <label class="search-box">${icon('search')}<input id="cmpSearch" value="${escapeHtml(f.q || '')}" placeholder="Wettbewerbsprodukt suchen, z. B. Sterillium"></label>
-    ${q ? '' : `<div class="filter-row">${COMPETITOR_COMPANIES.map(c => `<button type="button" class="filter-chip ${f.company === c.id ? 'active' : ''}" data-cmp-company="${c.id}">${escapeHtml(c.short)}</button>`).join('')}</div>`}
-    <div class="filter-row">${areas.map(([k, l]) => `<button type="button" class="filter-chip ${f.area === k ? 'active' : ''}" data-cmp-area="${k}">${l}</button>`).join('')}</div>
-    ${!q && comp.note ? `<div class="advisor-note">${escapeHtml(comp.note)}</div>` : ''}
-    <div class="cmp-list">${rows.map(c => {
-      const ours = competitorOurFor(c.key);
-      return `<div class="cmp-item"><div class="cmp-item-main"><span class="cmp-company">${escapeHtml(competitorCompany(c.company).short)}</span><strong>${escapeHtml(c.name)}</strong><small>${escapeHtml(c.kind)}${c.wirkstoff ? ' · ' + escapeHtml(c.wirkstoff) : ''}</small><div class="ws-chips">${competitorTagsHtml(c.tags)}</div></div>
-        <div class="cmp-ours"><b>Unser Gegenstück</b>${ours.length ? ours.map(o => `<button type="button" class="cmp-our-btn ${o.level === 'd' ? 'direct' : 'similar'}" data-product="${o.p.id}"><span>${escapeHtml(o.p.name)}</span><small>${o.level === 'd' ? 'direkt' : 'ähnlich'}</small></button>`).join('') : '<span class="cmp-na">Kein passendes Produkt im Sortiment hinterlegt</span>'}</div></div>`;
-    }).join('') || '<div class="empty-state"><h2>Nichts gefunden</h2><p>Anderen Suchbegriff oder Bereich wählen.</p></div>'}</div>
+    <div class="section-heading"><div><span class="eyebrow">Intern · Außendienst</span><h1>Äquivalent finden</h1><p>Wettbewerbsprodukt eintippen – das passende Dr. Schumacher Produkt erscheint sofort.</p></div></div>
+    <label class="search-box cmpf-search">${icon('search')}<input id="cmpSearch" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" value="${escapeHtml(f.q || '')}" placeholder="z. B. Sterillium, Bacillol, Softa-Man …">${q ? '<button type="button" class="cmpf-clear" data-action="cmp-clear" aria-label="Suche löschen">✕</button>' : ''}</label>
+    ${q.length >= 2 ? '' : `<div class="filter-row cmpf-companies"><span class="cmpf-label">Oder nach Hersteller:</span>${COMPETITOR_COMPANIES.map(c => `<button type="button" class="filter-chip ${f.company === c.id ? 'active' : ''}" data-cmp-company="${c.id}">${escapeHtml(c.short)}</button>`).join('')}</div>`}
+    ${body}
     ${competitorNoteHtml()}
   </main>`;
 }
 function wettbewerberBind() {
+  document.querySelectorAll('[data-cmp-open]').forEach(b => b.addEventListener('click', () => { state.cmpFilter = { company:'', q: b.dataset.cmpOpen }; state.screen = 'wettbewerber'; render(); }));
   if (state.screen !== 'wettbewerber') return;
-  document.querySelectorAll('[data-cmp-company]').forEach(b => b.addEventListener('click', () => { state.cmpFilter.company = b.dataset.cmpCompany; render(); }));
-  document.querySelectorAll('[data-cmp-area]').forEach(b => b.addEventListener('click', () => { state.cmpFilter.area = b.dataset.cmpArea; render(); }));
-  const s = $('#cmpSearch'); if (s) s.addEventListener('input', () => { state.cmpFilter.q = s.value; debouncedRender(); });
+  document.querySelectorAll('[data-cmp-company]').forEach(b => b.addEventListener('click', () => { state.cmpFilter.company = state.cmpFilter.company === b.dataset.cmpCompany ? '' : b.dataset.cmpCompany; render(); }));
+  document.querySelectorAll('[data-cmp-quick]').forEach(b => b.addEventListener('click', () => { state.cmpFilter.q = b.dataset.cmpQuick; render(); }));
+  $('[data-action="cmp-clear"]')?.addEventListener('click', () => { state.cmpFilter.q = ''; render(); const s = $('#cmpSearch'); if (s) s.focus(); });
+  const s = $('#cmpSearch');
+  if (s) {
+    s.addEventListener('input', () => { state.cmpFilter.q = s.value; debouncedRender(); });
+    if (state.cmpAutofocus) { state.cmpAutofocus = false; s.focus(); }
+  }
+}
+// Treffer für die Sofortsuche im Hauptmenü: Wettbewerbsprodukt erkannt → unser Äquivalent.
+function competitorGlobalSearchHtml(query) {
+  if (!competitorVisible()) return '';
+  const hits = competitorSearch(query).filter(c => competitorOurFor(c.key).length).slice(0, 3);
+  if (!hits.length) return '';
+  return `<div class="cmpf-global"><span class="eyebrow">Wettbewerbsprodukt erkannt</span>${hits.map(c => { const o = competitorOurFor(c.key)[0]; return `<button type="button" class="cmpf-our ${o.level === 'd' ? 'direct' : ''}" data-product="${o.p.id}"><span><small>${escapeHtml(competitorCompany(c.company).short)} · ${escapeHtml(c.name)} →</small><strong>${escapeHtml(o.p.name)}</strong></span><b>›</b></button>`; }).join('')}<button type="button" class="secondary-button compact" data-cmp-open="${escapeHtml(query)}">Alle Äquivalente zu „${escapeHtml(query)}“</button></div>`;
 }
 // Vorschläge für den Wettbewerbsvergleich: zuerst die recherchierten Äquivalente.
 function competitorSuggestionNames(productId) {
@@ -7773,7 +7826,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='reklamation'){ if (!reklHasData()) reklReset(); state.previousScreen = null; state.screen='reklamation'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','quiz','wettbewerber','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='reklamation'){ if (!reklHasData()) reklReset(); state.previousScreen = null; state.screen='reklamation'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(key==='wettbewerber'){state.cmpAutofocus=true;} if(['advisor','wirkspektrum','quiz','wettbewerber','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });

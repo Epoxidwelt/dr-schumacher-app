@@ -616,3 +616,19 @@ a.tip-link{text-decoration:none;display:inline-block}
 .cmp-our-btn{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:44px;border:2px solid var(--border);background:#f8fbfd;border-radius:12px;padding:8px 12px;font-weight:800;color:#173d65;cursor:pointer;text-align:left;touch-action:manipulation}
 .cmp-our-btn.direct{border-color:#0b79d0;background:#eaf5ff}.cmp-our-btn small{font-size:11px;color:#5c7084;font-weight:700}
 @media(max-width:760px){.cmp-item{grid-template-columns:1fr}}
+.cmpf-search{height:64px;border-color:#8e4fc2}.cmpf-search input{font-size:18px}.cmpf-clear{border:0;background:#eef2f7;border-radius:50%;width:34px;height:34px;flex:0 0 34px;font-size:15px;color:#5c7084;cursor:pointer}
+.cmpf-companies{align-items:center}.cmpf-label{font-size:13px;color:#5c7084;font-weight:700;white-space:nowrap}
+.cmpf-quick{margin-top:10px}.cmpf-chips{display:flex;flex-wrap:wrap;gap:8px}
+.cmpf-chip{min-height:44px;border:2px solid var(--border);background:#fff;border-radius:99px;padding:8px 16px;font-weight:800;color:#294c69;font-size:15px;cursor:pointer;touch-action:manipulation}
+.cmpf-count{font-size:13px;font-weight:800;color:#5c7084;margin:6px 0 10px}
+.cmpf-list{display:flex;flex-direction:column;gap:12px}
+.cmpf-result{background:#fff;border:1px solid var(--border);border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.cmpf-from{display:flex;flex-direction:column;gap:3px}.cmpf-from strong{font-size:17px;color:#294c69}.cmpf-from small{color:#7a8da0}
+.cmpf-arrow{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#0867bd}
+.cmpf-our{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:60px;border:2px solid var(--border);background:#f8fbfd;border-radius:14px;padding:10px 14px;text-align:left;cursor:pointer;color:#102443;touch-action:manipulation}
+.cmpf-our.direct{border-color:#0b79d0;background:linear-gradient(135deg,#eaf5ff,#f5faff)}
+.cmpf-our strong{display:block;font-size:19px}.cmpf-our small{display:block;color:#5c7084;font-size:12px;margin-top:2px}.cmpf-our b{font-size:26px;color:#0b79d0;font-weight:400}
+.cmpf-similar{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.cmpf-similar>span{font-size:12px;color:#7a8da0;font-weight:700}
+.cmpf-our-small{border:1px solid var(--border);background:#fff;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:800;color:#294c69;cursor:pointer;min-height:36px}
+.cmpf-diff summary{cursor:pointer;font-size:13px;font-weight:800;color:#5b2a86;padding:4px 0}.cmpf-diff[open]{display:flex;flex-direction:column;gap:6px}
+.cmpf-global{background:#fff;border:2px solid #8e4fc2;border-radius:18px;padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px}
