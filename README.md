@@ -166,3 +166,11 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 - Erscheint beim App-Start automatisch (einmal pro Tag), mit Button „Heute überspringen → zur App“
 - Schwierigkeit per Touch wählbar: Leicht (Bereiche, Produktarten, Eigenschaften), Mittel (dazu Wirkstoffe und Wirkspektren), Schwer (vor allem Einwirkzeiten und spezielle Wirkspektren). Wechsel vor der ersten Antwort gilt sofort, sonst ab dem nächsten Quiz.
 - „🔄 Neue Fragen“: beliebig viele Zusatzrunden am selben Tag (je 10 neue Fragen im gewählten Schwierigkeitsgrad), auch mitten in einer Runde
+
+## Neu: Wettbewerber & Äquivalente (nur Außendienst)
+
+- Wettbewerbsdaten zu Schülke & Mayr, BODE Chemie, HARTMANN (Desinfektion = BODE-Sortiment), B. Braun und Ecolab – Fläche, Hände & Haut, Instrumente
+- Produktseite: Abschnitt „Wettbewerbsprodukte“ mit „Direktes Äquivalent“ und „Ähnliche Anwendung“, inkl. Wirkstoff, Wirkspektrum und automatisch erzeugtem Unterschied (nur aus hinterlegten Daten)
+- Neue Kachel „Wettbewerber“: Sortiment je Firma, Suche (z. B. „Sterillium“) und unser Gegenstück per Antippen
+- Wettbewerbsvergleich schlägt die recherchierten Äquivalente zuerst vor
+- Nur Rolle Außendienst, im Kunden-/Messemodus ausgeblendet; Daten aus öffentlichen Herstellerangaben, Stand 11/2026, ohne Gewähr

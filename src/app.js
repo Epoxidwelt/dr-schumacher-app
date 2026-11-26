@@ -604,6 +604,7 @@ function icon(name) {
     smartmailing:'<svg viewBox="0 0 24 24"><path d="M3 6h18v13H3Z"/><path d="m4 7 8 6 8-6"/><path d="M18 3l.7 1.6L20.3 5l-1.6.7L18 7.3l-.7-1.6L15.7 5l1.6-.7Z"/></svg>',
     kol:'<svg viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 21c0-4 3.1-7 7-7s7 3 7 7"/><path d="m18.5 2 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z"/></svg>',
     konzept:'<svg viewBox="0 0 24 24"><path d="M4 21V9l8-6 8 6v12"/><path d="M9 21v-6h6v6M4 12h16"/></svg>',
+    wettbewerber:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     quiz:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><path d="M12 17h.01"/></svg>',
     wirkspektrum:'<svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4Z"/></svg>',
     ideenschmiede:'<svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.3V17h6v-1.2c0-.9.4-1.7 1-2.3A6 6 0 0 0 12 3Z"/></svg>'
@@ -710,6 +711,7 @@ function render() {
   if (state.screen === 'ideenschmiede') html = header(true) + ideenschmiedeScreen() + bottomNav('home');
   if (state.screen === 'aktionen') html = header(true) + aktionenScreen() + bottomNav('home');
   if (state.screen === 'wirkspektrum') html = header(true) + wirkspektrumScreen() + bottomNav('home');
+  if (state.screen === 'wettbewerber') html = header(true) + wettbewerberScreen() + bottomNav('home');
   if (state.screen === 'quiz') html = header(!state.quizAuto) + quizScreen() + (state.quizAuto ? '' : bottomNav('home'));
   if (state.screen === 'akquise') html = header(true) + acqScreen();
   if (state.screen === 'reklamation') html = header(true) + reklScreen();
@@ -811,7 +813,7 @@ function coreCategoryGrid() {
 // "Anordnen"-Modus selbst zurechtlegen (lokal auf dem eigenen Gerät gespeichert). Diese Liste
 // ist nur der Ausgangszustand; neu hinzukommende Kacheln werden an bestehende Reihenfolgen
 // automatisch hinten angehängt.
-const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','reklamation','meinekontakte','smartmailing','advisor','wirkspektrum','quiz','compare','competition','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
+const DASHBOARD_TOOL_KEYS_DEFAULT = ['aroundme','kundenbesuch','reklamation','meinekontakte','smartmailing','advisor','wirkspektrum','quiz','compare','competition','wettbewerber','offer','angebot','summary','report','dashboard','messe','pm','kol','konzepte','downloads','all'];
 function orderedToolCards(toolCards) {
   const order = (state.dashboardToolOrder && state.dashboardToolOrder.length) ? state.dashboardToolOrder : DASHBOARD_TOOL_KEYS_DEFAULT;
   const byKey = new Map(toolCards.map(c => [c[0], c]));
@@ -938,6 +940,7 @@ function menuScreen() {
     ['wirkspektrum','Wirkspektrum-Finder','Produkte nach Wirkspektrum filtern – z. B. fungizid + viruzid'],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
+    ['wettbewerber','Wettbewerber','Sortimente von Schülke, Bode/Hartmann, B. Braun, Ecolab mit unseren Äquivalenten'],
     ['offer','Kundenübersicht','Markierte Produkte als Angebot oder PDF'],
     ['angebot','Angebot anfragen','Mit ★ markierte Produkte als Angebotsanfrage an den Innendienst senden'],
     ['summary','Kundenzusammenfassung','Mit ★ markierte Produkte per E-Mail an den Kunden'],
@@ -953,7 +956,8 @@ function menuScreen() {
   ];
   if (!can('reports')) cards = cards.filter(card => !['report','dashboard'].includes(card[0]));
   if (!can('sales')) cards = cards.filter(card => !['compare','offer','angebot','summary','kundenbesuch','reklamation','meinekontakte','smartmailing','akquise','aktionen'].includes(card[0]));
-  if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kundenbesuch','meinekontakte','smartmailing'].includes(card[0]));
+  if (state.activeProfile !== 'sales') cards = cards.filter(card => !['aroundme','kundenbesuch','meinekontakte','smartmailing','wettbewerber'].includes(card[0]));
+  if (state.customerMode) cards = cards.filter(card => card[0] !== 'wettbewerber');
   const coreKeys = ['surface','hands','instruments','application'];
   const toolCards = orderedToolCards(cards.filter(c => !coreKeys.includes(c[0])));
   const today = new Date().toISOString().slice(0,10);
@@ -1311,6 +1315,7 @@ function detailScreen() {
         ${emailCard(p)}
       </div>
     </section>
+    ${competitorDetailHtml(p)}
     <section class="document-section"><h2>Aktuelle Unterlagen</h2><div class="document-grid">
       ${productDocUrl(p,'pif') ? documentLink('Produktinformation','Aktuelle Produktinformationen und Einwirkzeiten',productDocUrl(p,'pif'),'📄') : ''}
       ${productDocUrl(p,'sdb') ? documentLink('Sicherheitsdatenblatt','Aktuelle Sicherheitsinformationen',productDocUrl(p,'sdb'),'🛡️') : ''}
@@ -5124,8 +5129,8 @@ function deleteSavedReport(index) {
 const COMPETITOR_BY_KIND = {
   'Alkoholfreie Flächendesinfektion': ['Schülke – mikrozid sensitive liquid', 'Dr. Weigert – neodisher septo AF', 'Antiseptica – aseptisol'],
   'Alkoholisches Hautdesinfektionsmittel': ['Schülke – Kodan', 'Bode/Hartmann – Cutasept F', 'B. Braun – Softasept N'],
-  'Desinfektionsmittel-Konzentrat': ['Schülke – mikrobac forte', 'Bode/Hartmann – Kohrsolin extra', 'B. Braun – Melsept SF'],
-  'Desinfektionsmittelkonzentrate': ['Schülke – mikrobac forte', 'Bode/Hartmann – Kohrsolin extra', 'B. Braun – Melsept SF'],
+  'Desinfektionsmittel-Konzentrat': ['Schülke – terralin protect', 'Bode/Hartmann – Mikrobac forte', 'B. Braun – Melsept SF'],
+  'Desinfektionsmittelkonzentrate': ['Schülke – terralin protect', 'Bode/Hartmann – Mikrobac forte', 'B. Braun – Melsept SF'],
   'Gebrauchsfertige Desinfektionsmittel': ['Schülke – mikrozid universal', 'Bode/Hartmann – Bacillol 30 Foam', 'Ecolab – Incidin'],
   'Gebrauchsfertige Desinfektionstücher': ['Schülke – mikrozid AF wipes', 'Bode/Hartmann – Bacillol AF Tissues', 'Dr. Weigert – neodisher septo AF wipes'],
   'Gebrauchsfertige Flächendesinfektion': ['Schülke – mikrozid AF', 'Bode/Hartmann – Bacillol AF', 'Dr. Weigert – neodisher septo DA'],
@@ -5165,9 +5170,12 @@ const COMPETITOR_BY_PRODUCT = {
   'ultrasol-active': ['Schülke – perform classic concentrate OXY']
 };
 function competitorSuggestions(kind, productId) {
-  const direct = (productId && COMPETITOR_BY_PRODUCT[productId]) || [];
-  const byKind = COMPETITOR_BY_KIND[kind] || [];
-  return [...direct, ...byKind.filter(x => !direct.includes(x))];
+  const norm = x => x.toLowerCase().replace(/^.*?–\s*/, '').replace(/[®™]/g, '').trim();
+  const out = [];
+  const seen = new Set();
+  const researched = productId && state.activeProfile === 'sales' ? competitorSuggestionNames(productId) : [];
+  [...researched, ...((productId && COMPETITOR_BY_PRODUCT[productId]) || []), ...(COMPETITOR_BY_KIND[kind] || [])].forEach(x => { const k = norm(x); if (!seen.has(k)) { seen.add(k); out.push(x); } });
+  return out;
 }
 
 const PRODUCT_MANAGERS = [
@@ -7304,8 +7312,383 @@ function quizTileSubtitle() {
 }
 // ===================== Ende Produktwissen-Quiz =====================
 
+// ===================== Wettbewerber & Äquivalente =====================
+// Quelle: öffentliche Herstellerangaben (Sortimentskataloge, Produktinformationen, Websites), Stand 11/2026.
+// Nur intern für die Rolle Außendienst (im Kunden-/Messemodus ausgeblendet). Ohne Gewähr.
+// Wirkspektrum: nur was der Hersteller ausdrücklich angibt (Schlüssel wie SPEKTRUM_TAGS). Fehlt ein
+// Spektrum, heißt das „nicht ausgewiesen“, nicht „nicht wirksam“.
+const COMPETITOR_STAND = '11/2026';
+const COMPETITOR_COMPANIES = [
+  { id:'schuelke', name:'Schülke & Mayr', short:'Schülke' },
+  { id:'bode', name:'BODE Chemie', short:'Bode', note:'Gehört zur HARTMANN-Gruppe. Die Produkte werden heute unter der Marke HARTMANN vertrieben.' },
+  { id:'hartmann', name:'PAUL HARTMANN', short:'Hartmann', note:'Das Desinfektionssortiment von HARTMANN stammt von BODE Chemie (u. a. Sterillium, Bacillol, Cutasept, Mikrobac, Kohrsolin, Korsolex) und ist deshalb unter „Bode“ aufgeführt.' },
+  { id:'bbraun', name:'B. Braun', short:'B. Braun' },
+  { id:'ecolab', name:'Ecolab', short:'Ecolab' }
+];
+// [Schlüssel, Firma, Produktname, Bereich, Produktart, Wirkstoff(e), Wirkspektrum-Schlüssel, Zusatz]
+const COMPETITOR_PRODUCT_ROWS = [
+  // ---------- Schülke & Mayr ----------
+  ['sch-desderman-care','schuelke','desderman® care','hands','Händedesinfektion','Ethanol',['bakterizid','tuberkulozid','viruzid','noro']],
+  ['sch-desderman-care-gel','schuelke','desderman® care gel','hands','Händedesinfektionsgel','',['viruzid','noro']],
+  ['sch-desderman-pure','schuelke','desderman® pure','hands','Händedesinfektion','78,2 g Ethanol 96 %, 0,1 g Biphenyl-2-ol',['bakterizid','mykobakterizid','begrenzt']],
+  ['sch-desmanol-care','schuelke','desmanol® care','hands','Händedesinfektion','70,0 g Propan-2-ol, 9,9 g Ethanol 96 %',['bakterizid','mykobakterizid','begrenzt']],
+  ['sch-desmanol-pure','schuelke','desmanol® pure','hands','Händedesinfektion','',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
+  ['sch-kodan-farblos','schuelke','kodan® Tinktur forte farblos','hands','Hautantiseptik','45,0 g Propan-2-ol, 10,0 g Propan-1-ol, 0,2 g Biphenyl-2-ol',[]],
+  ['sch-kodan-gefaerbt','schuelke','kodan® Tinktur forte gefärbt','hands','Hautantiseptik (gefärbt)','45,0 g Propan-2-ol, 10,0 g Propan-1-ol, 0,2 g Biphenyl-2-ol',[]],
+  ['sch-octeniderm','schuelke','octeniderm® farblos','hands','Hautantiseptik mit Remanenz','0,1 g Octenidin, 30 g Propan-1-ol, 45 g Propan-2-ol',['bakterizid','mykobakterizid','begrenzt']],
+  ['sch-octenisan-wash','schuelke','octenisan® wash lotion','hands','Antimikrobielle Waschlotion (MRE-Dekontamination)','',[]],
+  ['sch-octenisan-gloves','schuelke','octenisan® Waschhandschuhe','hands','Antimikrobielle Waschhandschuhe (MRE)','',[]],
+  ['sch-esemtan-wash','schuelke','esemtan® wash lotion','hands','Waschlotion','',[]],
+  ['sch-sensiva-wash','schuelke','sensiva® wash lotion','hands','Waschlotion','',[]],
+  ['sch-esemtan-skin','schuelke','esemtan® skin lotion','hands','Hautpflege','',[]],
+  ['sch-esemtan-balm','schuelke','esemtan® dry skin balm','hands','Hautpflege (trockene Haut)','',[]],
+  ['sch-esemtan-gel','schuelke','esemtan® active gel','hands','Aktivierendes Gel','ätherische Öle',[]],
+  ['sch-esemtan-mitts','schuelke','esemtan® wash mitts','hands','Waschhandschuhe (Pflege)','',[]],
+  ['sch-sensiva-protect','schuelke','sensiva® protective cream','hands','Hautschutz','',[]],
+  ['sch-sensiva-regen','schuelke','sensiva® regeneration cream','hands','Hautpflege (regenerierend)','Panthenol',[]],
+  ['sch-mikrozid-af-liquid','schuelke','mikrozid® AF liquid','surface','Alkoholische Schnelldesinfektion','alkoholisch',['bakterizid','begrenzt','plus']],
+  ['sch-mikrozid-af-wipes','schuelke','mikrozid® AF wipes','surface','Alkoholische Desinfektionstücher','Ethanol, Propan-1-ol',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
+  ['sch-mikrozid-universal-liquid','schuelke','mikrozid® universal liquid','surface','Gering-alkoholische Schnelldesinfektion','17,4 g Propan-2-ol, 12,47 g Ethanol',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
+  ['sch-mikrozid-universal-wipes','schuelke','mikrozid® universal wipes','surface','Gering-alkoholische Desinfektionstücher','Ethanol, Propan-2-ol',['bakterizid','tuberkulozid','begrenzt','plus','noro']],
+  ['sch-mikrozid-sensitive-liquid','schuelke','mikrozid® sensitive liquid','surface','Alkoholfreie Schnelldesinfektion','je 0,25 g ADBAC, DDAC, ADEBAC (QAV)',['bakterizid','levurozid','begrenzt','noro']],
+  ['sch-mikrozid-sensitive-wipes','schuelke','mikrozid® sensitive wipes','surface','Alkoholfreie Desinfektionstücher','QAV',['bakterizid','levurozid','begrenzt']],
+  ['sch-mikrozid-paa-wipes','schuelke','mikrozid® PAA wipes','surface','Sporizide Desinfektionstücher','Peressigsäure',['bakterizid','tuberkulozid','viruzid','noro','sporizid','cdiff']],
+  ['sch-mikrozid-paaplus-wipes','schuelke','mikrozid® PAA+ wipes','surface','Sporizide Desinfektionstücher','',['sporizid']],
+  ['sch-terralin-protect','schuelke','terralin® protect','surface','Flächendesinfektion – Konzentrat (aldehydfrei)','aldehydfrei',['bakterizid','tuberkulozid','levurozid','begrenzt','adeno','noro']],
+  ['sch-perform','schuelke','perform®','surface','Flächendesinfektion – Konzentrat (Aktivsauerstoff)','Aktivsauerstoff',['bakterizid','tuberkulozid','viruzid','sporizid']],
+  ['sch-terralin-paa','schuelke','terralin® PAA','surface','Flächendesinfektion – Konzentrat (sporizid)','Peressigsäure',['sporizid']],
+  ['sch-gigazyme','schuelke','gigazyme® X-tra','instruments','Enzymatischer Instrumentenreiniger','Enzyme',[]],
+  ['sch-gigasept-instru-af','schuelke','gigasept® instru AF','instruments','Instrumentendesinfektion (aldehydfrei)','aldehydfrei',['bakterizid','tuberkulozid']],
+  ['sch-gigasept-af-forte','schuelke','gigasept® AF forte','instruments','Instrumentendesinfektion (aldehydfrei)','aldehydfrei',[]],
+  ['sch-gigasept-ff','schuelke','gigasept® FF (neu)','instruments','Instrumentendesinfektion (Aldehyd)','Bernsteinsäuredialdehyd',['tuberkulozid','mykobakterizid','viruzid','sporizid']],
+  ['sch-gigasept-pearls','schuelke','gigasept® pearls','instruments','Instrumentendesinfektion (Aktivsauerstoff, Granulat)','Aktivsauerstoff',['bakterizid','tuberkulozid','viruzid','sporizid','cdiff']],
+  ['sch-gigasept-paa','schuelke','gigasept® PAA concentrate','instruments','Instrumentendesinfektion (Peressigsäure)','Peressigsäure',['bakterizid','levurozid','viruzid','sporizid','cdiff']],
+  ['sch-rotasept','schuelke','rotasept®','instruments','Bohrerbad (rotierende Instrumente)','',['bakterizid','viruzid']],
+  ['sch-aspirmatic','schuelke','aspirmatic®','instruments','Desinfektion von Absauganlagen','aldehydfrei',['bakterizid','begrenzt']],
+  ['sch-aspirmatic-cleaner','schuelke','aspirmatic® cleaner','instruments','Reiniger für Absauganlagen','',[]],
+  ['sch-dentavon','schuelke','dentavon®','instruments','Desinfektion von Abformungen/Prothetik','Aktivsauerstoff',['bakterizid','tuberkulozid','begrenzt','viruzid']],
+  ['sch-thermodent-alka','schuelke','thermodent® alka clean','instruments','Alkalischer Reiniger (maschinell)','alkalisch',[]],
+  ['sch-thermodent-neutr','schuelke','thermodent® neutralizer','instruments','Neutralisator (maschinell)','Citronensäure',[]],
+  ['sch-thermodent-clear','schuelke','thermodent® clear','instruments','Klarspüler (maschinell)','',[]],
+  // ---------- BODE Chemie (HARTMANN) ----------
+  ['bode-sterillium','bode','Sterillium®','hands','Händedesinfektion','45 g Propan-2-ol, 30 g Propan-1-ol, 0,2 g Mecetroniumetilsulfat',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
+  ['bode-sterillium-classic-pure','bode','Sterillium® classic pure','hands','Händedesinfektion (parfümfrei)','45 g Propan-2-ol, 30 g Propan-1-ol, 0,2 g Mecetroniumetilsulfat',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
+  ['bode-sterillium-pure','bode','Sterillium® pure','hands','Händedesinfektion','45 g Propan-2-ol, 30 g Propan-1-ol',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
+  ['bode-sterillium-med','bode','Sterillium® med','hands','Händedesinfektion','85 g Ethanol',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','plus','viruzid']],
+  ['bode-sterillium-virugard','bode','Sterillium® Virugard®','hands','Händedesinfektion','95 g Ethanol 99 %',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','plus','viruzid']],
+  ['bode-sterillium-gel-pure','bode','Sterillium® Gel pure','hands','Händedesinfektionsgel','85 g Ethanol',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','plus','viruzid']],
+  ['bode-cutasept-f','bode','Cutasept® F','hands','Hautantiseptik','63 g Propan-2-ol',['bakterizid','levurozid','tuberkulozid','begrenzt']],
+  ['bode-cutasept-g','bode','Cutasept® G','hands','Hautantiseptik (gefärbt)','63 g Propan-2-ol',['bakterizid','levurozid','tuberkulozid','begrenzt']],
+  ['bode-stellisept-med','bode','Stellisept® med','hands','Antimikrobielle Körper- und Händewaschung','ohne Alkohol',[],'Reduktion von Bakterien inkl. MRSA und VRE (lt. Hersteller)'],
+  ['bode-stellisept-gloves','bode','Stellisept® med gloves','hands','Antimikrobielle Waschhandschuhe','',[],'Reduktion von Bakterien inkl. MRSA und VRE (lt. Hersteller)'],
+  ['bode-baktolin-pure','bode','Baktolin® pure','hands','Waschlotion','',[]],
+  ['bode-baktolin-sensitive','bode','Baktolin® sensitive','hands','Waschlotion (sensible Haut)','',[]],
+  ['bode-baktolan-protect','bode','Baktolan® protect','hands','Hautschutz','',[]],
+  ['bode-baktolan-balm','bode','Baktolan® balm','hands','Hautpflege (reichhaltig)','',[]],
+  ['bode-baktolan-lotion','bode','Baktolan® lotion','hands','Hautpflege (leicht)','',[]],
+  ['bode-baktolan-vital','bode','Baktolan® vital','hands','Durchblutungsförderndes Hydrogel','',[]],
+  ['bode-bacillol-af','bode','Bacillol® AF','surface','Alkoholische Schnelldesinfektion','450 mg/g Propan-1-ol, 250 mg/g Propan-2-ol, 47 mg/g Ethanol',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','plus']],
+  ['bode-bacillol-30-foam','bode','Bacillol® 30 Sensitive Foam','surface','Gering-alkoholische Schnelldesinfektion (Schaum)','140 mg/g Ethanol, 100 mg/g Propan-2-ol, 60 mg/g Propan-1-ol',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
+  ['bode-bacillol-af-tissues','bode','Bacillol® AF Tissues','surface','Alkoholische Desinfektionstücher','Tränklösung Bacillol® AF',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','plus']],
+  ['bode-bacillol-30-tissues','bode','Bacillol® 30 Sensitive Tissues','surface','Gering-alkoholische Desinfektionstücher','Tränklösung Bacillol® 30 Sensitive Foam',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
+  ['bode-bacillol-zero','bode','Bacillol® Zero Tissues','surface','Alkoholfreie Desinfektionstücher','5 mg/g Weinsäure, 5 mg/g Natriumbenzoat',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus','viruzid']],
+  ['bode-mikrobac-tissues','bode','Mikrobac® Tissues','surface','Alkoholfreie Desinfektionstücher','4 mg/g Benzalkoniumchlorid, 4 mg/g DDAC (QAV)',['bakterizid','levurozid','begrenzt','noro']],
+  ['bode-mikrobac-virucidal','bode','Mikrobac® Virucidal Tissues','surface','Alkoholfreie Desinfektionstücher','2,45 mg/g Benzalkoniumchlorid, 2,45 mg/g DDAC (QAV)',['bakterizid','levurozid','fungizid','begrenzt','plus','viruzid']],
+  ['bode-kohrsolin-ff','bode','Kohrsolin® FF','surface','Flächendesinfektion – Konzentrat (Aldehyd)','50 mg/g Glutaral, 30 mg/g Benzalkoniumchlorid, 30 mg/g DDAC',['bakterizid','levurozid','begrenzt','plus','viruzid']],
+  ['bode-mikrobac-forte','bode','Mikrobac® forte','surface','Flächendesinfektion – Konzentrat (aldehydfrei)','199 mg/g Benzalkoniumchlorid, 50 mg/g N-(3-Aminopropyl)-N-dodecylpropan-1,3-diamin',['bakterizid','levurozid','begrenzt','plus']],
+  ['bode-dismozon-plus','bode','Dismozon® plus','surface','Flächendesinfektion – Granulat (Aktivsauerstoff)','958 mg/g Magnesiummonoperoxyphthalat (MMPP)',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','sporizid','cdiff','begrenzt','plus','viruzid']],
+  ['bode-bodedex-forte','bode','Bodedex® forte','instruments','Instrumentenreiniger','amphotere und nichtionische Tenside',[]],
+  ['bode-bomix-plus','bode','Bomix® plus','instruments','Instrumentendesinfektion (aldehydfrei)','17,5 g N,N-Didecyl-N-methyl-poly(oxyethyl)ammoniumpropionat',['bakterizid','levurozid','begrenzt']],
+  ['bode-korsolex-extra','bode','Korsolex® extra','instruments','Instrumentendesinfektion (Aldehyd)','7,5 g Glutaral, 15,3 g (Ethylendioxy)dimethanol, QAV',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','cdiff','begrenzt','viruzid']],
+  ['bode-korsolex-basic','bode','Korsolex® basic','instruments','Instrumentendesinfektion (Aldehyd)','15,2 g Glutaral, 19,7 g (Ethylendioxy)dimethanol',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','cdiff','begrenzt','viruzid']],
+  ['bode-korsolex-endo-cleaner','bode','Korsolex® Endo-Cleaner','instruments','Enzymatischer Reiniger (maschinell, Endoskope)','Enzyme',[]],
+  ['bode-korsolex-endo-disinfectant','bode','Korsolex® Endo-Disinfectant','instruments','Desinfektion (maschinell, Endoskope)','20 g Glutaral',['bakterizid','fungizid','mykobakterizid','viruzid','cdiff','sporizid']],
+  // ---------- B. Braun ----------
+  ['bb-softa-man','bbraun','Softa-Man®','hands','Händedesinfektion','45 g Ethanol, 18 g 1-Propanol',['bakterizid','tuberkulozid','begrenzt','plus']],
+  ['bb-softa-man-acute','bbraun','Softa-Man® acute','hands','Händedesinfektion','Ethanol, 1-Propanol',['bakterizid','tuberkulozid','viruzid']],
+  ['bb-softa-man-pure','bbraun','Softa-Man® pure','hands','Händedesinfektion (parfümfrei)','Ethanol, 1-Propanol',['bakterizid','tuberkulozid','begrenzt']],
+  ['bb-softa-man-viscorub','bbraun','Softa-Man® ViscoRub','hands','Händedesinfektionsgel','Ethanol, 1-Propanol',['bakterizid','tuberkulozid','begrenzt','noro']],
+  ['bb-promanum-pure','bbraun','Promanum® pure','hands','Händedesinfektion','73,4 g Ethanol, 10 g 2-Propanol',['bakterizid','tuberkulozid','begrenzt','plus']],
+  ['bb-softasept-n','bbraun','Softasept® N','hands','Hautantiseptik','',['bakterizid','levurozid','begrenzt']],
+  ['bb-braunoderm','bbraun','Braunoderm®','hands','Hautantiseptik (gefärbt, mit PVP-Iod)','50 g 2-Propanol, 1 g Povidon-Iod',['bakterizid','levurozid']],
+  ['bb-prontoderm','bbraun','Prontoderm®','hands','MRE-Dekolonisation (Lösung, Schaum, Tücher)','',[]],
+  ['bb-lifosan-soft','bbraun','Lifosan® soft','hands','Waschlotion','',[]],
+  ['bb-lifosan-pure','bbraun','Lifosan® pure','hands','Waschlotion (parfümfrei)','Allantoin',[]],
+  ['bb-trixo','bbraun','Trixo®','hands','Hautpflege','Panthenol, Bisabolol',[]],
+  ['bb-trixo-lind','bbraun','Trixo®-lind','hands','Hautpflege','Panthenol, Allantoin',[]],
+  ['bb-meliseptol','bbraun','Meliseptol®','surface','Alkoholische Schnelldesinfektion','44 g Ethanol',['bakterizid','levurozid','mykobakterizid','begrenzt','plus']],
+  ['bb-meliseptol-rapid','bbraun','Meliseptol® rapid','surface','Alkoholische Schnelldesinfektion','50 g 1-Propanol, 0,075 g DDAC',['bakterizid','levurozid','fungizid','mykobakterizid','begrenzt','plus','noro','adeno']],
+  ['bb-meliseptol-foam-pure','bbraun','Meliseptol® Foam pure','surface','Gering-alkoholische Schnelldesinfektion (Schaum)','17 g 1-Propanol, 0,23 g DDAC',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','noro']],
+  ['bb-meliseptol-acute','bbraun','Meliseptol® acute','surface','Alkoholische Schnelldesinfektion (QAV-frei)','39 g 1-Propanol, 0,98 g Glykolsäure',['bakterizid','levurozid','fungizid','mykobakterizid','begrenzt','plus','viruzid','noro','adeno']],
+  ['bb-meliseptol-wipes-sensitive','bbraun','Meliseptol® Wipes sensitive','surface','Gering-alkoholische Desinfektionstücher','Tränklösung Meliseptol® Foam pure',['bakterizid','levurozid','fungizid','tuberkulozid','mykobakterizid','begrenzt','noro']],
+  ['bb-meliseptol-hbv-tuecher','bbraun','Meliseptol® HBV Tücher','surface','Alkoholische Desinfektionstücher','Tränklösung Meliseptol® rapid',['bakterizid','levurozid','fungizid','mykobakterizid','begrenzt','plus','noro','adeno']],
+  ['bb-meliseptol-wipes-ultra','bbraun','Meliseptol® Wipes ultra','surface','Alkoholfreie Desinfektionstücher','0,4 g ADBAC, 0,2 g DDAC (QAV)',['bakterizid','levurozid','begrenzt','plus','viruzid','noro','adeno','sporizid','cdiff']],
+  ['bb-hexaquart-xl','bbraun','Hexaquart® XL','surface','Flächendesinfektion – Konzentrat (aldehydfrei)','9,9 g N-(3-Aminopropyl)-N-dodecylpropan-1,3-diamin, 6,0 g DDAC',['bakterizid','levurozid','mykobakterizid','begrenzt','plus','noro','adeno']],
+  ['bb-hexaquart-pure','bbraun','Hexaquart® pure','surface','Flächendesinfektion – Konzentrat (aldehyd- und aminfrei)','10 g DDAC, 10 g ADBAC (QAV)',['bakterizid','levurozid','begrenzt','noro']],
+  ['bb-melsept-sf','bbraun','Melsept® SF','surface','Flächendesinfektion – Konzentrat (Aldehyd, formaldehydfrei)','7,5 g DDAC, 4,5 g Glutaral, 3,2 g Glyoxal',['bakterizid','levurozid','tuberkulozid','begrenzt','plus','viruzid','noro','adeno','cdiff']],
+  ['bb-helipur','bbraun','Helipur®','instruments','Instrumentendesinfektion (aldehydfrei)','aldehydfrei',['bakterizid','tuberkulozid','mykobakterizid','begrenzt','adeno']],
+  ['bb-helipur-h-plus-n','bbraun','Helipur® H plus N','instruments','Instrumentendesinfektion (Aldehyd, formaldehydfrei)','Aldehyd (formaldehydfrei)',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','viruzid']],
+  ['bb-stabimed-fresh','bbraun','Stabimed® fresh','instruments','Instrumentendesinfektion (aldehydfrei)','Alkylamine',['bakterizid','levurozid','tuberkulozid','begrenzt','adeno']],
+  ['bb-stabimed-ultra','bbraun','Stabimed® ultra','instruments','Instrumentendesinfektion (Peressigsäure, Pulver)','Peressigsäure',['bakterizid','tuberkulozid','mykobakterizid','sporizid','begrenzt','viruzid']],
+  ['bb-helizyme','bbraun','Helizyme®','instruments','Enzymatischer Vorreiniger','Tenside, proteolytische Enzyme',[]],
+  ['bb-cleaner-n','bbraun','Cleaner N','instruments','Instrumentenreiniger (Tenside)','',[]],
+  ['bb-tiutol-dent','bbraun','Tiutol® dent','instruments','Desinfektion von Absauganlagen','',['bakterizid','tuberkulozid','begrenzt','viruzid']],
+  ['bb-helimatic-alcaline','bbraun','Helimatic® Cleaner alcaline','instruments','Alkalischer Reiniger (maschinell)','alkalisch (pH > 10), Tenside',[]],
+  ['bb-helimatic-ma','bbraun','Helimatic® Cleaner MA','instruments','Mildalkalisch-enzymatischer Reiniger (maschinell)','Alkalien, Tenside, Enzyme',[]],
+  ['bb-helimatic-enzymatic','bbraun','Helimatic® Cleaner enzymatic NF','instruments','Enzymatischer Reiniger (maschinell)','Enzyme',[]],
+  ['bb-helimatic-neutral','bbraun','Helimatic® Cleaner neutral','instruments','Neutraler Reiniger (maschinell)','Tenside, pH-neutral',[]],
+  ['bb-helimatic-neutralizer','bbraun','Helimatic® Neutralizer C','instruments','Neutralisator (maschinell)','Citronensäure',[]],
+  ['bb-helimatic-disinfectant','bbraun','Helimatic® Disinfectant','instruments','Desinfektion (maschinell, Endoskope)','',['bakterizid','fungizid','tuberkulozid','begrenzt','viruzid']],
+  ['bb-helimatic-rinse','bbraun','Helimatic® Rinse neutral NF','instruments','Klarspüler (maschinell)','',[]],
+  ['bb-helimatic-latriniser','bbraun','Helimatic® Latriniser','instruments','Saurer Klarspüler (Steckbeckenspüler)','',[]],
+  // ---------- Ecolab ----------
+  ['eco-skinman-soft-protect','ecolab','Skinman™ Soft Protect','hands','Händedesinfektion','89 g Ethanol',['bakterizid','levurozid','mykobakterizid','begrenzt','plus','viruzid','noro','adeno']],
+  ['eco-skinman-soft-protect-ff','ecolab','Skinman™ Soft Protect FF','hands','Händedesinfektion (parfümfrei)','Ethanol',['bakterizid','levurozid','mykobakterizid','begrenzt','plus','viruzid','noro','adeno']],
+  ['eco-spirigel-complete','ecolab','Spirigel™ Complete','hands','Händedesinfektionsgel','alkoholisch',['viruzid']],
+  ['eco-skinsept-pur','ecolab','Skinsept™ Pur','hands','Hautantiseptik','alkoholisch',[]],
+  ['eco-skinsept-color','ecolab','Skinsept™ Color','hands','Hautantiseptik (gefärbt)','alkoholisch',[]],
+  ['eco-skinsan-scrub','ecolab','Skinsan™ Scrub N','hands','Antimikrobielle Ganzkörperwaschung','',[]],
+  ['eco-seraman-sensitive','ecolab','Seraman™ Sensitive','hands','Waschlotion (farb- und parfümfrei)','',[]],
+  ['eco-manisoft','ecolab','Manisoft™','hands','Waschlotion','',[]],
+  ['eco-silonda-lipid','ecolab','Silonda™ Lipid','hands','Hautpflege (reichhaltig)','',[]],
+  ['eco-silonda-sensitive','ecolab','Silonda™ Sensitive','hands','Hautpflege (leicht)','',[]],
+  ['eco-incidin-liquid','ecolab','Incidin™ Liquid','surface','Alkoholische Schnelldesinfektion','35 g 2-Propanol, 25 g 1-Propanol',['bakterizid','levurozid','tuberkulozid','begrenzt','noro','adeno']],
+  ['eco-incides-n','ecolab','Incides™ N Tücher','surface','Alkoholische Desinfektionstücher','alkoholisch',[]],
+  ['eco-incidin-oxyfoam-s','ecolab','Incidin™ OxyFoam S','surface','Sporizide Schnelldesinfektion','Wasserstoffperoxid',['viruzid','sporizid']],
+  ['eco-incidin-oxywipe-s','ecolab','Incidin™ OxyWipe S','surface','Sporizide Desinfektionstücher','Wasserstoffperoxid',['viruzid','sporizid']],
+  ['eco-incidin-pro','ecolab','Incidin™ Pro','surface','Flächendesinfektion – Konzentrat (aldehydfrei)','10 g Phenoxyethanol, 8 g Diamin, 7,5 g ADBAC',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus','noro','adeno']],
+  ['eco-incidin-rapid','ecolab','Incidin™ Rapid','surface','Flächendesinfektion – Konzentrat (Aldehyd)','QAV, Glutaraldehyd',['bakterizid','levurozid','viruzid','sporizid','cdiff']],
+  ['eco-incidin-active','ecolab','Incidin™ Active','surface','Flächendesinfektion – Konzentrat (Aktivsauerstoff)','Peressigsäure (Aktivsauerstoff)',['viruzid','sporizid']],
+  ['eco-sekusept-multienzyme','ecolab','Sekusept™ MultiEnzyme','instruments','Enzymatischer Instrumentenreiniger','Tenside, Enzyme',[]],
+  ['eco-sekusept-pure-clean','ecolab','Sekusept™ Pure Clean','instruments','Instrumentenreiniger (enzymfrei)','Tenside',[]],
+  ['eco-sekusept-extra-n','ecolab','Sekusept™ Extra N','instruments','Instrumentendesinfektion (Aldehyd)','Glutaraldehyd',[]],
+  ['eco-sekusept-plus','ecolab','Sekusept™ PLUS','instruments','Instrumentendesinfektion (aldehydfrei)','25 g Glucoprotamin',['bakterizid','levurozid','tuberkulozid','begrenzt']],
+  ['eco-sekusept-aktiv','ecolab','Sekusept™ Aktiv','instruments','Instrumentendesinfektion (Peressigsäure, Pulver)','Peressigsäure',['sporizid']],
+  ['eco-sekumatic-proclean','ecolab','Sekumatic™ ProClean','instruments','Mildalkalischer Reiniger (maschinell)','mildalkalisch, tensidfrei',[]],
+  ['eco-sekumatic-fr','ecolab','Sekumatic™ FR','instruments','Alkalischer Reiniger (maschinell)','hochalkalisch',[]],
+  ['eco-sekumatic-fre','ecolab','Sekumatic™ FRE','instruments','Enzymatischer Reiniger (maschinell)','Tenside, Protease, pH-neutral',[]],
+  ['eco-sekumatic-fdr','ecolab','Sekumatic™ FDR','instruments','Reiniger-Desinfektion (maschinell)','Glucoprotamin',[]],
+  ['eco-sekumatic-fnz','ecolab','Sekumatic™ FNZ','instruments','Neutralisator (maschinell)','Citronensäure',[]],
+  ['eco-sekumatic-fkn','ecolab','Sekumatic™ FKN','instruments','Klarspüler (maschinell)','pH-neutral',[]]
+];
+const COMPETITOR_PRODUCTS = Object.fromEntries(COMPETITOR_PRODUCT_ROWS.map(([key, company, name, area, kind, wirkstoff, tags, extra]) => [key, { key, company, name, area, kind, wirkstoff, tags, extra: extra || '' }]));
+
+// Zuordnung: unser Produkt → [Wettbewerbsprodukt, Stufe] mit d = direktes Äquivalent
+// (gleiche Produktart + vergleichbare Wirkstoffbasis), a = ähnliche Anwendung.
+const _ALC_SURFACE = [['sch-mikrozid-af-liquid','d'],['bode-bacillol-af','d'],['bb-meliseptol','d'],['eco-incidin-liquid','d'],['sch-mikrozid-universal-liquid','a'],['bode-bacillol-30-foam','a'],['bb-meliseptol-rapid','a'],['bb-meliseptol-foam-pure','a']];
+const _ALC_WIPES = [['sch-mikrozid-af-wipes','d'],['bode-bacillol-af-tissues','d'],['bb-meliseptol-hbv-tuecher','d'],['eco-incides-n','d'],['sch-mikrozid-universal-wipes','a'],['bode-bacillol-30-tissues','a'],['bb-meliseptol-wipes-sensitive','a']];
+const _QAV_WIPES = [['sch-mikrozid-sensitive-wipes','d'],['bode-mikrobac-tissues','d'],['bb-meliseptol-wipes-ultra','d'],['bode-bacillol-zero','a']];
+const _QAV_WIPES_VIRUZID = [['bode-mikrobac-virucidal','d'],['bb-meliseptol-wipes-ultra','d'],['bode-bacillol-zero','d'],['sch-mikrozid-sensitive-wipes','a'],['bode-mikrobac-tissues','a']];
+const _OXY_WIPES = [['eco-incidin-oxywipe-s','d'],['sch-mikrozid-paa-wipes','d'],['sch-mikrozid-paaplus-wipes','d'],['bb-meliseptol-wipes-ultra','a'],['bode-bacillol-zero','a']];
+const _QAV_CONC = [['bb-hexaquart-pure','d'],['bode-mikrobac-forte','d'],['sch-terralin-protect','d'],['eco-incidin-pro','d'],['bb-hexaquart-xl','a']];
+const _AMIN_CONC = [['bode-mikrobac-forte','d'],['bb-hexaquart-xl','d'],['eco-incidin-pro','d'],['sch-terralin-protect','a'],['bb-hexaquart-pure','a']];
+const _ALDEHYD_CONC = [['bode-kohrsolin-ff','d'],['bb-melsept-sf','d'],['eco-incidin-rapid','d'],['sch-perform','a']];
+const _OXY_CONC = [['sch-perform','d'],['sch-terralin-paa','d'],['bode-dismozon-plus','d'],['eco-incidin-active','d']];
+const _HAND_PROPANOL = [['bode-sterillium','d'],['bode-sterillium-pure','d'],['sch-desmanol-care','d'],['bb-promanum-pure','a'],['bb-softa-man','a'],['eco-skinman-soft-protect','a']];
+const _HAND_PROPANOL_PURE = [['bode-sterillium-classic-pure','d'],['bode-sterillium-pure','d'],['sch-desmanol-care','d'],['bb-softa-man-pure','a'],['sch-desderman-pure','a'],['eco-skinman-soft-protect-ff','a']];
+const _HAND_PLUS = [['bode-sterillium','d'],['bode-sterillium-classic-pure','d'],['sch-desmanol-pure','d'],['bb-softa-man','d'],['bb-promanum-pure','d'],['eco-skinman-soft-protect','a']];
+const _HAND_VIRUZID = [['bode-sterillium-med','d'],['bode-sterillium-virugard','d'],['sch-desderman-care','d'],['bb-softa-man-acute','d'],['eco-skinman-soft-protect','d']];
+const _HAND_GEL = [['bode-sterillium-gel-pure','d'],['sch-desderman-care-gel','d'],['eco-spirigel-complete','d'],['bb-softa-man-viscorub','a']];
+const _SKIN = [['bode-cutasept-f','d'],['sch-kodan-farblos','d'],['bb-softasept-n','d'],['eco-skinsept-pur','d'],['sch-octeniderm','a']];
+const _SKIN_COLOR = [['bode-cutasept-g','d'],['sch-kodan-gefaerbt','d'],['eco-skinsept-color','d'],['bb-braunoderm','a']];
+const _WASH = [['bode-baktolin-pure','d'],['sch-esemtan-wash','d'],['bb-lifosan-soft','d'],['eco-manisoft','d']];
+const _WASH_SENS = [['bode-baktolin-sensitive','d'],['sch-sensiva-wash','d'],['bb-lifosan-pure','d'],['eco-seraman-sensitive','d']];
+const _CARE_LIGHT = [['bode-baktolan-lotion','d'],['sch-esemtan-skin','d'],['bb-trixo','d'],['eco-silonda-sensitive','d']];
+const _CARE_RICH = [['bode-baktolan-balm','d'],['sch-esemtan-balm','d'],['sch-sensiva-regen','a'],['bb-trixo-lind','a'],['eco-silonda-lipid','d']];
+const _PROTECT = [['bode-baktolan-protect','d'],['sch-sensiva-protect','d']];
+const _DECON = [['sch-octenisan-wash','d'],['bode-stellisept-med','d'],['bb-prontoderm','a'],['eco-skinsan-scrub','a']];
+const _DECON_WIPES = [['sch-octenisan-gloves','d'],['bode-stellisept-gloves','d'],['bb-prontoderm','a']];
+const _INST_AF = [['bode-bomix-plus','d'],['sch-gigasept-instru-af','d'],['bb-stabimed-fresh','d'],['eco-sekusept-plus','d'],['bb-helipur','a'],['sch-gigasept-af-forte','a']];
+const _INST_ALDEHYD = [['bode-korsolex-basic','d'],['bode-korsolex-extra','d'],['sch-gigasept-ff','d'],['bb-helipur-h-plus-n','d'],['eco-sekusept-extra-n','d']];
+const _INST_PAA = [['sch-gigasept-paa','d'],['sch-gigasept-pearls','d'],['bb-stabimed-ultra','d'],['eco-sekusept-aktiv','d']];
+const _INST_ENZYM = [['sch-gigazyme','d'],['bb-helizyme','d'],['eco-sekusept-multienzyme','d'],['bode-bodedex-forte','a']];
+const _INST_CLEANER = [['bode-bodedex-forte','d'],['bb-cleaner-n','d'],['eco-sekusept-pure-clean','d'],['sch-gigazyme','a'],['bb-helizyme','a']];
+const COMPETITOR_EQUIV = {
+  'descosept-spezial': [['sch-mikrozid-sensitive-liquid','d'],['bode-bacillol-30-foam','a'],['bb-meliseptol-foam-pure','a']],
+  'descosept-sensitive': _ALC_SURFACE,
+  'descosept-pur': _ALC_SURFACE,
+  'ultrasol-oxy': [['eco-incidin-oxyfoam-s','d'],['bb-meliseptol-acute','a'],['sch-mikrozid-paa-wipes','a']],
+  'cleanisept': _QAV_CONC,
+  'biguanid-fläche-nr': _QAV_CONC,
+  'optisal-n': [['sch-terralin-protect','a'],['bode-mikrobac-forte','a'],['bb-hexaquart-pure','a'],['eco-incidin-pro','a']],
+  'optisal-plus': _AMIN_CONC,
+  'optisept': _ALDEHYD_CONC,
+  'ultrasol-active': _OXY_CONC,
+  'cleanisept-wipes': _QAV_WIPES,
+  'cleanisept-wipes-maxi': _QAV_WIPES,
+  'descosept-spezial-wipes': _QAV_WIPES,
+  'cleanisept-wipes-forte': _QAV_WIPES_VIRUZID,
+  'cleanisept-wipes-forte-maxi': _QAV_WIPES_VIRUZID,
+  'descosept-sensitive-wipes': _ALC_WIPES,
+  'descosept-sensitive-wipes-xl': _ALC_WIPES,
+  'descosept-pur-wipes-rtu': _ALC_WIPES,
+  'ultrasol-oxy-wipes': _OXY_WIPES,
+  'ultrasol-oxy-wipes-xl': _OXY_WIPES,
+  'descoderm': _HAND_PROPANOL_PURE,
+  'aseptoman-parfümfrei': _HAND_PROPANOL_PURE,
+  'aseptoman-duo': _HAND_PLUS,
+  'aseptoman-plus': _HAND_PLUS,
+  'aseptoman-med': _HAND_PLUS,
+  'aseptoman-forte': _HAND_VIRUZID,
+  'aseptoman-viral': _HAND_VIRUZID,
+  'aseptoman-gel': _HAND_GEL,
+  'aseptoderm': _SKIN,
+  'descoderm-hautdesinfektion': _SKIN,
+  'aseptoderm-gefärbt': _SKIN_COLOR,
+  'decontaman-pre-wash': _DECON,
+  'decontaman-pre-wipes': _DECON_WIPES,
+  'decontaman-pre-cap': [['sch-octenisan-wash','a'],['bode-stellisept-med','a']],
+  'descolind-comfort-wash': _WASH,
+  'descolind-pure-wash': _WASH_SENS,
+  'descolind-expert-wash': _WASH_SENS,
+  'descolind-comfort': _CARE_LIGHT,
+  'descolind-pure': _CARE_LIGHT,
+  'descolind-expert': _CARE_LIGHT,
+  'descolind-pure-intensive-cream': _CARE_RICH,
+  'descolind-expert-intensive-cream': _CARE_RICH,
+  'descolind-expert-protect-cream': _PROTECT,
+  'descomed-barrierecreme': [['bode-baktolan-protect','a'],['sch-sensiva-protect','a']],
+  'desco-vital-gel': [['bode-baktolan-vital','d'],['sch-esemtan-gel','d']],
+  'descolind-care-wipes': [['sch-esemtan-mitts','d']],
+  'plurazyme-extra': _INST_ENZYM,
+  'perfektan-enzyme': _INST_ENZYM,
+  'manushield-cleaner': _INST_CLEANER,
+  'desco-cleaner': _INST_CLEANER,
+  'perfektan-neu': _INST_AF,
+  'perfektan-tb': _INST_AF,
+  'perfektan-endo': _INST_AF,
+  'descoton-extra': _INST_ALDEHYD,
+  'perfektan-active': _INST_PAA,
+  'descosuc': [['sch-aspirmatic','d'],['bb-tiutol-dent','d']],
+  'descosuc-cleaner': [['sch-aspirmatic-cleaner','d']],
+  'desco-bohrerbad': [['sch-rotasept','d']],
+  'descoprent': [['sch-dentavon','d']],
+  'desinfektant': [['bode-korsolex-endo-disinfectant','d'],['bb-helimatic-disinfectant','d'],['eco-sekumatic-fdr','a']],
+  'thermoshield': [['bode-korsolex-endo-disinfectant','d'],['bb-helimatic-disinfectant','d'],['eco-sekumatic-fdr','a']],
+  'thermoshield-flex': [['bode-korsolex-endo-cleaner','d'],['bb-helimatic-enzymatic','d'],['eco-sekumatic-fre','d']],
+  'thermoshield-nr': [['bb-helimatic-neutral','d'],['eco-sekumatic-fre','a']],
+  'thermoshield-xtreme': [['bb-helimatic-ma','d'],['eco-sekumatic-proclean','a']],
+  'thermoshield-basix': [['bb-helimatic-alcaline','d'],['eco-sekumatic-fr','d'],['sch-thermodent-alka','d'],['eco-sekumatic-proclean','a']],
+  'thermoshield-c': [['bb-helimatic-neutralizer','d'],['eco-sekumatic-fnz','d'],['sch-thermodent-neutr','d']],
+  'thermoshield-p': [['bb-helimatic-neutralizer','a'],['eco-sekumatic-fnz','a']],
+  'thermoshield-shine': [['bb-helimatic-rinse','d'],['eco-sekumatic-fkn','d'],['sch-thermodent-clear','d']],
+  'thermo-clear': [['bb-helimatic-latriniser','d']],
+  'thermo-alka-clear': [['bb-helimatic-latriniser','a']]
+};
+const COMPETITOR_LEVEL_LABEL = { d:'Direktes Äquivalent', a:'Ähnliche Anwendung' };
+
+function competitorVisible() { return state.activeProfile === 'sales' && !state.customerMode && !inMesseContext(); }
+function competitorCompany(id) { return COMPETITOR_COMPANIES.find(c => c.id === id) || { name:id, short:id }; }
+function competitorEquivFor(productId) {
+  return (COMPETITOR_EQUIV[productId] || []).map(([key, level]) => ({ c: COMPETITOR_PRODUCTS[key], level })).filter(x => x.c);
+}
+// Umkehrung: Wettbewerbsprodukt → unsere Produkte
+function competitorOurFor(compKey) {
+  const out = [];
+  Object.entries(COMPETITOR_EQUIV).forEach(([pid, rows]) => rows.forEach(([key, level]) => { if (key === compKey) { const p = PRODUCTS.find(x => x.id === pid); if (p) out.push({ p, level }); } }));
+  return out.sort((a, b) => (a.level === b.level ? 0 : a.level === 'd' ? -1 : 1));
+}
+const COMPETITOR_SUBSTANCE_KEYS = [['Ethanol',/(^|[^a-z])ethanol/i],['Propanol',/propan-?\d-ol|\d-propanol|isopropanol/i],['QAV',/ammonium|qav|adbac|ddac|benzalkon/i],['Amin',/aminopropyl|propan-1,3-diamin|\bdiamin\b|alkylamin/i],['Glucoprotamin',/glucoprotamin/i],['Aldehyd',/glutar|glyoxal|aldehyd(?!frei)|ethandial|pentandial/i],['Peressigsäure',/peressig|aktivsauerstoff/i],['Wasserstoffperoxid',/wasserstoffperoxid/i]];
+function competitorSubstances(text) { return COMPETITOR_SUBSTANCE_KEYS.filter(([, re]) => re.test(text || '')).map(([k]) => k); }
+// Unterschiede nur aus hinterlegten Daten (Wirkspektrum je Herstellerangabe, Wirkstoffbasis).
+function competitorDiff(p, c) {
+  const lines = [];
+  // „begrenzt viruzid PLUS“ umfasst per Definition Adeno-, Noro- und Rotaviren, „viruzid“ ebenso –
+  // sonst würden diese Viren fälschlich als Unterschied erscheinen.
+  const widen = set => { if (set.has('plus') || set.has('viruzid')) { set.add('noro'); set.add('adeno'); } return set; };
+  const ours = widen(new Set(productSpektrum(p)));
+  const label = k => (SPEKTRUM_TAGS.find(t => t[0] === k) || [k, k])[1];
+  const reduce = set => [...set].filter(k => !(k === 'begrenzt' && (set.has('plus') || set.has('viruzid'))) && !(k === 'plus' && set.has('viruzid')));
+  if (c.tags.length && c.tags.length < 3 && ours.size) {
+    lines.push({ cls:'same', text:`Wettbewerber nennt öffentlich nur: ${reduce(spektrumClose(c.tags)).map(label).join(', ')} – kein vollständiger Vergleich möglich` });
+  } else if (c.tags.length && ours.size) {
+    const theirs = widen(spektrumClose(c.tags));
+    const onlyOurs = reduce(new Set([...ours].filter(k => !theirs.has(k))));
+    const onlyTheirs = reduce(new Set([...theirs].filter(k => !ours.has(k))));
+    if (onlyOurs.length) lines.push({ cls:'plus', text:`${p.name} zusätzlich ausgelobt: ${onlyOurs.map(label).join(', ')}` });
+    if (onlyTheirs.length) lines.push({ cls:'minus', text:`Beim Wettbewerber zusätzlich ausgelobt: ${onlyTheirs.map(label).join(', ')}` });
+    if (!onlyOurs.length && !onlyTheirs.length) lines.push({ cls:'same', text:'Gleiches ausgelobtes Wirkspektrum' });
+  } else if (!c.tags.length && ours.size) {
+    lines.push({ cls:'same', text:'Wirkspektrum des Wettbewerbers nicht öffentlich angegeben' });
+  }
+  const sa = competitorSubstances(p.ingredients), sb = competitorSubstances(c.wirkstoff);
+  if (sa.length && sb.length) {
+    const same = sa.filter(x => sb.includes(x));
+    lines.push({ cls:'same', text: same.length === sa.length && same.length === sb.length ? `Gleiche Wirkstoffbasis (${same.join(', ')})` : `Wirkstoffbasis: ${p.name} ${sa.join(', ')} · Wettbewerber ${sb.join(', ')}` });
+  }
+  return lines;
+}
+function competitorTagsHtml(tags) {
+  if (!tags.length) return '<span class="cmp-na">Wirkspektrum nicht angegeben</span>';
+  const set = spektrumClose(tags);
+  const shown = SPEKTRUM_TAGS.filter(([k]) => set.has(k) && !(k === 'begrenzt' && (set.has('plus') || set.has('viruzid'))) && !(k === 'plus' && set.has('viruzid')));
+  return shown.map(([, l]) => `<span class="ws-chip">${escapeHtml(l)}</span>`).join('');
+}
+function competitorCardHtml(c, p, level) {
+  const comp = competitorCompany(c.company);
+  const diff = p ? competitorDiff(p, c) : [];
+  return `<div class="cmp-card ${level === 'd' ? 'direct' : 'similar'}">
+    <div class="cmp-head"><span class="cmp-company">${escapeHtml(comp.short)}</span><span class="cmp-level">${COMPETITOR_LEVEL_LABEL[level]}</span></div>
+    <strong class="cmp-name">${escapeHtml(c.name)}</strong>
+    <small class="cmp-kind">${escapeHtml(c.kind)}</small>
+    <div class="cmp-row"><b>Wirkstoff</b><span>${escapeHtml(c.wirkstoff || 'nicht angegeben')}</span></div>
+    <div class="cmp-row"><b>Wirkspektrum</b><div class="ws-chips">${competitorTagsHtml(c.tags)}</div></div>
+    ${c.extra ? `<small class="cmp-extra">${escapeHtml(c.extra)}</small>` : ''}
+    ${diff.length ? `<ul class="cmp-diff">${diff.map(d => `<li class="${d.cls}">${escapeHtml(d.text)}</li>`).join('')}</ul>` : ''}
+  </div>`;
+}
+function competitorNoteHtml() {
+  return `<p class="cmp-note">Aus öffentlichen Herstellerangaben, Stand ${COMPETITOR_STAND} – ohne Gewähr. Nicht angegebene Wirkspektren bedeuten „nicht ausgewiesen“, nicht „unwirksam“. Verbindlich sind die aktuellen Produktinformationen der Hersteller.</p>`;
+}
+function competitorDetailHtml(p) {
+  if (!competitorVisible()) return '';
+  const list = competitorEquivFor(p.id);
+  if (!list.length) return '';
+  const groups = ['d', 'a'].map(l => [l, list.filter(x => x.level === l)]).filter(([, xs]) => xs.length);
+  return `<section class="cmp-section"><div class="section-heading"><div><span class="eyebrow">Intern · Außendienst</span><h2>Wettbewerbsprodukte</h2></div><button class="secondary-button compact" data-category="wettbewerber">Alle Wettbewerber</button></div>
+    ${groups.map(([l, xs]) => `<h3 class="cmp-group">${COMPETITOR_LEVEL_LABEL[l]} <small>(${xs.length})</small></h3><div class="cmp-grid">${xs.map(x => competitorCardHtml(x.c, p, x.level)).join('')}</div>`).join('')}
+    ${competitorNoteHtml()}
+  </section>`;
+}
+function wettbewerberScreen() {
+  if (state.activeProfile !== 'sales') return `<main class="page"><div class="empty-state"><h2>Nur für den Außendienst</h2><p>Die Wettbewerbsübersicht ist der Rolle Außendienst vorbehalten.</p></div></main>`;
+  if (state.customerMode) return `<main class="page"><div class="empty-state"><h2>Im Kundenmodus ausgeblendet</h2><p>Bitte den Kundengespräch-Modus beenden, um die Wettbewerbsübersicht zu sehen.</p></div></main>`;
+  const f = state.cmpFilter || (state.cmpFilter = { company:'schuelke', area:'all', q:'' });
+  const comp = competitorCompany(f.company);
+  const q = (f.q || '').trim().toLowerCase();
+  const rows = COMPETITOR_PRODUCT_ROWS.map(r => COMPETITOR_PRODUCTS[r[0]])
+    .filter(c => (q ? true : c.company === (f.company === 'hartmann' ? 'bode' : f.company)) && (f.area === 'all' || c.area === f.area))
+    .filter(c => !q || `${c.name} ${c.kind} ${competitorCompany(c.company).name}`.toLowerCase().includes(q));
+  const areas = [['all','Alle'],['surface','Fläche'],['hands','Hände & Haut'],['instruments','Instrumente']];
+  return `<main class="page cmp-page">
+    <div class="section-heading"><div><span class="eyebrow">Intern · Außendienst</span><h1>Wettbewerber</h1><p>Sortimente der Wettbewerber mit dem passenden Dr. Schumacher Produkt. Antippen öffnet unser Produkt.</p></div></div>
+    <label class="search-box">${icon('search')}<input id="cmpSearch" value="${escapeHtml(f.q || '')}" placeholder="Wettbewerbsprodukt suchen, z. B. Sterillium"></label>
+    ${q ? '' : `<div class="filter-row">${COMPETITOR_COMPANIES.map(c => `<button type="button" class="filter-chip ${f.company === c.id ? 'active' : ''}" data-cmp-company="${c.id}">${escapeHtml(c.short)}</button>`).join('')}</div>`}
+    <div class="filter-row">${areas.map(([k, l]) => `<button type="button" class="filter-chip ${f.area === k ? 'active' : ''}" data-cmp-area="${k}">${l}</button>`).join('')}</div>
+    ${!q && comp.note ? `<div class="advisor-note">${escapeHtml(comp.note)}</div>` : ''}
+    <div class="cmp-list">${rows.map(c => {
+      const ours = competitorOurFor(c.key);
+      return `<div class="cmp-item"><div class="cmp-item-main"><span class="cmp-company">${escapeHtml(competitorCompany(c.company).short)}</span><strong>${escapeHtml(c.name)}</strong><small>${escapeHtml(c.kind)}${c.wirkstoff ? ' · ' + escapeHtml(c.wirkstoff) : ''}</small><div class="ws-chips">${competitorTagsHtml(c.tags)}</div></div>
+        <div class="cmp-ours"><b>Unser Gegenstück</b>${ours.length ? ours.map(o => `<button type="button" class="cmp-our-btn ${o.level === 'd' ? 'direct' : 'similar'}" data-product="${o.p.id}"><span>${escapeHtml(o.p.name)}</span><small>${o.level === 'd' ? 'direkt' : 'ähnlich'}</small></button>`).join('') : '<span class="cmp-na">Kein passendes Produkt im Sortiment hinterlegt</span>'}</div></div>`;
+    }).join('') || '<div class="empty-state"><h2>Nichts gefunden</h2><p>Anderen Suchbegriff oder Bereich wählen.</p></div>'}</div>
+    ${competitorNoteHtml()}
+  </main>`;
+}
+function wettbewerberBind() {
+  if (state.screen !== 'wettbewerber') return;
+  document.querySelectorAll('[data-cmp-company]').forEach(b => b.addEventListener('click', () => { state.cmpFilter.company = b.dataset.cmpCompany; render(); }));
+  document.querySelectorAll('[data-cmp-area]').forEach(b => b.addEventListener('click', () => { state.cmpFilter.area = b.dataset.cmpArea; render(); }));
+  const s = $('#cmpSearch'); if (s) s.addEventListener('input', () => { state.cmpFilter.q = s.value; debouncedRender(); });
+}
+// Vorschläge für den Wettbewerbsvergleich: zuerst die recherchierten Äquivalente.
+function competitorSuggestionNames(productId) {
+  return competitorEquivFor(productId).map(x => `${competitorCompany(x.c.company).short} – ${x.c.name}`);
+}
+// ===================== Ende Wettbewerber =====================
+
 function bind() {
   quizBind();
+  wettbewerberBind();
   document.querySelectorAll('[data-akt-branche]').forEach(b => b.addEventListener('click', () => { setAktBranche(b.dataset.aktBranche); state.brancheAsked = true; state.screen = 'menu'; render(); }));
   $('[data-action="open-tipps"]')?.addEventListener('click', () => { state.screen = 'tipps'; render(); window.scrollTo(0, 0); });
   $('[data-action="branche-change"]')?.addEventListener('click', () => { state.brancheAsked = false; state.screen = 'branche'; render(); });
@@ -7374,6 +7757,7 @@ function bind() {
     if (state.screen === 'detail') {
       if (state.previousScreen === 'konzept') { state.previousScreen = null; state.screen = 'konzept'; render(); return; }
       if (state.previousScreen === 'tipps') { state.previousScreen = null; state.screen = 'tipps'; render(); return; }
+      if (state.previousScreen === 'wettbewerber') { state.previousScreen = null; state.screen = 'wettbewerber'; render(); return; }
       state.screen = 'products'; render(); return;
     }
     if (state.screen === 'konzept' && state.selectedKonzeptBereich) { state.selectedKonzeptBereich = null; render(); return; }
@@ -7390,7 +7774,7 @@ function bind() {
   $('[data-action="sync-prices"]')?.addEventListener('click', () => syncLivePrices(true));
   $('[data-action="sync-facts"]')?.addEventListener('click', () => syncLiveFacts(true));
   document.querySelectorAll('[data-action="customer-mode"]').forEach(button => button.onclick = () => { state.customerMode=!state.customerMode; sessionStorage.setItem('customerMode', String(state.customerMode)); if(state.customerMode && state.screen==='competition') state.screen='menu'; render(); });
-  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='reklamation'){ if (!reklHasData()) reklReset(); state.previousScreen = null; state.screen='reklamation'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','quiz','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
+  document.querySelectorAll('[data-category]').forEach(button => button.onclick = () => { const key=button.dataset.category; if(key==='favorites'){state.screen='favorites';render();return;} if(key==='settings'){state.screen='settings';render();return;} if(key==='competition'&&state.customerMode){alert('Der Wettbewerbsvergleich ist im Kundenmodus gesperrt.');return;} if(key==='summary'){startSummaryFlow();render();return;} if(key==='kundenbesuch'){startKundenbesuchFlow();render();return;} if(key==='angebot'){startAngebotFlow();render();return;} if(key==='meinekontakte'){oneDeepLink('mine');return;} if(key==='smartmailing'){oneDeepLink('mailing');return;} if(key==='akquise'){ if (!acqHasData()) acqReset(); state.previousScreen = null; state.screen='akquise'; render(); return;} if(key==='reklamation'){ if (!reklHasData()) reklReset(); state.previousScreen = null; state.screen='reklamation'; render(); return;} if(key==='aktionen'){state.aktionOpen=null; state.screen='aktionen'; render(); return;} if(['advisor','wirkspektrum','quiz','wettbewerber','recent','compare','competition','talk','offer','report','dashboard','messe','pm','kol','konzepte','aroundme','ideenschmiede'].includes(key)){state.screen=key; render(); return;} state.previousScreen = state.screen === 'messe' ? 'messe' : null; state.category=key; state.screen='products'; state.query=''; state.spectrum='all'; render(); });
   document.querySelectorAll('[data-spectrum]').forEach(button => button.onclick = () => { state.spectrum=button.dataset.spectrum; render(); });
   document.querySelectorAll('[data-aroundme-mode]').forEach(button => button.onclick = () => { state.aroundMe.mode=button.dataset.aroundmeMode; state.aroundMe.searched=false; state.aroundMe.results=[]; state.aroundMe.error=''; render(); });
   document.querySelectorAll('[data-aroundme-category]').forEach(button => button.onclick = () => { state.aroundMe.category=button.dataset.aroundmeCategory; render(); });
@@ -7398,7 +7782,7 @@ function bind() {
   document.querySelectorAll('[data-aroundme-save]').forEach(button => button.onclick = () => { aroundMeSaveAsContact(Number(button.dataset.aroundmeSave)); });
   $('#aroundmeRadius')?.addEventListener('input', e => { state.aroundMe.radiusKm = Number(e.target.value); render(); });
   $('[data-action="aroundme-search"]')?.addEventListener('click', () => aroundMeRun());
-  document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; if (state.screen === 'tipps') state.previousScreen = 'tipps'; else if (state.screen === 'konzept') state.previousScreen = 'konzept'; else if (state.previousScreen === 'konzept') state.previousScreen = null; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
+  document.querySelectorAll('[data-product]').forEach(row => row.onclick = event => { if (event.target.closest('[data-favorite]')) return; if (state.screen === 'tipps') state.previousScreen = 'tipps'; else if (state.screen === 'wettbewerber') state.previousScreen = 'wettbewerber'; else if (state.screen === 'konzept') state.previousScreen = 'konzept'; else if (state.previousScreen === 'konzept') state.previousScreen = null; state.selected=row.dataset.product; state.size=''; state.recent=[state.selected,...state.recent.filter(x=>x!==state.selected)].slice(0,8); localStorage.setItem('recentProducts', JSON.stringify(state.recent)); state.screen='detail'; render(); });
   document.querySelectorAll('[data-favorite]').forEach(button => button.onclick = event => { event.stopPropagation(); const id=button.dataset.favorite; if (button.dataset.favoriteSize) toggleFavorite(id, button.dataset.favoriteSize); else toggleFavoriteAny(id); });
   document.querySelectorAll('[data-size]').forEach(button => button.onclick = () => {
     const size = button.dataset.size;
