@@ -169,7 +169,7 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 
 ## Neu: Wettbewerber & Äquivalente (nur Außendienst)
 
-- Wettbewerbsdaten zu Schülke & Mayr, BODE Chemie, HARTMANN (Desinfektion = BODE-Sortiment), B. Braun und Ecolab – Fläche, Hände & Haut, Instrumente
+- Wettbewerbsdaten zu Schülke & Mayr, Bode/Hartmann, B. Braun und Ecolab – Fläche, Hände & Haut, Instrumente
 - Produktseite: Abschnitt „Wettbewerbsprodukte“ mit „Direktes Äquivalent“ und „Ähnliche Anwendung“, inkl. Wirkstoff, Wirkspektrum und automatisch erzeugtem Unterschied (nur aus hinterlegten Daten)
 - Neue Kachel „Wettbewerber“: Sortiment je Firma, Suche (z. B. „Sterillium“) und unser Gegenstück per Antippen
 - Wettbewerbsvergleich schlägt die recherchierten Äquivalente zuerst vor

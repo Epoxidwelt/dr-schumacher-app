@@ -7320,8 +7320,7 @@ function quizTileSubtitle() {
 const COMPETITOR_STAND = '11/2026';
 const COMPETITOR_COMPANIES = [
   { id:'schuelke', name:'Schülke & Mayr', short:'Schülke' },
-  { id:'bode', name:'BODE Chemie', short:'Bode', note:'Gehört zur HARTMANN-Gruppe. Die Produkte werden heute unter der Marke HARTMANN vertrieben.' },
-  { id:'hartmann', name:'PAUL HARTMANN', short:'Hartmann', note:'Das Desinfektionssortiment von HARTMANN stammt von BODE Chemie (u. a. Sterillium, Bacillol, Cutasept, Mikrobac, Kohrsolin, Korsolex) und ist deshalb unter „Bode“ aufgeführt.' },
+  { id:'bode', name:'BODE / HARTMANN', short:'Bode/Hartmann' },
   { id:'bbraun', name:'B. Braun', short:'B. Braun' },
   { id:'ecolab', name:'Ecolab', short:'Ecolab' }
 ];
@@ -7370,7 +7369,7 @@ const COMPETITOR_PRODUCT_ROWS = [
   ['sch-thermodent-alka','schuelke','thermodent® alka clean','instruments','Alkalischer Reiniger (maschinell)','alkalisch',[]],
   ['sch-thermodent-neutr','schuelke','thermodent® neutralizer','instruments','Neutralisator (maschinell)','Citronensäure',[]],
   ['sch-thermodent-clear','schuelke','thermodent® clear','instruments','Klarspüler (maschinell)','',[]],
-  // ---------- BODE Chemie (HARTMANN) ----------
+  // ---------- BODE / HARTMANN ----------
   ['bode-sterillium','bode','Sterillium®','hands','Händedesinfektion','45 g Propan-2-ol, 30 g Propan-1-ol, 0,2 g Mecetroniumetilsulfat',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
   ['bode-sterillium-classic-pure','bode','Sterillium® classic pure','hands','Händedesinfektion (parfümfrei)','45 g Propan-2-ol, 30 g Propan-1-ol, 0,2 g Mecetroniumetilsulfat',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
   ['bode-sterillium-pure','bode','Sterillium® pure','hands','Händedesinfektion','45 g Propan-2-ol, 30 g Propan-1-ol',['bakterizid','levurozid','tuberkulozid','mykobakterizid','begrenzt','plus']],
@@ -7657,7 +7656,7 @@ function wettbewerberScreen() {
   const comp = competitorCompany(f.company);
   const q = (f.q || '').trim().toLowerCase();
   const rows = COMPETITOR_PRODUCT_ROWS.map(r => COMPETITOR_PRODUCTS[r[0]])
-    .filter(c => (q ? true : c.company === (f.company === 'hartmann' ? 'bode' : f.company)) && (f.area === 'all' || c.area === f.area))
+    .filter(c => (q ? true : c.company === f.company) && (f.area === 'all' || c.area === f.area))
     .filter(c => !q || `${c.name} ${c.kind} ${competitorCompany(c.company).name}`.toLowerCase().includes(q));
   const areas = [['all','Alle'],['surface','Fläche'],['hands','Hände & Haut'],['instruments','Instrumente']];
   return `<main class="page cmp-page">
