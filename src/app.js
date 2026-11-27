@@ -938,6 +938,7 @@ function menuScreen() {
     ['smartmailing','Smart Mailing','Viele Kunden gezielt und persönlich per E-Mail informieren'],
     ['advisor','Produktberater','In wenigen Fragen zum passenden Produkt'],
     ['wirkspektrum','Wirkspektrum-Finder','Produkte nach Wirkspektrum filtern – z. B. fungizid + viruzid'],
+    ['quiz','Tagesquiz', quizTileSubtitle()],
     ['compare','Produktvergleich','Bis zu drei Produkte direkt vergleichen'],
     ['competition','Wettbewerbsvergleich','Kundenpreis eingeben, Ersparnis berechnen'],
     ['wettbewerber','Äquivalent finden','Wettbewerbsprodukt eintippen – passendes Dr. Schumacher Produkt sofort sehen'],
@@ -968,7 +969,7 @@ function menuScreen() {
   const searchResults = state.globalQuery.trim() ? PRODUCTS.filter(p => matchesQuery(`${p.name} ${p.kind} ${p.sku} ${p.summary}`, state.globalQuery)).slice(0,8) : [];
   return `<main class="page menu-page cockpit-page">
     <section class="cockpit-hero compact"><div><span class="eyebrow">Dr. Schumacher Sales Companion</span><h1>Aktiv: ${state.customerMode?'Preise ausgeblendet':state.priceList}</h1></div></section>
-    <button type="button" class="category-card quiz quiz-top" data-category="quiz"><span class="category-icon">${icon('quiz')}</span><span><strong>Tagesquiz</strong><small>${escapeHtml(quizTileSubtitle())}</small></span><b>›</b></button>
+    ${quizDoneToday() ? '' : `<button type="button" class="category-card quiz quiz-top" data-category="quiz"><span class="category-icon">${icon('quiz')}</span><span><strong>Tagesquiz</strong><small>${escapeHtml(quizTileSubtitle())}</small></span><b>›</b></button>`}
     ${(() => { const al = aktionenForCurrentUser(); if (!al.length) return ''; const a0 = al.find(x => !state.aktionStars.includes(x.id) && aktionenUnseen().some(u => u.id === x.id)) || al[0]; const neu = aktionenUnseen().length > 0; return `<button type="button" class="category-card aktion aktion-top" data-category="aktionen"><span class="category-icon">${icon('ideenschmiede')}</span><span><strong>${escapeHtml(a0.titel)}</strong><small>${neu ? 'NEU · ' : ''}Aktion${al.length > 1 ? ' · ' + al.length + ' aktuell' : ''}${state.aktionStars.includes(a0.id) ? ' · ★ besprochen' : ''}</small></span><b>›</b></button>`; })()}
     ${tippsBanner()}
     ${coreCategoryGrid()}
@@ -7299,6 +7300,13 @@ function quizBind() {
     if (!day.done && day.answers.length && !confirm('Aktuelle Runde verwerfen und ' + QUIZ_COUNT + ' neue Fragen starten?')) return;
     quizNewRound(); state.quizAuto = false; render(); window.scrollTo(0, 0);
   }));
+}
+// Tagesquiz heute erledigt (erste Runde abgeschlossen)? Dann verschwindet die Kachel oben bis morgen.
+function quizDoneToday() {
+  const today = quizToday();
+  if (quizLoad('quizDailyDone', '') === today) return true;
+  const day = quizLoad('quizDay', null);
+  return !!(day && day.date === today && day.done);
 }
 function quizTileSubtitle() {
   try {

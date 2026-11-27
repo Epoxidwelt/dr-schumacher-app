@@ -157,7 +157,7 @@ Alle Besuchsdaten bleiben lokal im Browser. Für eine unternehmensweite Nutzung 
 
 ## Neu: Tagesquiz (Produktwissen)
 
-- Kachel „Tagesquiz“ ganz oben im Hauptmenü (über den Aktionen)
+- Kachel „Tagesquiz“ ganz oben im Hauptmenü, bis das Quiz des Tages erledigt ist; danach nur noch bei den Werkzeugen (dort immer verfügbar)
 - Täglich 10 Multiple-Choice-Fragen mit je 3 Antwort-Buttons, automatisch aus den hinterlegten Produktdaten erzeugt
 - Themen: Anwendungsbereich, Wirkspektrum & Einwirkzeit, Wirkstoffe & Eigenschaften (ohne Zubehör)
 - Ein Durchgang pro Tag; nach jeder Antwort sofort richtig/falsch mit kurzer Erklärung
